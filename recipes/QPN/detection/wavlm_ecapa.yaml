@@ -1,0 +1,141 @@
+
+# ################################
+# Model: Parkinson's identification with ECAPA
+# Author: Briac Cordelle
+# ################################
+
+# Basic parameters
+seed: 2002
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+experiment_name: wavlm_ecapa
+output_folder: !ref results/<experiment_name>/<seed>
+save_folder: !ref <output_folder>/save
+train_log: !ref <output_folder>/train_log.txt
+
+# Data files
+data_folder: !PLACEHOLDER
+train_annotation: annotation/train.json
+test_fr_annotation: annotation/test_fr.json
+test_en_annotation: annotation/test_en.json
+valid_annotation: annotation/valid.json
+
+skip_prep: False
+ckpt_interval_minutes: 15 # save checkpoint every N min
+
+# Training parameters
+epochs: 65
+batch_size: 16
+test_batch_size: 1
+lr: 0.001
+base_lr: 0.000001
+max_lr: !ref <lr>
+step_size: 2000
+sample_rate: 16000
+sentence_len: 15.0 # seconds
+shuffle: True
+short_recordings: True
+
+# Feature parameters
+wavlm_hub: ../../ssl-models/wavlm-large
+wavlm_folder: !ref <output_folder>/wavlm-large
+freeze_wavlm_extractor: True
+freeze_wavlm: True
+lr_wavlm: 0.0001
+
+# Number of classes (pd/non-pd)
+weight_hc: 86.79
+weight_pd: 13.21
+out_neurons: 2
+
+# Dataloader options
+num_workers: 8
+dataloader_options:
+    batch_size: !ref <batch_size>
+    shuffle: !ref <shuffle>
+    num_workers: !ref <num_workers>
+
+test_dataloader_options:
+    batch_size: !ref <test_batch_size>
+    shuffle: !ref <shuffle>
+    num_workers: !ref <num_workers>
+
+# Augmentations would be here
+# See voxceleb recipe to add them back
+# For now we are going without and we will add them (one at a time) once we are
+# sure of our preliminary results
+
+# Functions
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+   source: !ref <wavlm_hub>
+   output_norm: True
+   freeze_feature_extractor: !ref <freeze_wavlm_extractor>
+   freeze: !ref <freeze_wavlm>
+   save_path: !ref <wavlm_folder>
+
+embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
+    input_size: 1024
+    channels: [1024, 1024, 1024, 1024, 3072]
+    kernel_sizes: [5, 3, 3, 3, 1]
+    dilations: [1, 2, 3, 4, 1]
+    groups: [1, 1, 1, 1, 1]
+    attention_channels: 128
+    lin_neurons: 192
+
+classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+    input_size: 192
+    out_neurons: !ref <out_neurons>
+
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <epochs>
+
+mean_var_norm: !new:speechbrain.processing.features.InputNormalization
+    norm_type: sentence
+    std_norm: False
+
+modules:
+    compute_features: !ref <compute_features>
+    embedding_model: !ref <embedding_model>
+    classifier: !ref <classifier>
+    mean_var_norm: !ref <mean_var_norm>
+
+softmax: !new:speechbrain.nnet.activations.Softmax
+log_softmax: !new:speechbrain.nnet.activations.Softmax
+    apply_log: True
+
+compute_cost: !name:speechbrain.nnet.losses.nll_loss
+
+opt_class: !name:torch.optim.Adam
+    lr: !ref <lr>
+    weight_decay: 0.0001
+
+wavlm_opt_class: !name:torch.optim.Adam
+   lr: !ref <lr_wavlm>
+
+lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
+    base_lr: !ref <base_lr>
+    max_lr: !ref <max_lr>
+    step_size: !ref <step_size>
+
+lr_annealing_wavlm: !new:speechbrain.nnet.schedulers.NewBobScheduler
+   initial_value: !ref <lr_wavlm>
+   improvement_threshold: 0.0025
+   annealing_factor: 0.9
+   patient: 0
+
+# Logging + checkpoints
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <train_log>
+
+error_stats: !name:speechbrain.utils.metric_stats.MetricStats
+    metric: !name:speechbrain.nnet.losses.classification_error
+        reduction: batch
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <save_folder>
+    recoverables:
+        compute_features: !ref <compute_features>
+        embedding_model: !ref <embedding_model>
+        classifier: !ref <classifier>
+        normalizer: !ref <mean_var_norm>
+        counter: !ref <epoch_counter>
+        lr_annealing: !ref <lr_annealing>
