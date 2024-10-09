@@ -31,6 +31,7 @@ from speechbrain.core import AMPConfig
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
 
@@ -133,7 +134,7 @@ class ParkinsonBrain(sb.core.Brain):
             {line}
         )
 
-    def custom_evaluate(self, test_set, max_key=None, min_key=None, progressbar=None, test_loader_kwargs={}, language=None):
+    def custom_evaluate(self, test_set, max_key=None, min_key=None, progressbar=None, test_loader_kwargs={}):
         if progressbar is None:
             progressbar = not self.noprogressbar
 
@@ -146,28 +147,29 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Create a dictionary for prediction stats
         categories = {"PD": 0, "HC": 0, "M": 0, "F": 0, "English": 0, "French": 0, "Other": 0, ">80": 0,
-                                 "71-80": 0, "61-70": 0, "51-60": 0, "<50": 0, "repeat": 0, "vowel_repeat": 0,
-                                 "recall": 0, "read_text": 0, "dpt": 0, "hbd": 0, "unk": 0}
-        prediction_stats = {"right": categories.copy(), "wrong": categories.copy(), "count": categories.copy()}
+                      "71-80": 0, "61-70": 0, "51-60": 0, "<50": 0, "repeat": 0, "vowel_repeat": 0,
+                      "recall": 0, "read_text": 0, "dpt": 0, "hbd": 0, "unk": 0}
+        prediction_stats = {"right_count": categories.copy(), "total_count": categories.copy()}
 
         self.modules.eval()
         avg_test_loss = 0.0
         with torch.no_grad():
             for batch in tqdm(
-                test_set,
-                dynamic_ncols=True,
-                disable=not progressbar,
-                colour=self.tqdm_barcolor["test"],
+                    test_set,
+                    dynamic_ncols=True,
+                    disable=not progressbar,
+                    colour=self.tqdm_barcolor["test"],
             ):
                 self.step += 1
-                loss, prediction_stats = self.custom_evaluate_batch(batch, stage=sb.Stage.TEST, prediction_stats=prediction_stats)
+                loss, prediction_stats = self.custom_evaluate_batch(batch, stage=sb.Stage.TEST,
+                                                                    prediction_stats=prediction_stats)
                 avg_test_loss = self.update_average(loss, avg_test_loss)
 
                 # Debug mode only runs a few batches
                 if self.debug and self.step == self.debug_batches:
                     break
 
-            self.write_test_stats(prediction_stats, language)
+            self.write_test_stats(prediction_stats)
             self.on_stage_end(sb.Stage.TEST, avg_test_loss, None)
         self.step = 0
         return avg_test_loss
@@ -178,7 +180,7 @@ class ParkinsonBrain(sb.core.Brain):
         amp = AMPConfig.from_name(self.eval_precision)
         if self.use_amp:
             with torch.autocast(
-                dtype=amp.dtype, device_type=torch.device(self.device).type,
+                    dtype=amp.dtype, device_type=torch.device(self.device).type,
             ):
                 losses, prediction_stats = self.custom_loss_compute(batch, stage, prediction_stats)
         else:
@@ -219,33 +221,26 @@ class ParkinsonBrain(sb.core.Brain):
             # Compute loss for this recording's chunks and add to losses
             losses.append(self.compute_objectives(out, batch, stage, patient_type_encoded))
 
-        return losses, prediction_stats #TODO make it possible to have batch_size > 1
+        return losses, prediction_stats  # TODO make it possible to have batch_size > 1
 
     def update_inference_stats(self, prediction_stats, predictions, label, info_dict):
         max_values, max_indices = torch.max(predictions, dim=-1)
         # Iterate through labels, determine whether the model was right
         # or wrong and add information to right/wrong predictions
         for i in range(max_indices.size(0)):
-            if label == max_indices[i]:
-                correct = "right"
-            else:
-                correct = "wrong"
+            correct = True if label == max_indices[i] else False
 
-            if info_dict["patient_age"] > 80:
-                prediction_stats[correct][">80"] += 1
-                prediction_stats["count"][">80"] += 1
-            elif info_dict["patient_age"] > 70:
-                prediction_stats[correct]["71-80"] += 1
-                prediction_stats["count"]["71-80"] += 1
-            elif info_dict["patient_age"] > 60:
-                prediction_stats[correct]["61-70"] += 1
-                prediction_stats["count"]["61-70"] += 1
-            elif info_dict["patient_age"] > 50:
-                prediction_stats[correct]["51-60"] += 1
-                prediction_stats["count"]["51-60"] += 1
-            else:
-                prediction_stats[correct]["<50"] += 1
-                prediction_stats["count"]["<50"] += 1
+            age_bin = next((k for k, v in [
+                (">80", info_dict["patient_age"] > 80),
+                ("71-80", info_dict["patient_age"] > 70),
+                ("61-70", info_dict["patient_age"] > 60),
+                ("51-60", info_dict["patient_age"] > 50),
+                ("<50", True)
+            ] if v), "<50")
+
+            if correct:
+                prediction_stats["right_count"][age_bin] += 1
+            prediction_stats["total_count"][age_bin] += 1
 
             # For the rest we can use the value in info_dict as a key
             for key in info_dict.keys():
@@ -254,41 +249,35 @@ class ParkinsonBrain(sb.core.Brain):
                     continue
 
                 # Update correct dict and count dict
-                prediction_stats[correct][info_dict[key]] += 1
-                prediction_stats["count"][info_dict[key]] += 1
+                if correct:
+                    prediction_stats["right_count"][info_dict[key]] += 1
+                prediction_stats["total_count"][info_dict[key]] += 1
 
         return prediction_stats
 
-    def write_test_stats(self, prediction_stats, language):
+    def write_test_stats(self, prediction_stats):
         # Add percentages for stats
-        keys_list = list(prediction_stats["right"].keys())
+        keys_list = list(prediction_stats["right_count"].keys())
 
         for key in keys_list:
             # Avoid potential division by 0
-            if prediction_stats["count"][key] == 0:
-                 prediction_stats["count"][key] = 1
+            if prediction_stats["total_count"][key] == 0:
+                prediction_stats["total_count"][key] = 1
 
+            # Get percentage value
             percentage_key = "{}%".format(key)
-            prediction_stats["wrong"][percentage_key] = prediction_stats["wrong"][key] / prediction_stats["count"][key]
-
-        for key in keys_list:
-            percentage_key = "{}%".format(key)
-            prediction_stats["right"][percentage_key] = prediction_stats["right"][key] / prediction_stats["count"][key]
+            prediction_stats["right_count"][percentage_key] = prediction_stats["right_count"][key] \
+                                                              / prediction_stats["total_count"][key]
 
         # Create file names
-        wrong_stats_filepath = os.path.join(self.hparams.output_folder, f"{language}_wrong_predictions.csv")
-        right_stats_filepath = os.path.join(self.hparams.output_folder, f"{language}_right_predictions.csv")
+        right_stats_filepath = os.path.join(self.hparams.output_folder, "predictions.csv")
 
         # Write stats to file
-        with open(wrong_stats_filepath, "w") as f:
-            writer = csv.writer(f)
-            for key, value in prediction_stats["wrong"].items():
-                writer.writerow([key, value])
-
         with open(right_stats_filepath, "w") as f:
             writer = csv.writer(f)
-            for key, value in prediction_stats["right"].items():
+            for key, value in prediction_stats["right_count"].items():
                 writer.writerow([key, value])
+
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -301,10 +290,9 @@ def dataio_prep(hparams):
     snt_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
 
     # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "patient_type", "patient_gender", "patient_age", 
-                                  "patient_l1", "test_type")
+    @sb.utils.data_pipeline.takes("wav", "duration", "info_dict")
     @sb.utils.data_pipeline.provides("sig", "info_dict")
-    def audio_pipeline(wav, duration, patient_type, patient_gender, patient_age, patient_l1, test_type):
+    def audio_pipeline(wav, duration, info_dict):
         if duration < hparams["sentence_len"]:
             sig, fs = torchaudio.load(wav)
         else:
@@ -313,21 +301,12 @@ def dataio_prep(hparams):
             sig, fs = torchaudio.load(wav, num_frames=snt_len_sample, frame_offset=start)
         sig = sig.transpose(0, 1).squeeze(1)
 
-        info_dict = {
-            "patient_type": patient_type,
-            "patient_gender": patient_gender,
-            "patient_age": patient_age,
-            "patient_l1": patient_l1,
-            "test_type": test_type
-        }
-
         return sig, info_dict
 
     # Define test pipeline:
-    @sb.utils.data_pipeline.takes("wav", "duration", "patient_type", "patient_gender", "patient_age",
-                                  "patient_l1", "test_type")
+    @sb.utils.data_pipeline.takes("wav", "duration", "info_dict")
     @sb.utils.data_pipeline.provides("sig", "info_dict")
-    def test_pipeline(wav, duration, patient_type, patient_gender, patient_age, patient_l1, test_type):
+    def test_pipeline(wav, duration, info_dict):
         # Get duration of sample
         duration_sample = int(duration * hparams["sample_rate"])
 
@@ -365,14 +344,6 @@ def dataio_prep(hparams):
         # Stack the chunks into a tensor of shape [chunks, wav]
         output = torch.stack(chunks, dim=0)
 
-        info_dict = {
-            "patient_type": patient_type,
-            "patient_gender": patient_gender,
-            "patient_age": patient_age,
-            "patient_l1" : patient_l1,
-            "test_type" : test_type,
-        }
-
         return output, info_dict
 
     # Define label pipeline:
@@ -393,12 +364,7 @@ def dataio_prep(hparams):
     train_info = {
         "train": hparams["train_annotation"],
         "valid": hparams["valid_annotation"],
-        "normal_test_fr": hparams["test_fr_annotation"],
-        "normal_test_en": hparams["test_en_annotation"],
-    }
-    test_info = {
-        "chunk_test_fr": hparams["test_fr_annotation"],
-        "chunk_test_en": hparams["test_en_annotation"],
+        "normal_test": hparams["test_annotation"],
     }
 
     hparams["dataloader_options"]["shuffle"] = True
@@ -409,12 +375,11 @@ def dataio_prep(hparams):
             output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
         )
 
-    for dataset in test_info:
-        datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=test_info[dataset],
-            dynamic_items=[test_pipeline, label_pipeline],
-            output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
-        )
+    datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
+        json_path=hparams["test_annotation"],
+        dynamic_items=[test_pipeline, label_pipeline],
+        output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
+    )
 
     # Load or compute the label encoder (with multi-GPU DDP support)
     # Please, take a look into the lab_enc_file to see the label to index
@@ -427,6 +392,7 @@ def dataio_prep(hparams):
     )
 
     return datasets
+
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
@@ -441,7 +407,7 @@ if __name__ == "__main__":
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
-    # Dataset prep (parsing KCL MDVR and annotation into json files)
+    # Dataset prep
     from prepare_neuro import prepare_neuro
 
     run_on_main(
@@ -449,10 +415,9 @@ if __name__ == "__main__":
         kwargs={
             "data_folder": hparams["data_folder"],
             "train_annotation": hparams["train_annotation"],
-            "test_annotation_fr": hparams["test_fr_annotation"],
-            "test_annotation_en": hparams["test_en_annotation"],
+            "test_annotation": hparams["test_annotation"],
             "valid_annotation": hparams["valid_annotation"],
-            "keep_short_recordings": hparams["short_recordings"],
+            "remove_repeats": hparams["remove_repeats"],
         },
     )
 
@@ -484,36 +449,17 @@ if __name__ == "__main__":
         valid_loader_kwargs=hparams["dataloader_options"],
     )
 
-    # Regular Testing FR
-    #parkinson_brain.write_to_logs("Testing on French test set")
-    regular_test_stats_fr = parkinson_brain.evaluate(
-        test_set=datasets["normal_test_fr"],
+    # Regular Testing
+    # parkinson_brain.write_to_logs("Testing on test set")
+    regular_test_stats = parkinson_brain.evaluate(
+        test_set=datasets["normal_test"],
         min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
     )
-
-    # Regular Testing EN
-    #parkinson_brain.write_to_logs("Testing on English test set")
-    regular_test_stats_en = parkinson_brain.evaluate(
-        test_set=datasets["normal_test_en"],
-        min_key="error",
-        test_loader_kwargs=hparams["dataloader_options"],
-    )
-
-    # Chunk Testing FR
-    #parkinson_brain.write_to_logs("Testing on French chunked test set")
-    chunk_test_stats_fr = parkinson_brain.custom_evaluate(
-        test_set=datasets["chunk_test_fr"],
+    # Chunk Testing
+    # parkinson_brain.write_to_logs("Testing on chunked test set")
+    chunk_test_stats = parkinson_brain.custom_evaluate(
+        test_set=datasets["chunk_test"],
         min_key="error",
         test_loader_kwargs=hparams["test_dataloader_options"],
-        language="french",
-    )
-
-    # Chunk Testing EN
-    #parkinson_brain.write_to_logs("Testing on English chunked test set")
-    chunk_test_stats_en = parkinson_brain.custom_evaluate(
-        test_set=datasets["chunk_test_en"],
-        min_key="error",
-        test_loader_kwargs=hparams["test_dataloader_options"],
-        language="english",
     )
