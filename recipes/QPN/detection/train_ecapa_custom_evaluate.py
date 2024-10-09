@@ -129,9 +129,7 @@ class ParkinsonBrain(sb.core.Brain):
             )
 
     def write_to_logs(self, line):
-        self.hparams.train_logger.log_stats(
-            {line}
-        )
+        self.hparams.train_logger.log_stats({"dummykey": line})
 
     def custom_evaluate(self, test_set, max_key=None, min_key=None, progressbar=None, test_loader_kwargs={}, language=None):
         if progressbar is None:
