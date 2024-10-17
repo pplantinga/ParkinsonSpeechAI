@@ -31,7 +31,7 @@ step_size: 2000
 sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
-remove_repeats: True
+remove_repeats: False
 
 # Test parameters
 max_test_chunks: 24

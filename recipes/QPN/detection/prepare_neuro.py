@@ -115,6 +115,9 @@ def get_patient_traits(files, sheet, batch):
             else:
                 l1 = "Other"
 
+            # TODO Convert UPDRS score to category, waiting for answer from Jen-Kai on B1 scores
+
+
             # Save to dict
             patient_traits = {
                 "ptype": ptype,

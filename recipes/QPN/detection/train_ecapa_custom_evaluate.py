@@ -319,7 +319,6 @@ def dataio_prep(hparams):
         # Case for short recordings
         if duration_sample <= snt_len_sample:
             sig, fs = torchaudio.load(wav)
-            sig = sig.transpose(0, 1)
             return sig, info_dict
 
         # Max chunks
