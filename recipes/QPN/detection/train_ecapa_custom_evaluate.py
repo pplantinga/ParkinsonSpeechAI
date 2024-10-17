@@ -149,6 +149,13 @@ class ParkinsonBrain(sb.core.Brain):
         categories = {"PD": 0, "HC": 0, "M": 0, "F": 0, "English": 0, "French": 0, "Other": 0, ">80": 0,
                       "71-80": 0, "61-70": 0, "51-60": 0, "<50": 0, "repeat": 0, "vowel_repeat": 0,
                       "recall": 0, "read_text": 0, "dpt": 0, "hbd": 0, "unk": 0}
+        # Add keys to breakdown between PD and HC
+        for key in categories.keys():
+            pd_key = "PD_" + key
+            hc_key = "HC_" + key
+            categories[pd_key] = 0
+            categories[hc_key] = 0
+        # Create prediction stats dict with copies of categories dict to track total count + right count
         prediction_stats = {"right_count": categories.copy(), "total_count": categories.copy()}
 
         self.modules.eval()
@@ -229,29 +236,34 @@ class ParkinsonBrain(sb.core.Brain):
         # or wrong and add information to right/wrong predictions
         for i in range(max_indices.size(0)):
             correct = True if label == max_indices[i] else False
+            ptype = info_dict["ptype"]
 
             age_bin = next((k for k, v in [
-                (">80", info_dict["patient_age"] > 80),
-                ("71-80", info_dict["patient_age"] > 70),
-                ("61-70", info_dict["patient_age"] > 60),
-                ("51-60", info_dict["patient_age"] > 50),
+                (">80", info_dict["age"] > 80),
+                ("71-80", info_dict["age"] > 70),
+                ("61-70", info_dict["age"] > 60),
+                ("51-60", info_dict["age"] > 50),
                 ("<50", True)
             ] if v), "<50")
 
             if correct:
                 prediction_stats["right_count"][age_bin] += 1
+                prediction_stats["right_count"][ptype + "_" + age_bin] += 1
             prediction_stats["total_count"][age_bin] += 1
+            prediction_stats["right_count"][ptype + "_" + age_bin] += 1
 
             # For the rest we can use the value in info_dict as a key
             for key in info_dict.keys():
                 # Skip ages
-                if key == "patient_age":
+                if key == "age":
                     continue
 
                 # Update correct dict and count dict
                 if correct:
                     prediction_stats["right_count"][info_dict[key]] += 1
+                    prediction_stats["right_count"][ptype + "_" + info_dict[key]] += 1
                 prediction_stats["total_count"][info_dict[key]] += 1
+                prediction_stats["total_count"][ptype + "_" + info_dict[key]] += 1
 
         return prediction_stats
 
