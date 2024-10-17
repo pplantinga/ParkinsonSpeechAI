@@ -24,7 +24,6 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 # Training parameters
 epochs: 65
 batch_size: 16
-test_batch_size: 1
 lr: 0.001
 base_lr: 0.000001
 max_lr: !ref <lr>
@@ -33,6 +32,10 @@ sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
 remove_repeats: True
+
+# Test parameters
+max_test_chunks: 24
+test_batch_size: 1
 
 # Feature parameters
 wavlm_hub: ../../ssl-models/wavlm-large

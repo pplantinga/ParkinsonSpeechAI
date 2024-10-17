@@ -316,9 +316,15 @@ def dataio_prep(hparams):
         # Determine the number of chunks
         num_chunks = (duration_sample // (snt_len_sample // 2)) + 1
 
+        # Case for short recordings
+        if duration_sample <= snt_len_sample:
+            sig, fs = torchaudio.load(wav)
+            sig = sig.transpose(0, 1)
+            return sig, info_dict
+
         # Max chunks
-        if num_chunks > 24:
-            num_chunks = 24
+        if num_chunks > hparams["max_test_chunks"]:
+            num_chunks = hparams["max_test_chunks"]
 
         # Iterate over the chunks
         for i in range(num_chunks):
@@ -341,7 +347,7 @@ def dataio_prep(hparams):
             sig = sig.transpose(0, 1).squeeze(1)
             chunks.append(sig)
 
-        # Stack the chunks into a tensor of shape [chunks, wav]
+        # Stack the chunks into a tensor of shape [chunks, wav] so output will be [batch, chunks, wav]
         output = torch.stack(chunks, dim=0)
 
         return output, info_dict
