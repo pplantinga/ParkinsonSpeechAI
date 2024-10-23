@@ -482,4 +482,36 @@ if __name__ == "__main__":
         test_set=datasets["chunk_test"],
         min_key="error",
         test_loader_kwargs=hparams["test_dataloader_options"],
+    # Regular Testing FR
+    #parkinson_brain.write_to_logs("Testing on French test set")
+    regular_test_stats_fr = parkinson_brain.evaluate(
+        test_set=datasets["normal_test_fr"],
+        min_key="error",
+        test_loader_kwargs=hparams["dataloader_options"],
+    )
+
+    # Regular Testing EN
+    #parkinson_brain.write_to_logs("Testing on English test set")
+    regular_test_stats_en = parkinson_brain.evaluate(
+        test_set=datasets["normal_test_en"],
+        min_key="error",
+        test_loader_kwargs=hparams["dataloader_options"],
+    )
+
+    # Chunk Testing FR
+    #parkinson_brain.write_to_logs("Testing on French chunked test set")
+    chunk_test_stats_fr = parkinson_brain.custom_evaluate(
+        test_set=datasets["chunk_test_fr"],
+        min_key="error",
+        test_loader_kwargs=hparams["test_dataloader_options"],
+        language="french",
+    )
+
+    # Chunk Testing EN
+    #parkinson_brain.write_to_logs("Testing on English chunked test set")
+    chunk_test_stats_en = parkinson_brain.custom_evaluate(
+        test_set=datasets["chunk_test_en"],
+        min_key="error",
+        test_loader_kwargs=hparams["test_dataloader_options"],
+        language="english",
     )
