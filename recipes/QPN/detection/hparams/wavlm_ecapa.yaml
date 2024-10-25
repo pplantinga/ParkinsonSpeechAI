@@ -15,8 +15,7 @@ train_log: !ref <output_folder>/train_log.txt
 # Data files
 data_folder: !PLACEHOLDER
 train_annotation: annotation/train.json
-test_fr_annotation: annotation/test_fr.json
-test_en_annotation: annotation/test_en.json
+test_annotation: annotation/test.json
 valid_annotation: annotation/valid.json
 
 skip_prep: False
@@ -33,7 +32,8 @@ step_size: 2000
 sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
-short_recordings: True
+remove_repeats: True
+max_test_chunks: 24
 
 # Feature parameters
 wavlm_hub: ../../ssl-models/wavlm-large

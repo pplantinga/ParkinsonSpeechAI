@@ -475,10 +475,10 @@ if __name__ == "__main__":
         min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
     )
-    
+
     # Chunk Testing
     chunk_test_stats = parkinson_brain.custom_evaluate(
-        test_set=datasets["test"],
+        test_set=datasets["chunk_test"],
         min_key="error",
         test_loader_kwargs=hparams["test_dataloader_options"],
-        
+    )
