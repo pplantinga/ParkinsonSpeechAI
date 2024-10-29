@@ -5,7 +5,7 @@ import openpyxl
 
 
 def prepare_neuro(data_folder, train_annotation, test_annotation, valid_annotation,
-                  remove_repeats):
+                  remove_repeats, remove_keys):
     try:
         os.listdir(data_folder)
     except:
@@ -14,9 +14,9 @@ def prepare_neuro(data_folder, train_annotation, test_annotation, valid_annotati
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], remove_repeats)
-    create_json(test_annotation, path_type_dict["test"], remove_repeats)
-    create_json(valid_annotation, path_type_dict["valid"], remove_repeats)
+    create_json(train_annotation, path_type_dict["train"], remove_repeats, remove_keys)
+    create_json(test_annotation, path_type_dict["test"], remove_repeats, remove_keys)
+    create_json(valid_annotation, path_type_dict["valid"], remove_repeats, remove_keys)
 
 
 def get_path_type_dicts(data_folder):
@@ -136,7 +136,7 @@ def get_patient_traits(files, sheet, batch):
     return updated_dict
 
 
-def create_json(json_file, path_type_dict, remove_repeats):
+def create_json(json_file, path_type_dict, remove_repeats, remove_keys):
     json_dict = {}
     
     for audiofile in path_type_dict.keys():
@@ -181,6 +181,11 @@ def create_json(json_file, path_type_dict, remove_repeats):
         # Get patient traits and add test to it
         info_dict = path_type_dict[audiofile].copy()
         info_dict["test"] = test
+
+        # Remove keys
+        for key in info_dict.keys():
+            if key in remove_keys and "test" not in audiofile:
+                continue
 
         # Create entry for this utterance
         json_dict[uttid] = {

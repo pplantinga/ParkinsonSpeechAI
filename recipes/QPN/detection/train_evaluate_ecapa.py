@@ -20,16 +20,15 @@ import csv
 
 import torch
 import torchaudio
+from torch.utils.data import DataLoader
+
 from hyperpyyaml import load_hyperpyyaml
+from tqdm import tqdm
 
 import speechbrain as sb
-from speechbrain.utils.data_utils import download_file
+from speechbrain.dataio.encoder import CategoricalEncoder
 from speechbrain.utils.distributed import run_on_main
 from speechbrain.dataio.dataloader import LoopedLoader
-from speechbrain.core import AMPConfig
-
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 
 class ParkinsonBrain(sb.core.Brain):
@@ -58,9 +57,6 @@ class ParkinsonBrain(sb.core.Brain):
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
         outputs = self.modules.classifier(embeddings)
-
-        # Pass through log softmax
-        outputs = self.hparams.log_softmax(outputs)
 
         # Outputs
         return outputs, lens
@@ -129,11 +125,6 @@ class ParkinsonBrain(sb.core.Brain):
                 test_stats=stage_stats,
             )
 
-    def write_to_logs(self, line):
-        self.hparams.train_logger.log_stats(
-            {line}
-        )
-
     def custom_evaluate(self, test_set, max_key=None, min_key=None, progressbar=None, test_loader_kwargs={}):
         if progressbar is None:
             progressbar = not self.noprogressbar
@@ -145,21 +136,6 @@ class ParkinsonBrain(sb.core.Brain):
         self.on_evaluate_start(max_key=max_key, min_key=min_key)
         self.on_stage_start(sb.Stage.TEST, epoch=None)
 
-        # Create a dictionary for prediction stats
-        categories = {"PD": 0, "HC": 0, "M": 0, "F": 0, "English": 0, "French": 0, "Other": 0, ">80": 0,
-                      "71-80": 0, "61-70": 0, "51-60": 0, "<50": 0, "repeat": 0, "vowel_repeat": 0,
-                      "recall": 0, "read_text": 0, "dpt": 0, "hbd": 0, "unk": 0}
-        # Add keys to breakdown between PD and HC
-        keys = list(categories.keys())
-        for key in keys:
-            pd_key = "PD_" + key
-            hc_key = "HC_" + key
-            categories[pd_key] = 0
-            categories[hc_key] = 0
-
-        # Create prediction stats dict with copies of categories dict to track total count + right count
-        prediction_stats = {"right_count": categories.copy(), "total_count": categories.copy()}
-
         self.modules.eval()
         avg_test_loss = 0.0
         with torch.no_grad():
@@ -170,35 +146,19 @@ class ParkinsonBrain(sb.core.Brain):
                     colour=self.tqdm_barcolor["test"],
             ):
                 self.step += 1
-                loss, prediction_stats = self.custom_evaluate_batch(batch, stage=sb.Stage.TEST,
-                                                                    prediction_stats=prediction_stats)
+                loss = self.custom_loss_compute(batch, stage=sb.Stage.TEST)
                 avg_test_loss = self.update_average(loss, avg_test_loss)
 
                 # Debug mode only runs a few batches
                 if self.debug and self.step == self.debug_batches:
                     break
 
-            self.write_test_stats(prediction_stats)
             self.on_stage_end(sb.Stage.TEST, avg_test_loss, None)
         self.step = 0
         return avg_test_loss
 
-    @torch.no_grad()
-    def custom_evaluate_batch(self, batch, stage, prediction_stats):
-        losses = []
-        amp = AMPConfig.from_name(self.eval_precision)
-        if self.use_amp:
-            with torch.autocast(
-                    dtype=amp.dtype, device_type=torch.device(self.device).type,
-            ):
-                losses, prediction_stats = self.custom_loss_compute(batch, stage, prediction_stats)
-        else:
-            losses, prediction_stats = self.custom_loss_compute(batch, stage, prediction_stats)
 
-        loss = torch.stack(losses).mean()
-        return loss.detach().cpu(), prediction_stats
-
-    def custom_loss_compute(self, batch, stage, prediction_stats):
+    def custom_loss_compute(self, batch, stage):
         losses = []
         batch = batch.to(self.device)
         wavs, lens = batch.sig
@@ -211,11 +171,12 @@ class ParkinsonBrain(sb.core.Brain):
             chunks = wavs[i]
             chunk_lens = torch.full((chunks.size(0),), lens[i]).to(self.device)
 
-            # Compute forward for this recording's chunks
+            # Compute forward, extract score and index
             out = self.compute_forward(batch, stage, chunks, chunk_lens)
-            predictions, chunk_lens = out
+            predictions, lens = out
+            score, index = torch.max(predictions, dim=-1)
 
-            # Now get the labels and create a label tensor (similarly to lens tensor)
+            # Get the labels and create a label tensor (similarly to lens tensor)
             patient_type_encoded, _ = batch.patient_type_encoded
             patient_type_encoded = torch.full((chunks.size(0),), patient_type_encoded[i, 0].item()).to(self.device)
             patient_type_encoded = patient_type_encoded.unsqueeze(1)
@@ -223,75 +184,32 @@ class ParkinsonBrain(sb.core.Brain):
             # Get the info_dict
             info_dict = batch.info_dict
 
-            # Update prediction statistics
-            prediction_stats = self.update_inference_stats(prediction_stats, predictions,
-                                                           patient_type_encoded[0], info_dict[i])
+            # Get the keys and add other headers
+            info = info_dict[0]
+            info["average score"] = score.mean().item()
+            info["indexes"] = index.tolist()
+            info["label"] = torch.mean(patient_type_encoded.squeeze(0), dtype=torch.float32).item()
+
+            # Write headings if this is the first time
+            write_headings = True
+            if os.path.exists(self.hparams.predictions_file):
+                write_headings = False
+            # Write stats of this recording to predictions
+            with open(self.hparams.predictions_file, "a") as f:
+                writer = csv.writer(f)
+
+                if write_headings:
+                    writer.writerow(list(info.keys()))
+
+                writer.writerow(list(info.values()))
 
             # Compute loss for this recording's chunks and add to losses
             losses.append(self.compute_objectives(out, batch, stage, patient_type_encoded))
 
-        return losses, prediction_stats  # TODO make it possible to have batch_size > 1
+        # Compute and return loss
+        loss = torch.stack(losses).mean()
+        return loss.detach().cpu() # TODO make it possible to have batch_size > 1
 
-    def update_inference_stats(self, prediction_stats, predictions, label, info_dict):
-        max_values, max_indices = torch.max(predictions, dim=-1)
-        # Iterate through labels, determine whether the model was right
-        # or wrong and add information to right/wrong predictions
-        for i in range(max_indices.size(0)):
-            correct = True if label == max_indices[i] else False
-            ptype = info_dict["ptype"]
-
-            age_bin = next((k for k, v in [
-                (">80", info_dict["age"] > 80),
-                ("71-80", info_dict["age"] > 70),
-                ("61-70", info_dict["age"] > 60),
-                ("51-60", info_dict["age"] > 50),
-                ("<50", True)
-            ] if v), "<50")
-
-            if correct:
-                prediction_stats["right_count"][age_bin] += 1
-                prediction_stats["right_count"][ptype + "_" + age_bin] += 1
-            prediction_stats["total_count"][age_bin] += 1
-            prediction_stats["total_count"][ptype + "_" + age_bin] += 1
-
-            # For the rest we can use the value in info_dict as a key
-            for key in info_dict.keys():
-                # Skip ages and updrs (for now)
-                if key == "age" or key == "updrs":
-                    continue
-                # Update correct dict and count dict
-                if correct:
-                    prediction_stats["right_count"][info_dict[key]] += 1
-                    prediction_stats["right_count"][ptype + "_" + info_dict[key]] += 1
-
-                prediction_stats["total_count"][info_dict[key]] += 1
-                prediction_stats["total_count"][ptype + "_" + info_dict[key]] += 1
-
-        return prediction_stats
-
-    def write_test_stats(self, prediction_stats):
-        # Add percentages for stats
-        keys_list = list(prediction_stats["right_count"].keys())
-
-        for key in keys_list:
-            # Avoid potential division by 0
-            if prediction_stats["total_count"][key] == 0:
-                prediction_stats["total_count"][key] = 1
-
-            # Get percentage value
-            percentage_key = "{}%".format(key)
-            prediction_stats["right_count"][percentage_key] = prediction_stats["right_count"][key] \
-                                                              / prediction_stats["total_count"][key]
-
-        # Create file names
-        right_stats_filepath = os.path.join(self.hparams.output_folder, "predictions.csv")
-
-        # Write stats to file
-        with open(right_stats_filepath, "w") as f:
-            writer = csv.writer(f)
-            for key in prediction_stats.keys():
-                writer.writerow(prediction_stats[key].keys())
-                writer.writerow(prediction_stats[key].values())
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -315,7 +233,6 @@ def dataio_prep(hparams):
             sig, fs = torchaudio.load(wav, num_frames=snt_len_sample, frame_offset=start)
 
         sig = sig.transpose(0, 1).squeeze(1)
-
         return sig, info_dict
 
     # Define test pipeline:
@@ -404,7 +321,7 @@ def dataio_prep(hparams):
     # Load or compute the label encoder (with multi-GPU DDP support)
     # Please, take a look into the lab_enc_file to see the label to index
     # mapping.
-    lab_enc_file = os.path.join(hparams["save_folder"], "label_encoder.txt")
+    lab_enc_file = hparams["encoded_labels"]
     label_encoder.load_or_create(
         path=lab_enc_file,
         from_didatasets=[datasets["train"]],
@@ -438,6 +355,7 @@ if __name__ == "__main__":
             "test_annotation": hparams["test_annotation"],
             "valid_annotation": hparams["valid_annotation"],
             "remove_repeats": hparams["remove_repeats"],
+            "remove_keys": hparams["remove_keys"],
         },
     )
 
