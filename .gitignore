@@ -1,2 +1,8 @@
 .ipynb_checkpoints
 *.wav
+
+recipes/QPN/detection/*
+
+!recipes/QPN/detection/*.py
+!recipes/QPN/detection/hparams/
+
