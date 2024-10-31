@@ -13,6 +13,6 @@ To begin with, we have started analyzing a dataset of speech samples of Parkinso
 So far our analysis and experimentation consists of two efforts:
 
 * An analysis effort on the level of vocal features, computed using an in-progress addition to SpeechBrain. The analysis is in the included notebook: [voice-analysis.ipynb](voice-analysis.ipynb), and the SpeechBrain contribution can be found at [PR #2689](https://github.com/speechbrain/speechbrain/pull/2689). 
-* A recipe for detection of Parkinsons' using `wav2vec2` or `WavLM` to extract features, and `ECAPA-TDNN` as a classification model. The training script can be seen at [train.py][recipes/QPN/detection/train.py] and the hyperparameters at [wavlm_ecapa.yaml](recipes/QPN/detection/hparams/wavlm_ecapa.yaml)
+* A recipe for detection of Parkinsons' using `wav2vec2` or `WavLM` to extract features, and `ECAPA-TDNN` as a classification model. The training script can be seen at [train.py](recipes/QPN/detection/train.py) and the hyperparameters at [wavlm_ecapa.yaml](recipes/QPN/detection/hparams/wavlm_ecapa.yaml)
 
 Eventually, we hope to integrate these two efforts by training `ECAPA-TDNN` or `SincNet` or other classification models on top of traditional voice features to compare their predictiveness on different tasks with the features from pre-trained self-supervised models. In addition, we will explore post-hoc interpretation of these models using `L-MAC` or other post-hoc interpretation methods.
