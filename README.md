@@ -1,4 +1,4 @@
-# ParkinsonSpeechAI
+# Parkinson's Speech and Voice AI
 
 This repository serves as a collection of recipes and analysis documents serving to organize efforts around detection, classification, and analysis of the speech patterns of Parkinson's patients.
 
