@@ -51,7 +51,7 @@ class ParkinsonBrain(sb.core.Brain):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
 
         # Compute features
-        feats = self.modules.compute_features(wavs)
+        feats = self.compute_features(wavs)
         feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
@@ -63,6 +63,14 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Outputs
         return outputs, lens
+
+    def compute_features(self, wavs):
+        feats = self.modules.compute_features(wavs)
+
+        if self.hparams.add_vocal_features:
+            pass
+
+        return feats
 
     def compute_objectives(self, predictions, batch, stage, labels=None):
         """Computes the loss using patient-type as label."""
@@ -299,10 +307,9 @@ def dataio_prep(hparams):
     snt_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
 
     # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "patient_type", "patient_gender", "patient_age", 
-                                  "patient_l1", "test_type")
-    @sb.utils.data_pipeline.provides("sig", "info_dict")
-    def audio_pipeline(wav, duration, patient_type, patient_gender, patient_age, patient_l1, test_type):
+    @sb.utils.data_pipeline.takes("wav", "duration")
+    @sb.utils.data_pipeline.provides("sig")
+    def audio_pipeline(wav, duration):
         if duration < hparams["sentence_len"]:
             sig, fs = torchaudio.load(wav)
         else:
@@ -311,6 +318,11 @@ def dataio_prep(hparams):
             sig, fs = torchaudio.load(wav, num_frames=snt_len_sample, frame_offset=start)
         sig = sig.transpose(0, 1).squeeze(1)
 
+        return sig
+
+    @sb.utils.data_pipeline.takes("patient_type", "patient_gender", "patient_age", "patient_l1", "test_type")
+    @sb.utils.data_pipeline.provides("info_dict")
+    def info_dict_pipeline(patient_type, patient_gender, patient_age, patient_l1, test_type):
         info_dict = {
             "patient_type": patient_type,
             "patient_gender": patient_gender,
@@ -318,14 +330,12 @@ def dataio_prep(hparams):
             "patient_l1": patient_l1,
             "test_type": test_type
         }
-
-        return sig, info_dict
+        return info_dict
 
     # Define test pipeline:
-    @sb.utils.data_pipeline.takes("wav", "duration", "patient_type", "patient_gender", "patient_age",
-                                  "patient_l1", "test_type")
-    @sb.utils.data_pipeline.provides("sig", "info_dict")
-    def test_pipeline(wav, duration, patient_type, patient_gender, patient_age, patient_l1, test_type):
+    @sb.utils.data_pipeline.takes("wav", "duration")
+    @sb.utils.data_pipeline.provides("sig")
+    def test_pipeline(wav, duration):
         # Get duration of sample
         duration_sample = int(duration * hparams["sample_rate"])
 
@@ -403,14 +413,14 @@ def dataio_prep(hparams):
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
-            dynamic_items=[audio_pipeline, label_pipeline],
+            dynamic_items=[audio_pipeline, info_dict_pipeline, label_pipeline],
             output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
         )
 
     for dataset in test_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=test_info[dataset],
-            dynamic_items=[test_pipeline, label_pipeline],
+            dynamic_items=[test_pipeline, info_dict_pipeline, label_pipeline],
             output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
         )
 

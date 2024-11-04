@@ -1,1 +1,9 @@
+# python files
 .ipynb_checkpoints
+__pycache__
+
+# vim files
+*.sw*
+
+# slurm files
+*.out

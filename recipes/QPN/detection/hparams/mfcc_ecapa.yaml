@@ -9,7 +9,7 @@ seed: 2007
 lr_factor: 1
 lr: !ref 0.004 / 2 ** <lr_factor>
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-experiment_name: wavlm_ecapa
+experiment_name: mfcc_ecapa
 results_dir: results
 output_folder: !ref <results_dir>/<experiment_name>/lr_<lr>_seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -37,13 +37,6 @@ sentence_len: 15.0 # seconds
 shuffle: True
 short_recordings: True
 
-# Feature parameters
-wavlm_hub: ../../ssl-models/wavlm-large
-wavlm_folder: !ref <output_folder>/wavlm-large
-freeze_wavlm_extractor: True
-freeze_wavlm: True
-lr_wavlm: 0.0001
-
 # Number of classes (pd/non-pd)
 weight_hc: 86.79
 weight_pd: 13.21
@@ -67,15 +60,17 @@ test_dataloader_options:
 # sure of our preliminary results
 
 # Functions
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-   source: !ref <wavlm_hub>
-   output_norm: True
-   freeze_feature_extractor: !ref <freeze_wavlm_extractor>
-   freeze: !ref <freeze_wavlm>
-   save_path: !ref <wavlm_folder>
+n_mfcc: 20
+compute_features: !new:speechbrain.lobes.features.MFCC
+    n_fft: 480
+    n_mfcc: !ref <n_mfcc>
+    win_length: 30
+    hop_length: 10
+    deltas: False
+    context: False
 
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: 1024
+    input_size: !ref <n_mfcc>
     channels: [1024, 1024, 1024, 1024, 3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]
@@ -110,19 +105,10 @@ opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
     weight_decay: 0.0001
 
-wavlm_opt_class: !name:torch.optim.Adam
-   lr: !ref <lr_wavlm>
-
 lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
     base_lr: !ref <base_lr>
     max_lr: !ref <max_lr>
     step_size: !ref <step_size>
-
-lr_annealing_wavlm: !new:speechbrain.nnet.schedulers.NewBobScheduler
-   initial_value: !ref <lr_wavlm>
-   improvement_threshold: 0.0025
-   annealing_factor: 0.9
-   patient: 0
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
