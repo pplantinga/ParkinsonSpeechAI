@@ -21,14 +21,15 @@ import csv
 import torch
 import torchaudio
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 
 from hyperpyyaml import load_hyperpyyaml
 from tqdm import tqdm
 
 import speechbrain as sb
 from speechbrain.dataio.encoder import CategoricalEncoder
-from speechbrain.utils.distributed import run_on_main
 from speechbrain.dataio.dataloader import LoopedLoader
+from speechbrain.utils.distributed import run_on_main
 
 
 class ParkinsonBrain(sb.core.Brain):
@@ -61,13 +62,13 @@ class ParkinsonBrain(sb.core.Brain):
         # Outputs
         return outputs, lens
 
-    def compute_objectives(self, predictions, batch, stage, labels=None):
+    def compute_objectives(self, outputs, batch, stage, labels=None):
         """Computes the loss using patient-type as label."""
 
         # Get predictions and labels
         if labels is None:
             labels, _ = batch.patient_type_encoded
-        predictions, lens = predictions
+        preds, lens = outputs
 
         # Concatenate labels in case of wav_augment
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
@@ -77,16 +78,31 @@ class ParkinsonBrain(sb.core.Brain):
         max_weight = max(self.hparams.weight_pd, self.hparams.weight_hc)
         weight_pd = self.hparams.weight_pd / max_weight
         weight_hc = self.hparams.weight_hc / max_weight
+        weights = torch.tensor([weight_pd, weight_hc]).unsqueeze(0).to(self.device)
+
+        # Squeeze and ensure targets are one hot encoded (for AAM)
+        preds = preds.squeeze(1)
+        targets = labels.squeeze(1)
+        targets = F.one_hot(targets.long(), preds.shape[1]).float()
 
         # Compute loss with weights
-        weights = torch.tensor([weight_pd, weight_hc]).to(self.device)
-        loss = self.hparams.compute_cost(predictions, labels, lens, weight=weights)
+        preds = self.hparams.AAM_loss(preds, targets)
+
+        # Pass through log softmax
+        preds = F.log_softmax(preds, dim=1)
+
+        # Pass through KLDiv Loss, apply weight and average
+        KLDLoss = torch.nn.KLDivLoss(reduction="none")
+        loss = KLDLoss(preds, targets)
+        loss = loss * weights
+        loss = loss.sum() / targets.sum()
 
         if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
             self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
         if stage != sb.Stage.TRAIN:
-            self.error_metrics.append(batch.id, predictions, labels, lens)
+            outputs, _ = outputs
+            self.error_metrics.append(batch.id, outputs, labels, lens)
 
         return loss
 
@@ -186,14 +202,15 @@ class ParkinsonBrain(sb.core.Brain):
 
             # Get the keys and add other headers
             info = info_dict[0]
-            info["average score"] = score.mean().item()
-            info["indexes"] = index.tolist()
+            info["average score"] = score.squeeze(1).tolist()
+            info["indexes"] = index.squeeze(1).tolist()
             info["label"] = torch.mean(patient_type_encoded.squeeze(0), dtype=torch.float32).item()
 
             # Write headings if this is the first time
             write_headings = True
             if os.path.exists(self.hparams.predictions_file):
                 write_headings = False
+
             # Write stats of this recording to predictions
             with open(self.hparams.predictions_file, "a") as f:
                 writer = csv.writer(f)
@@ -321,9 +338,8 @@ def dataio_prep(hparams):
     # Load or compute the label encoder (with multi-GPU DDP support)
     # Please, take a look into the lab_enc_file to see the label to index
     # mapping.
-    lab_enc_file = hparams["encoded_labels"]
     label_encoder.load_or_create(
-        path=lab_enc_file,
+        path=hparams["encoded_labels"],
         from_didatasets=[datasets["train"]],
         output_key="patient_type",
     )

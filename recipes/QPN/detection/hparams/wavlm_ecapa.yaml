@@ -40,7 +40,7 @@ max_test_chunks: 24
 test_batch_size: 1
 
 # Feature parameters
-wavlm_hub: ../../ssl-models/wavlm-large
+wavlm_hub: !PLACEHOLDER #path/to/wavlm/checkpoint
 wavlm_folder: !ref <output_folder>/wavlm-large
 freeze_wavlm_extractor: True
 freeze_wavlm: True
@@ -102,11 +102,16 @@ modules:
     classifier: !ref <classifier>
     mean_var_norm: !ref <mean_var_norm>
 
-softmax: !new:speechbrain.nnet.activations.Softmax
+# Trying AAM loss
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-compute_cost: !name:speechbrain.nnet.losses.nll_loss
+KLD_Loss: !name:speechbrain.nnet.losses.kldiv_loss
+    reduction: sum
+
+AAM_loss: !new:speechbrain.nnet.losses.AdditiveAngularMargin
+    margin: 0.2
+    scale: 30
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
