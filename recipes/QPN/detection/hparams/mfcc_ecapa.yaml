@@ -27,7 +27,7 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 epochs: 65
-batch_size: 16
+batch_size: 4
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
 max_lr: !ref <lr>
@@ -43,11 +43,12 @@ weight_pd: 13.21
 out_neurons: 2
 
 # Dataloader options
-num_workers: 8
+num_workers: 4
 dataloader_options:
     batch_size: !ref <batch_size>
     shuffle: !ref <shuffle>
     num_workers: !ref <num_workers>
+    drop_last: True
 
 test_dataloader_options:
     batch_size: !ref <test_batch_size>
@@ -61,6 +62,7 @@ test_dataloader_options:
 
 # Functions
 n_mfcc: 20
+add_vocal_features: True
 compute_features: !new:speechbrain.lobes.features.MFCC
     n_fft: 480
     n_mfcc: !ref <n_mfcc>
@@ -70,7 +72,7 @@ compute_features: !new:speechbrain.lobes.features.MFCC
     context: False
 
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: !ref <n_mfcc>
+    input_size: !ref <n_mfcc> + 4
     channels: [1024, 1024, 1024, 1024, 3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]

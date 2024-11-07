@@ -1,7 +1,11 @@
+import torch
 import json
 import os
+import glob
 import torchaudio
 import openpyxl
+
+from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
 
 
 def prepare_neuro(data_folder, train_annotation, test_annotation_en, test_annotation_fr, valid_annotation,
@@ -52,8 +56,8 @@ def get_path_type_dicts(data_folder):
         batch1_data_path = os.path.join(dataset_path, "Batch1")
         batch2_data_path = os.path.join(dataset_path, "Batch2")
 
-        batch1_files = get_file_paths(batch1_data_path)
-        batch2_files = get_file_paths(batch2_data_path)
+        batch1_files = glob.glob(batch1_data_path + "/*.wav")
+        batch2_files = glob.glob(batch2_data_path + "/*.wav")
 
         batch1_patients = get_patient_traits(batch1_files, batch1_sheet, "Batch1")
         batch2_patients = get_patient_traits(batch2_files, batch2_sheet, "Batch2")
@@ -61,16 +65,6 @@ def get_path_type_dicts(data_folder):
         path_type_dict[dataset] = batch1_patients | batch2_patients
 
     return path_type_dict
-
-
-def get_file_paths(path):
-    files = os.listdir(path)
-    file_paths = []
-    for file in files:
-        file_path = os.path.join(path, file)
-        file_paths.append(file_path)
-
-    return file_paths
 
 
 def get_patient_traits(files, sheet, batch):
@@ -179,9 +173,26 @@ def create_json(json_file, path_type_dict, keep_short_recordings):
             test_type = "unk"
             print(f"Unknown test found, {audiofile}")
 
+        # Create slow voice features
+        audio, fs = torchaudio.load(audiofile)
+
+        featurefile = audiofile.replace(".wav", ".pt")
+        if not os.path.exists(featurefile):
+            f0, voiced, jitter, shimmer, hnr = vocal_characteristics(audio.squeeze(), sample_rate=fs)
+            gne = compute_gne(audio.squeeze(), sample_rate=fs)
+            min_length = min(len(jitter), len(shimmer), len(hnr), len(gne))
+            jitter = jitter[:min_length]
+            shimmer = shimmer[:min_length]
+            hnr = hnr[:min_length]
+            gne = gne[:min_length]
+            feats = torch.stack((jitter, shimmer, hnr, gne), dim=1)
+
+            torch.save(feats, featurefile)
+
         # Create entry for this utterance
         json_dict[uttid] = {
             "wav": audiofile,
+            "feat_file": featurefile,
             "patient_type": patient_type,
             "patient_gender": patient_gender,
             "patient_age": patient_age,

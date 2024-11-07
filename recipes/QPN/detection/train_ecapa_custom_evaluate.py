@@ -11,6 +11,7 @@ Using your own hyperparameter file or one of the following:
 
 Author
     * Briac Cordelle 2024
+    * Peter Plantinga 2024
 """
 
 import os
@@ -51,8 +52,8 @@ class ParkinsonBrain(sb.core.Brain):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
 
         # Compute features
-        feats = self.compute_features(wavs)
-        feats = self.modules.mean_var_norm(feats, lens)
+        voice_feats, voice_lens = batch.feats
+        feats = self.compute_features(wavs, lens, voice_feats)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -64,11 +65,15 @@ class ParkinsonBrain(sb.core.Brain):
         # Outputs
         return outputs, lens
 
-    def compute_features(self, wavs):
+    def compute_features(self, wavs, lens, voice_feats):
         feats = self.modules.compute_features(wavs)
 
         if self.hparams.add_vocal_features:
-            pass
+            min_len = min(feats.size(1), voice_feats.size(1))
+            feats = feats[:, :min_len]
+            voice_feats = voice_feats[:, :min_len]
+            feats = torch.cat((feats, voice_feats), dim=-1)
+            feats = self.modules.mean_var_norm(feats, lens)
 
         return feats
 
@@ -304,21 +309,28 @@ def dataio_prep(hparams):
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
 
     # Length of a chunk
-    snt_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
+    frame_rate = 100
+    sentence_len_frames = int(frame_rate * hparams["sentence_len"])
+    sentence_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
 
     # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration")
-    @sb.utils.data_pipeline.provides("sig")
-    def audio_pipeline(wav, duration):
+    @sb.utils.data_pipeline.takes("wav", "duration", "feat_file")
+    @sb.utils.data_pipeline.provides("sig", "feats")
+    def audio_pipeline(wav, duration, feat_file):
+        feats = torch.load(feat_file, weights_only=True)
         if duration < hparams["sentence_len"]:
             sig, fs = torchaudio.load(wav)
         else:
+            duration_frames = int(duration * frame_rate)
             duration_sample = int(duration * hparams["sample_rate"])
-            start = random.randint(0, duration_sample - snt_len_sample)
-            sig, fs = torchaudio.load(wav, num_frames=snt_len_sample, frame_offset=start)
-        sig = sig.transpose(0, 1).squeeze(1)
+            start_frame = random.randint(0, duration_frames - sentence_len_frames)
+            start_sample = start_frame * hparams["sample_rate"] // frame_rate
+            sig, fs = torchaudio.load(
+                wav, num_frames=sentence_len_sample, frame_offset=start_sample
+            )
+            feats = feats[start_frame:start_frame + sentence_len_frames]
 
-        return sig
+        return sig.squeeze(0), feats
 
     @sb.utils.data_pipeline.takes("patient_type", "patient_gender", "patient_age", "patient_l1", "test_type")
     @sb.utils.data_pipeline.provides("info_dict")
@@ -333,55 +345,33 @@ def dataio_prep(hparams):
         return info_dict
 
     # Define test pipeline:
-    @sb.utils.data_pipeline.takes("wav", "duration")
-    @sb.utils.data_pipeline.provides("sig")
-    def test_pipeline(wav, duration):
+    @sb.utils.data_pipeline.takes("wav", "duration", "feat_file")
+    @sb.utils.data_pipeline.provides("sig", "feats")
+    def test_pipeline(wav, duration, feat_file):
+        feats = torch.load(feat_file, weights_only=True)
+
         # Get duration of sample
         duration_sample = int(duration * hparams["sample_rate"])
+        duration_frames = int(duration * frame_rate)
 
-        # Initialize an empty list to store the chunks
-        chunks = []
+        # Load
+        sig, fs = torchaudio.load(wav)
+        sig = sig.squeeze(0)
 
-        # Determine the number of chunks
-        num_chunks = (duration_sample // (snt_len_sample // 2)) + 1
+        # Case for short recordings
+        if duration_sample <= sentence_len_sample:
+            return sig, feats 
 
-        # Max chunks
-        if num_chunks > 24:
-            num_chunks = 24
+        # Unfold chunks
+        sig = sig.unfold(0, sentence_len_sample, sentence_len_sample // 2)
+        feats = feats.unfold(0, sentence_len_frames, sentence_len_frames // 2)
 
-        # Iterate over the chunks
-        for i in range(num_chunks):
-            start = i * (snt_len_sample // 2)
-            stop = start + snt_len_sample
+        # Cap chunks at 24
+        if sig.size(0) > 24:
+            sig = sig[:24]
+            feats = feats[:24]
 
-            # Ensure the last chunk doesn't go beyond the end of the WAV file
-            if stop > duration_sample:
-                stop = duration_sample
-                start = stop - snt_len_sample
-                if start < 0:
-                    start = 0
-
-            num_frames = stop - start
-            sig, fs = torchaudio.load(
-                wav, num_frames=num_frames, frame_offset=start
-            )
-
-            # Transpose the signal to have shape [wav, chunks]
-            sig = sig.transpose(0, 1).squeeze(1)
-            chunks.append(sig)
-
-        # Stack the chunks into a tensor of shape [chunks, wav]
-        output = torch.stack(chunks, dim=0)
-
-        info_dict = {
-            "patient_type": patient_type,
-            "patient_gender": patient_gender,
-            "patient_age": patient_age,
-            "patient_l1" : patient_l1,
-            "test_type" : test_type,
-        }
-
-        return output, info_dict
+        return sig, feats
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("patient_type")
@@ -414,14 +404,14 @@ def dataio_prep(hparams):
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, info_dict_pipeline, label_pipeline],
-            output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
+            output_keys=["id", "sig", "feats", "patient_type_encoded", "info_dict"],
         )
 
     for dataset in test_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=test_info[dataset],
             dynamic_items=[test_pipeline, info_dict_pipeline, label_pipeline],
-            output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
+            output_keys=["id", "sig", "feats", "patient_type_encoded", "info_dict"],
         )
 
     # Load or compute the label encoder (with multi-GPU DDP support)
