@@ -189,8 +189,8 @@ def create_json(json_file, path_type_dict, keep_short_recordings):
 
             torch.save(feats, featurefile)
 
-        # Create entry for this utterance
-        json_dict[uttid] = {
+        # Create entry or entries for this utterance
+        base_dict = {
             "wav": audiofile,
             "feat_file": featurefile,
             "patient_type": patient_type,
@@ -200,6 +200,13 @@ def create_json(json_file, path_type_dict, keep_short_recordings):
             "test_type": test_type,
             "duration": duration,
         }
+        chunk_size, step_size = 15., 7.5
+        if duration < chunk_size:
+            json_dict[uttid] = {**base_dict, "start": 0}
+        else:
+            chunk_count = min(24, int((duration - chunk_size) // step_size))
+            for i in range(chunk_count):
+                json_dict[f"{uttid}_{i}"] = {**base_dict, "start": i * step_size}
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:

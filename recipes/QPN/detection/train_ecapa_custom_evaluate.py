@@ -314,17 +314,15 @@ def dataio_prep(hparams):
     sentence_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
 
     # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "feat_file")
+    @sb.utils.data_pipeline.takes("wav", "duration", "feat_file", "start")
     @sb.utils.data_pipeline.provides("sig", "feats")
-    def audio_pipeline(wav, duration, feat_file):
+    def audio_pipeline(wav, duration, feat_file, start):
         feats = torch.load(feat_file, weights_only=True)
         if duration < hparams["sentence_len"]:
             sig, fs = torchaudio.load(wav)
         else:
-            duration_frames = int(duration * frame_rate)
-            duration_sample = int(duration * hparams["sample_rate"])
-            start_frame = random.randint(0, duration_frames - sentence_len_frames)
-            start_sample = start_frame * hparams["sample_rate"] // frame_rate
+            start_frame = int(start * frame_rate)
+            start_sample = int(start * hparams["sample_rate"])
             sig, fs = torchaudio.load(
                 wav, num_frames=sentence_len_sample, frame_offset=start_sample
             )
@@ -394,23 +392,12 @@ def dataio_prep(hparams):
         "normal_test_fr": hparams["test_fr_annotation"],
         "normal_test_en": hparams["test_en_annotation"],
     }
-    test_info = {
-        "chunk_test_fr": hparams["test_fr_annotation"],
-        "chunk_test_en": hparams["test_en_annotation"],
-    }
 
     hparams["dataloader_options"]["shuffle"] = True
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, info_dict_pipeline, label_pipeline],
-            output_keys=["id", "sig", "feats", "patient_type_encoded", "info_dict"],
-        )
-
-    for dataset in test_info:
-        datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=test_info[dataset],
-            dynamic_items=[test_pipeline, info_dict_pipeline, label_pipeline],
             output_keys=["id", "sig", "feats", "patient_type_encoded", "info_dict"],
         )
 
@@ -496,22 +483,4 @@ if __name__ == "__main__":
         test_set=datasets["normal_test_en"],
         min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
-    )
-
-    # Chunk Testing FR
-    #parkinson_brain.write_to_logs("Testing on French chunked test set")
-    chunk_test_stats_fr = parkinson_brain.custom_evaluate(
-        test_set=datasets["chunk_test_fr"],
-        min_key="error",
-        test_loader_kwargs=hparams["test_dataloader_options"],
-        language="french",
-    )
-
-    # Chunk Testing EN
-    #parkinson_brain.write_to_logs("Testing on English chunked test set")
-    chunk_test_stats_en = parkinson_brain.custom_evaluate(
-        test_set=datasets["chunk_test_en"],
-        min_key="error",
-        test_loader_kwargs=hparams["test_dataloader_options"],
-        language="english",
     )
