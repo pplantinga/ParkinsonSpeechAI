@@ -399,6 +399,8 @@ def dataio_prep(hparams):
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, info_dict_pipeline, label_pipeline],
             output_keys=["id", "sig", "feats", "patient_type_encoded", "info_dict"],
+        ).filtered_sorted(
+            key_test={"info_dict": lambda x: x["test_type"] == "vowel_repeat"}
         )
 
     # Load or compute the label encoder (with multi-GPU DDP support)
@@ -473,7 +475,6 @@ if __name__ == "__main__":
     #parkinson_brain.write_to_logs("Testing on French test set")
     regular_test_stats_fr = parkinson_brain.evaluate(
         test_set=datasets["normal_test_fr"],
-        min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
     )
 
@@ -481,6 +482,5 @@ if __name__ == "__main__":
     #parkinson_brain.write_to_logs("Testing on English test set")
     regular_test_stats_en = parkinson_brain.evaluate(
         test_set=datasets["normal_test_en"],
-        min_key="error",
         test_loader_kwargs=hparams["dataloader_options"],
     )

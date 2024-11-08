@@ -9,7 +9,7 @@ seed: 2007
 lr_factor: 1
 lr: !ref 0.004 / 2 ** <lr_factor>
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-experiment_name: mfcc_ecapa
+experiment_name: mfcc_phonation_ecapa
 results_dir: results
 output_folder: !ref <results_dir>/<experiment_name>/lr_<lr>_seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -26,7 +26,7 @@ skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-epochs: 65
+epochs: 24
 batch_size: 4
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
@@ -35,7 +35,7 @@ step_size: 2000
 sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
-short_recordings: True
+short_recordings: False
 
 # Number of classes (pd/non-pd)
 weight_hc: 86.79
