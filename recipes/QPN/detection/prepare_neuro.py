@@ -182,6 +182,9 @@ def create_json(json_file, path_type_dict, remove_repeats, remove_keys):
         info_dict = path_type_dict[audiofile].copy()
         info_dict["test"] = test
 
+        # Add pid to the patient traits
+        info_dict["pid"] = uttid.split("_")[1]
+
         # Remove keys
         for key in info_dict.keys():
             if key in remove_keys and "test" not in audiofile:

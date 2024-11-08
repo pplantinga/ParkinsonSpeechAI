@@ -7,7 +7,8 @@
 seed: 2002
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 experiment_name: wavlm_ecapa
-output_folder: !ref results/<experiment_name>/<seed>
+storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch on compute canada)
+output_folder: !ref <storage_folder>/<experiment_name>/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
@@ -33,7 +34,7 @@ sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
 remove_repeats: True
-remove_keys: ["M"]
+remove_keys: [""]
 
 # Test parameters
 max_test_chunks: 24

@@ -202,7 +202,7 @@ class ParkinsonBrain(sb.core.Brain):
 
             # Get the keys and add other headers
             info = info_dict[0]
-            info["average score"] = score.squeeze(1).tolist()
+            info["score"] = score.squeeze(1).tolist()
             info["indexes"] = index.squeeze(1).tolist()
             info["label"] = torch.mean(patient_type_encoded.squeeze(0), dtype=torch.float32).item()
 
