@@ -27,7 +27,7 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 epochs: 24
-batch_size: 4
+batch_size: 16
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
 max_lr: !ref <lr>
@@ -62,7 +62,6 @@ test_dataloader_options:
 
 # Functions
 n_mfcc: 20
-add_vocal_features: True
 compute_features: !new:speechbrain.lobes.features.MFCC
     n_fft: 480
     n_mfcc: !ref <n_mfcc>
@@ -72,7 +71,7 @@ compute_features: !new:speechbrain.lobes.features.MFCC
     context: False
 
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: !ref <n_mfcc> + 4
+    input_size: !ref <n_mfcc>
     channels: [1024, 1024, 1024, 1024, 3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]

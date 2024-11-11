@@ -7,3 +7,7 @@ __pycache__
 
 # slurm files
 *.out
+
+# other files
+*.wav
+**/results/

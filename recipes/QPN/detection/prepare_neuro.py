@@ -5,11 +5,9 @@ import glob
 import torchaudio
 import openpyxl
 
-from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
-
 
 def prepare_neuro(data_folder, train_annotation, test_annotation_en, test_annotation_fr, valid_annotation,
-                  keep_short_recordings):
+                  keep_short_recordings, chunk_length=30):
     try:
         os.listdir(data_folder)
     except:
@@ -18,10 +16,10 @@ def prepare_neuro(data_folder, train_annotation, test_annotation_en, test_annota
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], keep_short_recordings)
-    create_json(test_annotation_en, path_type_dict["test_en"], keep_short_recordings)
-    create_json(test_annotation_fr, path_type_dict["test_fr"], keep_short_recordings)
-    create_json(valid_annotation, path_type_dict["valid"], keep_short_recordings)
+    create_json(train_annotation, path_type_dict["train"], keep_short_recordings, chunk_length)
+    create_json(test_annotation_en, path_type_dict["test_en"], keep_short_recordings, chunk_length)
+    create_json(test_annotation_fr, path_type_dict["test_fr"], keep_short_recordings, chunk_length)
+    create_json(valid_annotation, path_type_dict["valid"], keep_short_recordings, chunk_length)
 
 
 def get_path_type_dicts(data_folder):
@@ -99,7 +97,6 @@ def get_patient_traits(files, sheet, batch):
             elif patient_type == "PD" or patient_type == "patient":
                 patient_type = "PD"
             else:
-                print("Unknown key found")
                 continue
 
             # Refactor language
@@ -123,7 +120,7 @@ def get_patient_traits(files, sheet, batch):
 
     return updated_dict
 
-def create_json(json_file, path_type_dict, keep_short_recordings):
+def create_json(json_file, path_type_dict, keep_short_recordings, chunk_length):
     json_dict = {}
     
     for audiofile in path_type_dict.keys():
@@ -133,7 +130,7 @@ def create_json(json_file, path_type_dict, keep_short_recordings):
             continue
 
         # Keep/remove short recordings from the data (repeats/vowels)
-        if keep_short_recordings:
+        if not keep_short_recordings:
             if 'repeat' in audiofile:
                 continue
             if 'a1' in audiofile or 'a2' in audiofile or 'a3' in audiofile or 'a4' in audiofile:
@@ -176,23 +173,9 @@ def create_json(json_file, path_type_dict, keep_short_recordings):
         # Create slow voice features
         audio, fs = torchaudio.load(audiofile)
 
-        featurefile = audiofile.replace(".wav", ".pt")
-        if not os.path.exists(featurefile):
-            f0, voiced, jitter, shimmer, hnr = vocal_characteristics(audio.squeeze(), sample_rate=fs)
-            gne = compute_gne(audio.squeeze(), sample_rate=fs)
-            min_length = min(len(jitter), len(shimmer), len(hnr), len(gne))
-            jitter = jitter[:min_length]
-            shimmer = shimmer[:min_length]
-            hnr = hnr[:min_length]
-            gne = gne[:min_length]
-            feats = torch.stack((jitter, shimmer, hnr, gne), dim=1)
-
-            torch.save(feats, featurefile)
-
         # Create entry or entries for this utterance
         base_dict = {
             "wav": audiofile,
-            "feat_file": featurefile,
             "patient_type": patient_type,
             "patient_gender": patient_gender,
             "patient_age": patient_age,
@@ -200,13 +183,11 @@ def create_json(json_file, path_type_dict, keep_short_recordings):
             "test_type": test_type,
             "duration": duration,
         }
-        chunk_size, step_size = 15., 7.5
-        if duration < chunk_size:
+        if duration < chunk_length:
             json_dict[uttid] = {**base_dict, "start": 0}
         else:
-            chunk_count = min(24, int((duration - chunk_size) // step_size))
-            for i in range(chunk_count):
-                json_dict[f"{uttid}_{i}"] = {**base_dict, "start": i * step_size}
+            for i in range(int(duration // chunk_length)):
+                json_dict[f"{uttid}_{i}"] = {**base_dict, "start": i * chunk_length}
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:

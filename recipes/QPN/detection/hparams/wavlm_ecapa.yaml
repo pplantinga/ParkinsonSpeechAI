@@ -26,7 +26,7 @@ skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-epochs: 65
+epochs: 24
 batch_size: 16
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
@@ -35,7 +35,7 @@ step_size: 2000
 sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
-short_recordings: True
+short_recordings: False
 
 # Feature parameters
 wavlm_hub: ../../ssl-models/wavlm-large
@@ -67,6 +67,7 @@ test_dataloader_options:
 # sure of our preliminary results
 
 # Functions
+add_vocal_features: False
 compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
    source: !ref <wavlm_hub>
    output_norm: True
