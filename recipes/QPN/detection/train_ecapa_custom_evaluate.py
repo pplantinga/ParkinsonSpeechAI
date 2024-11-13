@@ -25,9 +25,10 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.utils.data_utils import download_file
-from speechbrain.utils.distributed import run_on_main
+from speechbrain.utils.distributed import run_on_main, main_process_only
 from speechbrain.dataio.dataloader import LoopedLoader
 from speechbrain.core import AMPConfig
+from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -51,6 +52,12 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs)
+
+        if self.hparams.vocal_features == 5:
+            voice_feats = vocal_characteristics(wavs)
+            #gne = compute_gne(wavs)
+            added_feats = torch.stack(voice_feats, dim=-1)
+            feats = torch.cat((feats, added_feats), dim=-1)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -88,12 +95,32 @@ class ParkinsonBrain(sb.core.Brain):
         if stage != sb.Stage.TRAIN:
             self.error_metrics.append(batch.id, predictions, labels, lens)
 
+        if stage == sb.Stage.TEST:
+            self.write_stats(predictions, batch)
+
         return loss
 
     def on_stage_start(self, stage, epoch=None):
         """Gets called at the beginning of an epoch."""
         if stage != sb.Stage.TRAIN:
             self.error_metrics = self.hparams.error_stats()
+
+        if stage == sb.Stage.TEST:
+            self.metrics_file = open(self.hparams.metrics_file, delimiter="")
+            header = [
+                "id",
+                "score_pos",
+                "score_neg",
+                "label",
+                "patient_type",
+                "patient_gender",
+                "patient_age",
+                "patient_l1",
+                "test_type",
+            ]
+            self.metrics_csv = csv.DictWriter(self.metrics_file, header)
+            self.metrics_csv.writeheader()
+
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -124,7 +151,23 @@ class ParkinsonBrain(sb.core.Brain):
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
+            self.metrics_file.close()
 
+    @main_process_only
+    def write_stats(predictions, batch):
+        for i in range(len(batch)):
+            row = {
+                "id": batch.id[i],
+                "score_pos": predictions[i][0],
+                "score_neg": predictions[i][1],
+                "label": labels[i],
+                "patient_type": batch.patient_type[i],
+                "patient_gender": batch.patient_gender[i],
+                "patient_age": batch.patient_age[i],
+                "patient_l1": batch.patient_l1[i],
+                "test_type": batch.test_type[i],
+            }
+            self.metrics_csv.writerow(row)
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -132,6 +175,7 @@ def dataio_prep(hparams):
     # Initialization of the label encoder. The label encoder assigns to each
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
+    label_encoder.expect_len(2)
 
     # Length of a chunk
     sentence_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
@@ -149,18 +193,6 @@ def dataio_prep(hparams):
             )
 
         return sig.squeeze(0)
-
-    @sb.utils.data_pipeline.takes("patient_type", "patient_gender", "patient_age", "patient_l1", "test_type")
-    @sb.utils.data_pipeline.provides("info_dict")
-    def info_dict_pipeline(patient_type, patient_gender, patient_age, patient_l1, test_type):
-        info_dict = {
-            "patient_type": patient_type,
-            "patient_gender": patient_gender,
-            "patient_age": patient_age,
-            "patient_l1": patient_l1,
-            "test_type": test_type
-        }
-        return info_dict
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("patient_type")
@@ -188,8 +220,17 @@ def dataio_prep(hparams):
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
-            dynamic_items=[audio_pipeline, info_dict_pipeline, label_pipeline],
-            output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
+            dynamic_items=[audio_pipeline, label_pipeline],
+            output_keys=[
+                "id",
+                "sig",
+                "patient_type_encoded",
+                "patient_type",
+                "patient_gender",
+                "patient_age",
+                "patient_l1",
+                "test_type",
+            ],
         )
 
     # Load or compute the label encoder (with multi-GPU DDP support)

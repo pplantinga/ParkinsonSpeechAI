@@ -5,7 +5,7 @@
 # ################################
 
 # Basic parameters
-seed: 2007
+seed: 2009
 lr_factor: 1
 lr: !ref 0.004 / 2 ** <lr_factor>
 __set_seed: !apply:torch.manual_seed [!ref <seed>]

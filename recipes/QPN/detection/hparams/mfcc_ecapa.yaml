@@ -5,7 +5,7 @@
 # ################################
 
 # Basic parameters
-seed: 2007
+seed: 2008
 lr_factor: 1
 lr: !ref 0.004 / 2 ** <lr_factor>
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
@@ -14,6 +14,7 @@ results_dir: results
 output_folder: !ref <results_dir>/<experiment_name>/lr_<lr>_seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
+metrics_file: !ref <output_folder>/metrics.csv
 
 # Data files
 data_folder: !PLACEHOLDER
@@ -27,15 +28,15 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 epochs: 24
-batch_size: 16
+batch_size: 8
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
 max_lr: !ref <lr>
 step_size: 2000
 sample_rate: 16000
-sentence_len: 15.0 # seconds
+sentence_len: 30.0 # seconds
 shuffle: True
-short_recordings: False
+short_recordings: True
 
 # Number of classes (pd/non-pd)
 weight_hc: 86.79
@@ -62,6 +63,7 @@ test_dataloader_options:
 
 # Functions
 n_mfcc: 20
+vocal_features: 5
 compute_features: !new:speechbrain.lobes.features.MFCC
     n_fft: 480
     n_mfcc: !ref <n_mfcc>
@@ -71,7 +73,7 @@ compute_features: !new:speechbrain.lobes.features.MFCC
     context: False
 
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: !ref <n_mfcc>
+    input_size: !ref <n_mfcc> + <vocal_features>
     channels: [1024, 1024, 1024, 1024, 3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]
