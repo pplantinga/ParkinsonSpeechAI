@@ -106,7 +106,7 @@ class ParkinsonBrain(sb.core.Brain):
             self.error_metrics = self.hparams.error_stats()
 
         if stage == sb.Stage.TEST:
-            self.metrics_file = open(self.hparams.metrics_file, delimiter="")
+            self.metrics_file = open(self.hparams.metrics_file, "w", newline="")
             header = [
                 "id",
                 "score_pos",
@@ -154,16 +154,16 @@ class ParkinsonBrain(sb.core.Brain):
             self.metrics_file.close()
 
     @main_process_only
-    def write_stats(predictions, batch):
+    def write_stats(self, predictions, batch):
         for i in range(len(batch)):
             row = {
                 "id": batch.id[i],
-                "score_pos": predictions[i][0],
-                "score_neg": predictions[i][1],
-                "label": labels[i],
+                "score_pos": predictions[i, 0, 0].cpu().numpy(),
+                "score_neg": predictions[i, 0, 1].cpu().numpy(),
+                "label": batch.patient_type_encoded[0][i, 0].cpu().numpy(),
                 "patient_type": batch.patient_type[i],
                 "patient_gender": batch.patient_gender[i],
-                "patient_age": batch.patient_age[i],
+                "patient_age": batch.patient_age[i].cpu().numpy(),
                 "patient_l1": batch.patient_l1[i],
                 "test_type": batch.test_type[i],
             }

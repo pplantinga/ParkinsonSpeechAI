@@ -6,7 +6,7 @@ import torchaudio
 import openpyxl
 
 
-def prepare_neuro(data_folder, train_annotation, test_annotation_en, test_annotation_fr, valid_annotation,
+def prepare_neuro(data_folder, train_annotation, valid_annotation, test_annotation,
                   keep_short_recordings, chunk_length=30):
     try:
         os.listdir(data_folder)
@@ -17,9 +17,8 @@ def prepare_neuro(data_folder, train_annotation, test_annotation_en, test_annota
     path_type_dict = get_path_type_dicts(data_folder)
 
     create_json(train_annotation, path_type_dict["train"], keep_short_recordings, chunk_length)
-    create_json(test_annotation_en, path_type_dict["test_en"], keep_short_recordings, chunk_length)
-    create_json(test_annotation_fr, path_type_dict["test_fr"], keep_short_recordings, chunk_length)
     create_json(valid_annotation, path_type_dict["valid"], keep_short_recordings, chunk_length)
+    create_json(test_annotation, path_type_dict["test"], keep_short_recordings, chunk_length)
 
 
 def get_path_type_dicts(data_folder):
@@ -85,6 +84,9 @@ def get_patient_traits(files, sheet, batch):
 
         # Check if the patient ID is in the recordings, if it is add to dict
         if patient_id is not None and patient_id.rstrip() in pids:
+            print(batch)
+            print(patient_id)
+            print(patient_gender)
 
             # rstrip() everything
             patient_type = patient_type.rstrip()
