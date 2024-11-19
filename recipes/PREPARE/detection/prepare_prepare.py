@@ -14,8 +14,8 @@ def prepare_prepare(data_folder, manifests, valid_ratio=0.05):
         return
 
     data_folder = pathlib.Path(data_folder)
-    train_files = (data_folder / "train_audios").glob("*.mp3")
-    test_files = (data_folder / "test_audios").glob("*.mp3")
+    train_files = (data_folder / "train_audios").glob("*.flac")
+    test_files = (data_folder / "test_audios").glob("*.flac")
     files = {
         file.stem: file for file in [*train_files, *test_files]
     }

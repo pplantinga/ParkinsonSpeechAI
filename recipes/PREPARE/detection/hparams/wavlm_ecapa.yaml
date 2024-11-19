@@ -28,7 +28,7 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 epochs: 30
-batch_size: 16
+batch_size: 8
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
 max_lr: !ref <lr>
@@ -107,7 +107,7 @@ compute_cost: !name:speechbrain.nnet.losses.nll_loss
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
-    weight_decay: 0.0001
+    #weight_decay: 0.0001
 
 wavlm_opt_class: !name:torch.optim.Adam
    lr: !ref <lr_wavlm>
