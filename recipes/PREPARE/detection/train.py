@@ -12,7 +12,9 @@ Author
     * Peter Plantinga 2024
 """
 
+import csv
 import sys
+import tqdm
 
 import torch
 import torchaudio
@@ -45,9 +47,6 @@ class DetectBrain(sb.core.Brain):
         embeddings = self.modules.embedding_model(feats)
         outputs = self.modules.classifier(embeddings)
 
-        # Pass through log softmax
-        outputs = self.hparams.log_softmax(outputs)
-
         # Outputs
         return outputs, lens
 
@@ -63,7 +62,10 @@ class DetectBrain(sb.core.Brain):
             patient_type = self.hparams.wav_augment.replicate_labels(labels)
 
         # Compute loss with weights
-        loss = self.hparams.compute_cost(predictions, labels, lens)
+        predictions = self.hparams.log_softmax(predictions)
+        loss = self.hparams.compute_cost(
+            predictions, labels, lens, weight=self.weights
+        )
 
         if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
             self.hparams.lr_annealing.on_batch_end(self.optimizer)
@@ -88,8 +90,31 @@ class DetectBrain(sb.core.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
+                meta={"loss": stage_loss},
+                name=f"epoch_{epoch}_loss_{stage_loss:.2f}",
                 min_keys=["loss"],
             )
+
+    @torch.no_grad()
+    def predict_test(self, test_set):
+        self.modules.eval()
+        test_set = test_set.filtered_sorted(sort_key="id")
+        test_dl = sb.dataio.dataloader.make_dataloader(test_set)
+
+        self.checkpointer.recover_if_possible(min_key="loss")
+        with open(self.hparams.test_predictions_file, "w", newline="") as f:
+            fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            for test_example in tqdm.tqdm(test_dl):
+                predictions, lens = self.compute_forward(test_example, sb.Stage.TEST)
+                predictions = torch.softmax(predictions.squeeze(), dim=-1)
+                w.writerow({
+                    "uid": test_example.id[0],
+                    "diagnosis_control": predictions[0].cpu().numpy(),
+                    "diagnosis_mci": predictions[1].cpu().numpy(),
+                    "diagnosis_adrd": predictions[2].cpu().numpy(),
+                })
 
 
 def dataio_prep(hparams):
@@ -118,10 +143,16 @@ def dataio_prep(hparams):
     # functions defined above.
     datasets = {}
     for dataset, json_path in hparams["manifests"].items():
+        items = [audio_pipeline]
+        keys = ["id", "sig"]
+
+        # Add label for train/valid where we have them
+        if dataset != "test":
+            items.append(label_pipeline)
+            keys.append("diagnosis")
+
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=json_path,
-            dynamic_items=[audio_pipeline, label_pipeline],
-            output_keys=["id", "sig", "diagnosis"],
+            json_path=json_path, dynamic_items=items, output_keys=keys,
         )
 
     return datasets
@@ -146,7 +177,6 @@ if __name__ == "__main__":
         kwargs={
             "data_folder": hparams["data_folder"],
             "manifests": hparams["manifests"],
-            "valid_ratio": hparams["valid_ratio"],
         },
     )
 
@@ -169,6 +199,11 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
 
+    # Add weights for training balance
+    detector.weights = torch.tensor(
+        hparams["weights"], device=detector.device, requires_grad=False
+    )
+
     # Training
     detector.fit(
         detector.hparams.epoch_counter,
@@ -179,3 +214,4 @@ if __name__ == "__main__":
     )
 
     # TODO: Print estimates for TEST
+    detector.predict_test(datasets["test"])

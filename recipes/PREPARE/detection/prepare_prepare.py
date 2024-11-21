@@ -2,10 +2,11 @@ import csv
 import json
 import os
 import pathlib
+import torch
 import torchaudio
 
 
-def prepare_prepare(data_folder, manifests, valid_ratio=0.05):
+def prepare_prepare(data_folder, manifests, valid_count=90):
     assert manifests.keys() == {"train", "valid", "test"}
     try:
         os.listdir(data_folder)
@@ -22,13 +23,12 @@ def prepare_prepare(data_folder, manifests, valid_ratio=0.05):
 
     demographics = read_csv(data_folder / "metadata.csv")
     annotations = read_csv(data_folder / "train_labels.csv", type_fn=float)
-    sorted_ids = list(sorted(annotations.keys()))
-    valid_count = int(len(sorted_ids) * valid_ratio)
+    valid_ids = select_validation(valid_count, annotations)
 
     ids = {
         "test": demographics.keys() - annotations.keys(),
-        "valid": set(sorted_ids[:valid_count]),
-        "train": set(sorted_ids[valid_count:]),
+        "valid": valid_ids,
+        "train": annotations.keys() - set(valid_ids),
     }
 
     for dataset, path in manifests.items():
@@ -36,7 +36,22 @@ def prepare_prepare(data_folder, manifests, valid_ratio=0.05):
             dataset, path, ids[dataset], files, demographics, annotations
         )
 
+def select_validation(valid_count, annotations):
+    """Select an evenly distributed validation set of `valid_count` size"""
+    valid_ids = []
+    counts = {"diagnosis_control": 0, "diagnosis_mci": 0, "diagnosis_adrd": 0}
+    for uid, row in annotations.items():
+        for label in counts:
+            if row[label] > 0 and counts[label] < valid_count // 3:
+                valid_ids.append(uid)
+                counts[label] += 1
+                break
+
+    return valid_ids
+
+
 def read_csv(filepath, type_fn=None):
+    """Read a csv file into a dictionary with the first key as index"""
     with open(filepath, newline="") as f:
         reader = csv.DictReader(f)
         index, keys = reader.fieldnames[0], reader.fieldnames[1:]
@@ -48,8 +63,7 @@ def read_csv(filepath, type_fn=None):
 
 
 def create_json(dataset, path, ids, files, demographics, annotations):
-
-    # First load annotations
+    """Prepare a json manifest with all relevant info"""
     json_dict = {}
     
     for uid in ids:
