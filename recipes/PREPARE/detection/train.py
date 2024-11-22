@@ -67,10 +67,20 @@ class DetectBrain(sb.core.Brain):
             predictions, labels, lens, weight=self.weights
         )
 
+        if stage != sb.Stage.TRAIN:
+            pred_class = torch.argmax(predictions, dim=-1).squeeze()
+            pred_class = self.hparams.label_encoder.decode_torch(pred_class)
+            actual_class = self.hparams.label_encoder.decode_torch(labels.squeeze())
+            self.class_stats.append(batch.id, pred_class, actual_class)
+
         if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
             self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
         return loss
+
+    def on_stage_start(self, stage, epoch=None):
+        if stage != sb.Stage.TRAIN:
+            self.class_stats = self.hparams.class_stats()
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -78,9 +88,11 @@ class DetectBrain(sb.core.Brain):
         stage_stats = {"loss": stage_loss}
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
+        else:
+            stage_stats["accuracy"] = self.class_stats.summarize("accuracy")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
-        elif stage == sb.Stage.VALID:
+        if stage == sb.Stage.VALID:
             old_lr, new_lr = self.hparams.lr_annealing(epoch)
             sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
 
@@ -91,8 +103,9 @@ class DetectBrain(sb.core.Brain):
             )
             self.checkpointer.save_and_keep_only(
                 meta={"loss": stage_loss},
-                name=f"epoch_{epoch}_loss_{stage_loss:.2f}",
+                name=f"epoch_{epoch}_loss_{stage_loss:.3f}_acc_{stage_stats['accuracy']:.2f}",
                 min_keys=["loss"],
+                max_keys=["accuracy"],
             )
 
     @torch.no_grad()
@@ -121,11 +134,11 @@ def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
-    # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
-    label_encoder = sb.dataio.encoder.CategoricalEncoder()
-
-    # Length of a chunk
-    sentence_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
+    # of the observed label a unique index (e.g, 'control': 0, 'mci': 1, ..)
+    hparams["label_encoder"] = sb.dataio.encoder.CategoricalEncoder()
+    label_names = ("diagnosis_control", "diagnosis_mci", "diagnosis_adrd")
+    hparams["label_encoder"].expect_len(len(label_names))
+    hparams["label_encoder"].update_from_iterable(label_names)
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("filepath")
@@ -134,10 +147,10 @@ def dataio_prep(hparams):
         return sb.dataio.dataio.read_audio(filepath)
 
     # Define label pipeline:
-    @sb.utils.data_pipeline.takes("diagnosis_control", "diagnosis_mci", "diagnosis_adrd")
+    @sb.utils.data_pipeline.takes(*label_names)
     @sb.utils.data_pipeline.provides("diagnosis")
-    def label_pipeline(diagnosis_control, diagnosis_mci, diagnosis_adrd):
-        return torch.LongTensor([diagnosis_control, diagnosis_mci, diagnosis_adrd])
+    def label_pipeline(*labels):
+        return torch.argmax(torch.LongTensor(labels), dim=-1, keepdim=True)
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
