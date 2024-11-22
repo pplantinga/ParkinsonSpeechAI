@@ -61,20 +61,24 @@ class DetectBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
             patient_type = self.hparams.wav_augment.replicate_labels(labels)
 
-        # Compute loss with weights
+        # Compute loss with weights, but only for train
         predictions = self.hparams.log_softmax(predictions)
-        loss = self.hparams.compute_cost(
-            predictions, labels, lens, weight=self.weights
-        )
-
-        if stage != sb.Stage.TRAIN:
+        if stage == sb.Stage.TRAIN:
+            loss = self.hparams.compute_cost(
+                predictions,
+                labels,
+                lens,
+                weight=self.weights,
+                label_smoothing=self.hparams.label_smoothing,
+            )
+            if hasattr(self.hparams.lr_annealing, "on_batch_end"):
+                self.hparams.lr_annealing.on_batch_end(self.optimizer)
+        else:
+            loss = self.hparams.compute_cost(predictions, labels, lens)
             pred_class = torch.argmax(predictions, dim=-1).squeeze()
             pred_class = self.hparams.label_encoder.decode_torch(pred_class)
             actual_class = self.hparams.label_encoder.decode_torch(labels.squeeze())
             self.class_stats.append(batch.id, pred_class, actual_class)
-
-        if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
-            self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
         return loss
 
@@ -128,6 +132,15 @@ class DetectBrain(sb.core.Brain):
                     "diagnosis_mci": predictions[1].cpu().numpy(),
                     "diagnosis_adrd": predictions[2].cpu().numpy(),
                 })
+
+        # Also print ssl weights
+        if hasattr(self.hparams, "ssl_weights_file"):
+            with open(self.hparams.ssl_weights_file, "w", encoding="utf-8") as w:
+                weights = self.modules.compute_features.weights.cpu().numpy()
+                for weight in weights:
+                    w.write(str(weight))
+                    w.write("\n")
+
 
 
 def dataio_prep(hparams):
