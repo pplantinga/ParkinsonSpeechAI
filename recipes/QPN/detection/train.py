@@ -29,7 +29,7 @@ from tqdm import tqdm
 import speechbrain as sb
 from speechbrain.dataio.encoder import CategoricalEncoder
 from speechbrain.dataio.dataloader import LoopedLoader
-from speechbrain.utils.distributed import run_on_main
+from speechbrain.utils.distributed import run_on_main, main_process_only, if_main_process
 
 
 class ParkinsonBrain(sb.core.Brain):
@@ -102,7 +102,9 @@ class ParkinsonBrain(sb.core.Brain):
 
         if stage != sb.Stage.TRAIN:
             outputs, _ = outputs
-            self.error_metrics.append(batch.id, outputs, labels, lens)
+            outputs = outputs.squeeze(1)
+            outputs = (outputs[:, 0] - outputs[:, 1] + 2) / 4
+            self.error_metrics.append(batch.id, outputs, labels.squeeze(1))
 
         return loss
 
@@ -118,7 +120,7 @@ class ParkinsonBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            stage_stats["ErrorRate"] = self.error_metrics.summarize("average")
+            stage_stats["ErrorRates"] = self.error_metrics.summarize(threshold=0.5)
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -131,8 +133,8 @@ class ParkinsonBrain(sb.core.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta={"ErrorRate": stage_stats["ErrorRate"]},
-                min_keys=["ErrorRate"],
+                meta={"precision": stage_stats["ErrorRates"]["precision"]},
+                min_keys=["precision"],
             )
 
         if stage == sb.Stage.TEST:
@@ -190,7 +192,6 @@ class ParkinsonBrain(sb.core.Brain):
             # Compute forward, extract score and index
             out = self.compute_forward(batch, stage, chunks, chunk_lens)
             predictions, lens = out
-            score, index = torch.max(predictions, dim=-1)
 
             # Get the labels and create a label tensor (similarly to lens tensor)
             patient_type_encoded, _ = batch.patient_type_encoded
@@ -202,31 +203,27 @@ class ParkinsonBrain(sb.core.Brain):
 
             # Get the keys and add other headers
             info = info_dict[0]
-            info["score"] = score.squeeze(1).tolist()
-            info["indexes"] = index.squeeze(1).tolist()
+            info["cosine similarities"] = predictions.squeeze(1).tolist()
             info["label"] = torch.mean(patient_type_encoded.squeeze(0), dtype=torch.float32).item()
 
-            # Write headings if this is the first time
-            write_headings = True
-            if os.path.exists(self.hparams.predictions_file):
-                write_headings = False
-
             # Write stats of this recording to predictions
-            with open(self.hparams.predictions_file, "a") as f:
-                writer = csv.writer(f)
-
-                if write_headings:
-                    writer.writerow(list(info.keys()))
-
-                writer.writerow(list(info.values()))
+            if if_main_process():
+                self.write_prediction(info)
 
             # Compute loss for this recording's chunks and add to losses
             losses.append(self.compute_objectives(out, batch, stage, patient_type_encoded))
 
         # Compute and return loss
         loss = torch.stack(losses).mean()
-        return loss.detach().cpu() # TODO make it possible to have batch_size > 1
+        return loss.detach().cpu() # TODO make it possible to have batch_size > 1, (is this useful though)?
 
+    def write_prediction(self, info):
+        with open(self.hparams.predictions_file, "a") as f:
+            writer = csv.writer(f)
+            if self.step == 1:
+                writer.writerow(list(info.keys()))
+            else:
+                writer.writerow(list(info.values()))
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -370,7 +367,6 @@ if __name__ == "__main__":
             "train_annotation": hparams["train_annotation"],
             "test_annotation": hparams["test_annotation"],
             "valid_annotation": hparams["valid_annotation"],
-            "remove_repeats": hparams["remove_repeats"],
             "remove_keys": hparams["remove_keys"],
         },
     )
@@ -406,13 +402,13 @@ if __name__ == "__main__":
     # Regular Testing
     regular_test_stats = parkinson_brain.evaluate(
         test_set=datasets["test"],
-        min_key="error",
+        min_key="precision",
         test_loader_kwargs=hparams["dataloader_options"],
     )
 
     # Chunk Testing
     chunk_test_stats = parkinson_brain.custom_evaluate(
         test_set=datasets["chunk_test"],
-        min_key="error",
+        min_key="precision",
         test_loader_kwargs=hparams["test_dataloader_options"],
     )

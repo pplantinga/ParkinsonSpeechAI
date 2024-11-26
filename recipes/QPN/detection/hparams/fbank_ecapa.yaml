@@ -8,7 +8,7 @@ seed: 2002
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Save folders and paths
-experiment_name: wavlm_ecapa
+experiment_name: fbank_ecapa
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/<seed>
 save_folder: !ref <output_folder>/save
@@ -42,11 +42,10 @@ max_test_chunks: 24
 test_batch_size: 1
 
 # Feature parameters
-wavlm_hub: !PLACEHOLDER #path/to/wavlm/checkpoint
-wavlm_folder: !ref <output_folder>/wavlm-large
-freeze_wavlm_extractor: True
-freeze_wavlm: True
-lr_wavlm: 0.0001
+n_mels: 80
+left_frames: 0
+right_frames: 0
+deltas: False
 
 # Number of classes (pd/non-pd)
 weight_hc: 86.79
@@ -71,15 +70,14 @@ test_dataloader_options:
 # sure of our preliminary results
 
 # Functions
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-   source: !ref <wavlm_hub>
-   output_norm: True
-   freeze_feature_extractor: !ref <freeze_wavlm_extractor>
-   freeze: !ref <freeze_wavlm>
-   save_path: !ref <wavlm_folder>
+compute_features: !new:speechbrain.lobes.features.Fbank
+    n_mels: !ref <n_mels>
+    left_frames: !ref <left_frames>
+    right_frames: !ref <right_frames>
+    deltas: !ref <deltas>
 
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: 1024
+    input_size: !ref <n_mels>
     channels: [1024, 1024, 1024, 1024, 3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]
@@ -119,19 +117,10 @@ opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
     weight_decay: 0.0001
 
-wavlm_opt_class: !name:torch.optim.Adam
-   lr: !ref <lr_wavlm>
-
 lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
     base_lr: !ref <base_lr>
     max_lr: !ref <max_lr>
     step_size: !ref <step_size>
-
-lr_annealing_wavlm: !new:speechbrain.nnet.schedulers.NewBobScheduler
-   initial_value: !ref <lr_wavlm>
-   improvement_threshold: 0.0025
-   annealing_factor: 0.9
-   patient: 0
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger

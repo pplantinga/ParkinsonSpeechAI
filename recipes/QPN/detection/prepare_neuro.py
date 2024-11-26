@@ -5,7 +5,7 @@ import openpyxl
 
 
 def prepare_neuro(data_folder, train_annotation, test_annotation, valid_annotation,
-                  remove_repeats, remove_keys):
+                  remove_keys):
     try:
         os.listdir(data_folder)
     except:
@@ -14,9 +14,9 @@ def prepare_neuro(data_folder, train_annotation, test_annotation, valid_annotati
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], remove_repeats, remove_keys)
-    create_json(test_annotation, path_type_dict["test"], remove_repeats, remove_keys)
-    create_json(valid_annotation, path_type_dict["valid"], remove_repeats, remove_keys)
+    create_json(train_annotation, path_type_dict["train"], remove_keys)
+    create_json(test_annotation, path_type_dict["test"], remove_keys)
+    create_json(valid_annotation, path_type_dict["valid"], remove_keys)
 
 
 def get_path_type_dicts(data_folder):
@@ -79,7 +79,7 @@ def get_patient_traits(files, sheet, batch):
     for row in range(2, sheet.max_row + 1):  # Start from row 2 to skip the header
         pid = sheet.cell(row=row, column=1).value
         ptype = sheet.cell(row=row, column=2).value
-        gender = sheet.cell(row=row, column=3).value
+        sex = sheet.cell(row=row, column=3).value
         l1 = sheet.cell(row=row, column=4).value
         updrs = sheet.cell(row=row, column=5).value
 
@@ -93,7 +93,7 @@ def get_patient_traits(files, sheet, batch):
 
             # rstrip() everything
             ptype = ptype.rstrip()
-            gender = gender.rstrip()
+            sex = sex.rstrip()
             l1 = l1.rstrip()
 
             # Refactor patient type
@@ -119,7 +119,7 @@ def get_patient_traits(files, sheet, batch):
             # Save to dict
             patient_traits = {
                 "ptype": ptype,
-                "gender": gender,
+                "sex": sex,
                 "age": age,
                 "l1": l1,
                 "updrs": updrs,
@@ -136,21 +136,18 @@ def get_patient_traits(files, sheet, batch):
     return updated_dict
 
 
-def create_json(json_file, path_type_dict, remove_repeats, remove_keys):
+def create_json(json_file, path_type_dict, remove_keys):
     json_dict = {}
-    
     for audiofile in path_type_dict.keys():
+        # Get info dict
+        info_dict = path_type_dict[audiofile].copy()
+
+        # Skip condition
+        skip = False
 
         # Remove 'l1' files as they are duplicates
         if 'l1' in audiofile:
-            continue
-
-        # Keep/remove short recordings from the data (repeats/vowels)
-        if remove_repeats:
-            if 'repeat' in audiofile:
-                continue
-            if 'a1' in audiofile or 'a2' in audiofile or 'a3' in audiofile or 'a4' in audiofile:
-                continue
+            skip = True
 
         # Get uttid
         uttid = audiofile.split("/")[-1].split(".")[0] + "_" + audiofile.split("/")[-2]
@@ -160,37 +157,31 @@ def create_json(json_file, path_type_dict, remove_repeats, remove_keys):
         duration = audioinfo.num_frames / audioinfo.sample_rate
 
         # Get test type
-        test = ""
-
         if 'repeat' in audiofile:
-            test = "repeat"
+            info_dict["test"] = "repeat"
         if 'a1' in audiofile or 'a2' in audiofile or 'a3' in audiofile or 'a4' in audiofile:
-            test = "vowel_repeat"
+            info_dict["test"] = "vowel_repeat"
         if 'recall' in audiofile:
-            test = "recall"
+            info_dict["test"] = "recall"
         if 'read' in audiofile:
-            test = "read_text"
+            info_dict["test"] = "read_text"
         if 'dpt' in audiofile:
-            test = "dpt"
+            info_dict["test"] = "dpt"
         if 'hbd' in audiofile:
-            test = "hbd"
-        if test == "":
-            test = "unk"
-            print(f"Unknown test found, {audiofile}")
-
-        # Get patient traits and add test to it
-        info_dict = path_type_dict[audiofile].copy()
-        info_dict["test"] = test
+            info_dict["test"] = "hbd"
 
         # Add pid to the patient traits
         info_dict["pid"] = uttid.split("_")[1]
 
-        # Remove keys
-        for key in info_dict.keys():
-            if key in remove_keys and "test" not in audiofile:
-                continue
+        # Remove certain values for specific tests (i.e if we want to train only on men/women, only on an age group, etc)
+        for value in info_dict.values():
+            if value in remove_keys and "train" in audiofile:
+                skip = True
 
         # Create entry for this utterance
+        if skip:
+            continue
+
         json_dict[uttid] = {
             "wav": audiofile,
             "duration": duration,
