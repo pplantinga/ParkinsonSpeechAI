@@ -6,8 +6,10 @@
 # Basic parameters
 seed: 2002
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
+
+# Save folders and paths
 experiment_name: wavlm_ecapa
-storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch on compute canada)
+storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -16,9 +18,9 @@ encoded_labels: !ref <save_folder>/label_encoder.txt
 
 # Data files
 data_folder: !PLACEHOLDER
-train_annotation: annotation/train.json
-test_annotation: annotation/test.json
-valid_annotation: annotation/valid.json
+train_annotation: !ref <output_folder>/train.json
+test_annotation: !ref <output_folder>/test.json
+valid_annotation: !ref <output_folder>/valid.json
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
