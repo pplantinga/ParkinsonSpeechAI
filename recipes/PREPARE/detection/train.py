@@ -12,6 +12,7 @@ Author
     * Peter Plantinga 2024
 """
 
+import collections
 import csv
 import sys
 import tqdm
@@ -22,6 +23,7 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main
+#from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
 
 class DetectBrain(sb.core.Brain):
     """Class for training detector"""
@@ -41,7 +43,7 @@ class DetectBrain(sb.core.Brain):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
 
         # Compute features
-        feats = self.modules.compute_features(wavs)
+        feats, lens = batch.ssl_feats
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -49,6 +51,19 @@ class DetectBrain(sb.core.Brain):
 
         # Outputs
         return outputs, lens
+
+    def compute_features(self, wavs, lens):
+        feats = self.modules.compute_features(wavs)
+
+        if hasattr(self.hparams, "vocal_features"):
+            f0, voiced, jit, shim, hnr = vocal_characteristics(wavs, step_size=0.02)
+            gne = compute_gne(wavs, hop_size=200)
+            vocal_feats = torch.stack((jit, shim, hnr, gne), dim=-1)
+            vocal_feats = self.modules.mean_var_norm(vocal_feats, lens)
+            vocal_feats = vocal_feats[:, :feats.size(1)]
+            feats = torch.cat((feats, vocal_feats), dim=-1)
+
+        return feats
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss using patient-type as label."""
@@ -94,6 +109,7 @@ class DetectBrain(sb.core.Brain):
             self.train_stats = stage_stats
         else:
             stage_stats["accuracy"] = self.class_stats.summarize("accuracy")
+            self.class_stats.write_stats(sys.stdout)
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -117,15 +133,36 @@ class DetectBrain(sb.core.Brain):
         self.modules.eval()
         test_set = test_set.filtered_sorted(sort_key="id")
         test_dl = sb.dataio.dataloader.make_dataloader(test_set)
-
         self.checkpointer.recover_if_possible(min_key="loss")
+
+        # Run all samples through model
+        uids = []
+        predictions_raw = {}
+        for test_example in tqdm.tqdm(test_dl):
+            predictions, lens = self.compute_forward(test_example, sb.Stage.TEST)
+            predictions_raw[test_example.id[0]] = predictions.cpu().squeeze()
+            if "_" in test_example.id[0]:
+                uids.append(test_example.id[0].split("_")[0])
+            else:
+                uids.append(test_example.id[0])
+        uid_counts = collections.Counter(uids)
+
+        # If chunked, we have to combine predictions
+        if not self.hparams.chunk_size:
+            predictions = predictions_raw
+        else:
+            predictions = {u: torch.tensor([0., 0., 0.]) for u in uid_counts}
+            for k, row in predictions_raw.items():
+                uid = k.split("_")[0] if "_" in k else k
+                predictions[uid] += row.squeeze() / uid_counts[uid]
+            
+        # Write to file
         with open(self.hparams.test_predictions_file, "w", newline="") as f:
             fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
             w = csv.DictWriter(f, fieldnames=fields)
             w.writeheader()
-            for test_example in tqdm.tqdm(test_dl):
-                predictions, lens = self.compute_forward(test_example, sb.Stage.TEST)
-                predictions = torch.softmax(predictions.squeeze(), dim=-1)
+            for uid, prediction in predictions.items():
+                predictions = torch.softmax(prediction.squeeze(), dim=-1)
                 w.writerow({
                     "uid": test_example.id[0],
                     "diagnosis_control": predictions[0].cpu().numpy(),
@@ -154,16 +191,25 @@ def dataio_prep(hparams):
     hparams["label_encoder"].update_from_iterable(label_names)
 
     # Define audio pipeline
-    @sb.utils.data_pipeline.takes("filepath")
+    @sb.utils.data_pipeline.takes("filepath", "start", "duration")
     @sb.utils.data_pipeline.provides("sig")
-    def audio_pipeline(filepath):
-        return sb.dataio.dataio.read_audio(filepath)
+    def audio_pipeline(filepath, start, duration):
+        start = int(start * 16000)
+        stop = int((start + duration) * 16000)
+        file_obj = {"file": filepath, "start": start, "stop": stop}
+        return sb.dataio.dataio.read_audio(file_obj)
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes(*label_names)
     @sb.utils.data_pipeline.provides("diagnosis")
     def label_pipeline(*labels):
         return torch.argmax(torch.LongTensor(labels), dim=-1, keepdim=True)
+
+    # Pretrained ssl feature pipeline
+    @sb.utils.data_pipeline.takes("ssl_path", "start", "duration")
+    @sb.utils.data_pipeline.provides("ssl_feats")
+    def ssl_pipeline(ssl_path, start, duration):
+        return torch.load(ssl_path, map_location="cpu").float()
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
@@ -176,6 +222,11 @@ def dataio_prep(hparams):
         if dataset != "test":
             items.append(label_pipeline)
             keys.append("diagnosis")
+
+        # If precomputed features are available, add them
+        if hparams["prep_ssl"]:
+            items.append(ssl_pipeline)
+            keys.append("ssl_feats")
 
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=json_path, dynamic_items=items, output_keys=keys,
@@ -195,14 +246,19 @@ if __name__ == "__main__":
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
-    # Dataset prep (parsing KCL MDVR and annotation into json files)
+    # Dataset prep including chunking etc.
     from prepare_prepare import prepare_prepare
 
+    chunk_size = hparams["chunk_size"] if "chunk_size" in hparams else None
+    hop_size = hparams["hop_size"] if "hop_size" in hparams else None
     run_on_main(
         prepare_prepare,
         kwargs={
             "data_folder": hparams["data_folder"],
             "manifests": hparams["manifests"],
+            "chunk_size": chunk_size,
+            "hop_size": hop_size,
+            "prep_ssl": hparams["prep_ssl"],
         },
     )
 
