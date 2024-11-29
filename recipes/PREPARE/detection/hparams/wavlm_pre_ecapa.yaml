@@ -46,7 +46,7 @@ label_smoothing: 0.1
 out_neurons: 3
 
 # Dataloader options
-num_workers: 4
+num_workers: 8
 dataloader_options:
     batch_size: !ref <batch_size>
     shuffle: !ref <shuffle>

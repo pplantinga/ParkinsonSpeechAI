@@ -77,8 +77,8 @@ class DetectBrain(sb.core.Brain):
             patient_type = self.hparams.wav_augment.replicate_labels(labels)
 
         # Compute loss with weights, but only for train
-        predictions = self.hparams.log_softmax(predictions)
         if stage == sb.Stage.TRAIN:
+            predictions = self.hparams.log_softmax(predictions)
             loss = self.hparams.compute_cost(
                 predictions,
                 labels,
@@ -89,17 +89,24 @@ class DetectBrain(sb.core.Brain):
             if hasattr(self.hparams.lr_annealing, "on_batch_end"):
                 self.hparams.lr_annealing.on_batch_end(self.optimizer)
         else:
+            # Save prediction to be combined with same id predictions at the end
+            for uid, pred in zip(batch.id, predictions):
+                self.predictions_raw[uid] = pred.squeeze()
+
+            # Record stats for the chunks independently, using raw log-loss
+            predictions = self.hparams.log_softmax(predictions)
             loss = self.hparams.compute_cost(predictions, labels, lens)
             pred_class = torch.argmax(predictions, dim=-1).squeeze()
             pred_class = self.hparams.label_encoder.decode_torch(pred_class)
             actual_class = self.hparams.label_encoder.decode_torch(labels.squeeze())
-            self.class_stats.append(batch.id, pred_class, actual_class)
+            self.chunk_stats.append(batch.id, pred_class, actual_class)
 
         return loss
 
     def on_stage_start(self, stage, epoch=None):
         if stage != sb.Stage.TRAIN:
-            self.class_stats = self.hparams.class_stats()
+            self.chunk_stats = self.hparams.class_stats()
+            self.predictions_raw = {}
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -108,8 +115,13 @@ class DetectBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            stage_stats["accuracy"] = self.class_stats.summarize("accuracy")
-            self.class_stats.write_stats(sys.stdout)
+            stage_stats["chunk_accuracy"] = self.chunk_stats.summarize("accuracy")
+
+            # Combine chunk predictions into an overall prediction
+            comb_preds = self.combine_predictions(self.predictions_raw)
+            comb_stats = self.hparams.class_stats()
+            if stage == sb.stage.VALID:
+                loss, stats = self.compute_stats(comb_preds, comb_stats)
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -129,32 +141,14 @@ class DetectBrain(sb.core.Brain):
             )
 
     @torch.no_grad()
-    def predict_test(self, test_set):
+    def predict_test(self, valid_set, test_set):
         self.modules.eval()
         test_set = test_set.filtered_sorted(sort_key="id")
-        test_dl = sb.dataio.dataloader.make_dataloader(test_set)
         self.checkpointer.recover_if_possible(min_key="loss")
 
-        # Run all samples through model
-        uids = []
-        predictions_raw = {}
-        for test_example in tqdm.tqdm(test_dl):
-            predictions, lens = self.compute_forward(test_example, sb.Stage.TEST)
-            predictions_raw[test_example.id[0]] = predictions.cpu().squeeze()
-            if "_" in test_example.id[0]:
-                uids.append(test_example.id[0].split("_")[0])
-            else:
-                uids.append(test_example.id[0])
-        uid_counts = collections.Counter(uids)
-
-        # If chunked, we have to combine predictions
-        if not self.hparams.chunk_size:
-            predictions = predictions_raw
-        else:
-            predictions = {u: torch.tensor([0., 0., 0.]) for u in uid_counts}
-            for k, row in predictions_raw.items():
-                uid = k.split("_")[0] if "_" in k else k
-                predictions[uid] += row.squeeze() / uid_counts[uid]
+        # Make predictions, test set doesn't have labels to compute acc
+        valid_preds = predict_dataset(valid_set, compute_metrics=True)
+        test_preds = predict_dataset(test_set, compute_metrics=False)
             
         # Write to file
         with open(self.hparams.test_predictions_file, "w", newline="") as f:
@@ -178,12 +172,25 @@ class DetectBrain(sb.core.Brain):
                     w.write(str(weight))
                     w.write("\n")
 
+    def combine_preds(self, predictions_raw):
+        """Combine chunked predictions into sample predictions"""
 
+        # If chunked, we have to combine predictions
+        if not self.hparams.chunk_size:
+            predictions = predictions_raw
+        else:
+            predictions = {u: torch.tensor([0., 0., 0.]) for u in uid_counts}
+            for k, row in predictions_raw.items():
+                uid = k.split("_")[0] if "_" in k else k
+                predictions[uid] += row.squeeze() / uid_counts[uid]
+
+        return predictions
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
+
     # of the observed label a unique index (e.g, 'control': 0, 'mci': 1, ..)
     hparams["label_encoder"] = sb.dataio.encoder.CategoricalEncoder()
     label_names = ("diagnosis_control", "diagnosis_mci", "diagnosis_adrd")
@@ -296,4 +303,4 @@ if __name__ == "__main__":
     )
 
     # TODO: Print estimates for TEST
-    detector.predict_test(datasets["test"])
+    detector.predict_test(datasets["valid"], datasets["test"])

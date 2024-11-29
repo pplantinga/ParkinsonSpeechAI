@@ -5,13 +5,13 @@
 # ################################
 
 # Basic parameters
-seed: 2007
 lr_factor: 1
+seed: !ref 2025 + <lr_factor>
 lr: 0.001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 experiment_name: wavlm_ecapa
 results_dir: results
-output_folder: !ref <results_dir>/<experiment_name>/smooth_<lr_factor>_seed_<seed>_weighted
+output_folder: !ref <results_dir>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -28,9 +28,9 @@ skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-epochs: 5
+epochs: 30
 batch_size: 2
-grad_accumulation_factor: 5
+grad_accumulation_factor: 8
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
 max_lr: !ref <lr>
@@ -39,7 +39,7 @@ sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
 weights: [0.15, 0.55, 0.3] # roughly 900 negs, 200 mild, 500 severe
-label_smoothing: !ref 0.005 * 2 ** <lr_factor>
+label_smoothing: 0.01
 
 # Feature parameters
 wavlm_hub: ../../ssl-models/wavlm-large
@@ -80,8 +80,9 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.weighte
     layernorm: True
     freeze: !ref <freeze_wavlm>
 
+projection_size: 1024
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: 1024
+    input_size: !ref <projection_size>
     channels: [1024, 1024, 1024, 1024, 3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]
@@ -92,6 +93,7 @@ embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
     out_neurons: !ref <out_neurons>
+    dropout: 0
 
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <epochs>
@@ -115,7 +117,6 @@ compute_cost: !name:speechbrain.nnet.losses.nll_loss
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
-    #weight_decay: 0.0001
 
 wavlm_opt_class: !name:torch.optim.Adam
    lr: !ref <lr_wavlm>
