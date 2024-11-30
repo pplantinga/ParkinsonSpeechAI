@@ -68,8 +68,6 @@ class DetectBrain(sb.core.Brain):
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss using patient-type as label."""
 
-        # Get predictions and labels
-        labels, _ = batch.diagnosis
         predictions, lens = predictions
 
         # Concatenate labels in case of wav_augment
@@ -78,6 +76,7 @@ class DetectBrain(sb.core.Brain):
 
         # Compute loss with weights, but only for train
         if stage == sb.Stage.TRAIN:
+            labels, _ = batch.diagnosis
             predictions = self.hparams.log_softmax(predictions)
             loss = self.hparams.compute_cost(
                 predictions,
@@ -91,9 +90,17 @@ class DetectBrain(sb.core.Brain):
         else:
             # Save prediction to be combined with same id predictions at the end
             for uid, pred in zip(batch.id, predictions):
-                self.predictions_raw[uid] = pred.squeeze()
+                self.predictions_raw[uid] = pred.cpu().detach()
 
-            # Record stats for the chunks independently, using raw log-loss
+            # Cannot compute loss for test because we don't have labels
+            loss = torch.zeros(1)
+
+        # Record stats for the chunks independently, using raw log-loss
+        if stage == sb.Stage.VALID:
+            labels, _ = batch.diagnosis
+            for uid, label in zip(batch.id, labels):
+                self.labels_raw[uid] = label.cpu().detach()
+
             predictions = self.hparams.log_softmax(predictions)
             loss = self.hparams.compute_cost(predictions, labels, lens)
             pred_class = torch.argmax(predictions, dim=-1).squeeze()
@@ -104,9 +111,13 @@ class DetectBrain(sb.core.Brain):
         return loss
 
     def on_stage_start(self, stage, epoch=None):
+        """Initialize containers for metrics"""
         if stage != sb.Stage.TRAIN:
-            self.chunk_stats = self.hparams.class_stats()
             self.predictions_raw = {}
+
+            if stage == sb.Stage.VALID:
+                self.chunk_stats = self.hparams.class_stats()
+                self.labels_raw = {}
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -115,13 +126,13 @@ class DetectBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            stage_stats["chunk_accuracy"] = self.chunk_stats.summarize("accuracy")
-
             # Combine chunk predictions into an overall prediction
             comb_preds = self.combine_predictions(self.predictions_raw)
-            comb_stats = self.hparams.class_stats()
-            if stage == sb.stage.VALID:
-                loss, stats = self.compute_stats(comb_preds, comb_stats)
+            if stage == sb.Stage.VALID:
+                stage_stats["chunk_accuracy"] = self.chunk_stats.summarize("accuracy")
+                comb_labels = self.combine_predictions(self.labels_raw, labels=True)
+                stats = self.combine_stats(comb_preds, comb_labels)
+                stage_stats.update(stats)
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -133,64 +144,84 @@ class DetectBrain(sb.core.Brain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
+            loss, acc = stage_stats["comb_loss"], stage_stats["comb_acc"]
             self.checkpointer.save_and_keep_only(
-                meta={"loss": stage_loss},
-                name=f"epoch_{epoch}_loss_{stage_loss:.3f}_acc_{stage_stats['accuracy']:.2f}",
-                min_keys=["loss"],
-                max_keys=["accuracy"],
+                meta=stage_stats,
+                name=f"epoch_{epoch}_loss_{loss:.3f}_acc_{acc:.2f}",
+                min_keys=["comb_loss"],
+                max_keys=["comb_acc"],
             )
 
-    @torch.no_grad()
-    def predict_test(self, valid_set, test_set):
-        self.modules.eval()
-        test_set = test_set.filtered_sorted(sort_key="id")
-        self.checkpointer.recover_if_possible(min_key="loss")
+        # For test, we write our predictions in case we want to upload for competition
+        if stage == sb.Stage.TEST:
+            with open(self.hparams.test_predictions_file, "w", newline="") as f:
+                fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
+                w = csv.DictWriter(f, fieldnames=fields)
+                w.writeheader()
+                for uid, prediction in comb_preds.items():
+                    predictions = torch.softmax(prediction.squeeze(), dim=-1)
+                    w.writerow({
+                        "uid": uid,
+                        "diagnosis_control": predictions[0].numpy(),
+                        "diagnosis_mci": predictions[1].numpy(),
+                        "diagnosis_adrd": predictions[2].numpy(),
+                    })
 
-        # Make predictions, test set doesn't have labels to compute acc
-        valid_preds = predict_dataset(valid_set, compute_metrics=True)
-        test_preds = predict_dataset(test_set, compute_metrics=False)
-            
-        # Write to file
-        with open(self.hparams.test_predictions_file, "w", newline="") as f:
-            fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
-            w = csv.DictWriter(f, fieldnames=fields)
-            w.writeheader()
-            for uid, prediction in predictions.items():
-                predictions = torch.softmax(prediction.squeeze(), dim=-1)
-                w.writerow({
-                    "uid": test_example.id[0],
-                    "diagnosis_control": predictions[0].cpu().numpy(),
-                    "diagnosis_mci": predictions[1].cpu().numpy(),
-                    "diagnosis_adrd": predictions[2].cpu().numpy(),
-                })
+            # Also print ssl weights
+            if hasattr(self.hparams, "ssl_weights_file"):
+                with open(self.hparams.ssl_weights_file, "w", encoding="utf-8") as w:
+                    weights = self.modules.compute_features.weights.cpu().numpy()
+                    for weight in weights:
+                        w.write(str(weight))
+                        w.write("\n")
 
-        # Also print ssl weights
-        if hasattr(self.hparams, "ssl_weights_file"):
-            with open(self.hparams.ssl_weights_file, "w", encoding="utf-8") as w:
-                weights = self.modules.compute_features.weights.cpu().numpy()
-                for weight in weights:
-                    w.write(str(weight))
-                    w.write("\n")
-
-    def combine_preds(self, predictions_raw):
+    def combine_predictions(self, predictions_raw, labels=False):
         """Combine chunked predictions into sample predictions"""
-
-        # If chunked, we have to combine predictions
         if not self.hparams.chunk_size:
             predictions = predictions_raw
         else:
-            predictions = {u: torch.tensor([0., 0., 0.]) for u in uid_counts}
+            uids = [k.split("_")[0] for k in predictions_raw.keys()]
+            uid_counts = collections.Counter(uids)
+            predictions = {u: torch.tensor([[0., 0., 0.]]) for u in uid_counts}
             for k, row in predictions_raw.items():
-                uid = k.split("_")[0] if "_" in k else k
-                predictions[uid] += row.squeeze() / uid_counts[uid]
+                uid = k.split("_")[0]
+                if labels:
+                    predictions[uid] = row
+                else:
+                    predictions[uid] += row / uid_counts[uid]
 
         return predictions
+
+    def combine_stats(self, predictions, labels):
+        """Compute statistics for combined predictions"""
+        stats = {"comb_loss": 0}
+        classification_stats = self.hparams.class_stats()
+
+        for uid in predictions:
+            # Add a batch dimension back in
+            prediction = predictions[uid].unsqueeze(0)
+            label = labels[uid].unsqueeze(0)
+            prediction_ls = self.hparams.log_softmax(prediction)
+            stats["comb_loss"] += self.hparams.compute_cost(prediction_ls, label)
+
+            # Classification
+            pred_class = torch.argmax(prediction, dim=-1)
+            pred_class = self.hparams.label_encoder.decode_torch(pred_class)
+            actual_class = self.hparams.label_encoder.decode_torch(label)
+            classification_stats.append([uid], pred_class[0], actual_class[0])
+
+        stats["comb_loss"] /= len(predictions)
+        stats["comb_acc"] = classification_stats.summarize("accuracy")
+
+        # Write summary of dataset to output
+        classification_stats.write_stats(sys.stdout)
+        return stats
+
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
-
     # of the observed label a unique index (e.g, 'control': 0, 'mci': 1, ..)
     hparams["label_encoder"] = sb.dataio.encoder.CategoricalEncoder()
     label_names = ("diagnosis_control", "diagnosis_mci", "diagnosis_adrd")
@@ -216,7 +247,7 @@ def dataio_prep(hparams):
     @sb.utils.data_pipeline.takes("ssl_path", "start", "duration")
     @sb.utils.data_pipeline.provides("ssl_feats")
     def ssl_pipeline(ssl_path, start, duration):
-        return torch.load(ssl_path, map_location="cpu").float()
+        return torch.load(ssl_path, map_location="cpu", weights_only=True).float()
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
@@ -238,6 +269,7 @@ def dataio_prep(hparams):
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=json_path, dynamic_items=items, output_keys=keys,
         )
+    datasets["test"] = datasets["test"].filtered_sorted(sort_key="id")
 
     return datasets
 
@@ -302,5 +334,4 @@ if __name__ == "__main__":
         valid_loader_kwargs=hparams["dataloader_options"],
     )
 
-    # TODO: Print estimates for TEST
-    detector.predict_test(datasets["valid"], datasets["test"])
+    detector.evaluate(datasets["test"], min_key="comb_loss")
