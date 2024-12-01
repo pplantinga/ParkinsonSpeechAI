@@ -23,7 +23,8 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main
-#from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
+from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
+
 
 class DetectBrain(sb.core.Brain):
     """Class for training detector"""
@@ -87,37 +88,33 @@ class DetectBrain(sb.core.Brain):
             )
             if hasattr(self.hparams.lr_annealing, "on_batch_end"):
                 self.hparams.lr_annealing.on_batch_end(self.optimizer)
-        else:
-            # Save prediction to be combined with same id predictions at the end
-            for uid, pred in zip(batch.id, predictions):
-                self.predictions_raw[uid] = pred.cpu().detach()
 
-            # Cannot compute loss for test because we don't have labels
-            loss = torch.zeros(1)
-
-        # Record stats for the chunks independently, using raw log-loss
-        if stage == sb.Stage.VALID:
-            labels, _ = batch.diagnosis
-            for uid, label in zip(batch.id, labels):
-                self.labels_raw[uid] = label.cpu().detach()
-
+        # Record stats for the validation samples, without weighting/smoothing etc.
+        elif stage == sb.Stage.VALID:
             predictions = self.hparams.log_softmax(predictions)
+            labels, _ = batch.diagnosis
             loss = self.hparams.compute_cost(predictions, labels, lens)
             pred_class = torch.argmax(predictions, dim=-1).squeeze()
             pred_class = self.hparams.label_encoder.decode_torch(pred_class)
             actual_class = self.hparams.label_encoder.decode_torch(labels.squeeze())
-            self.chunk_stats.append(batch.id, pred_class, actual_class)
+            self.class_stats.append(batch.id, pred_class, actual_class)
+
+        # Save prediction to be combined with same id predictions at the end
+        elif stage == sb.Stage.TEST:
+            for uid, pred in zip(batch.id, predictions):
+                self.predictions[uid] = pred.cpu().detach()
+
+            # Cannot compute loss for test because we don't have labels
+            loss = torch.zeros(1)
 
         return loss
 
     def on_stage_start(self, stage, epoch=None):
         """Initialize containers for metrics"""
-        if stage != sb.Stage.TRAIN:
-            self.predictions_raw = {}
-
-            if stage == sb.Stage.VALID:
-                self.chunk_stats = self.hparams.class_stats()
-                self.labels_raw = {}
+        if stage == sb.Stage.TEST:
+            self.predictions = {}
+        elif stage == sb.Stage.VALID:
+            self.class_stats = self.hparams.class_stats()
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -125,17 +122,10 @@ class DetectBrain(sb.core.Brain):
         stage_stats = {"loss": stage_loss}
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
-        else:
-            # Combine chunk predictions into an overall prediction
-            comb_preds = self.combine_predictions(self.predictions_raw)
-            if stage == sb.Stage.VALID:
-                stage_stats["chunk_accuracy"] = self.chunk_stats.summarize("accuracy")
-                comb_labels = self.combine_predictions(self.labels_raw, labels=True)
-                stats = self.combine_stats(comb_preds, comb_labels)
-                stage_stats.update(stats)
+        elif stage == sb.Stage.VALID:
+            stage_stats["accuracy"] = self.class_stats.summarize("accuracy")
 
-        # Perform end-of-iteration things, like annealing, logging, etc.
-        if stage == sb.Stage.VALID:
+            # Perform end-of-iteration things, like annealing, logging, etc.
             old_lr, new_lr = self.hparams.lr_annealing(epoch)
             sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
 
@@ -144,21 +134,23 @@ class DetectBrain(sb.core.Brain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
-            loss, acc = stage_stats["comb_loss"], stage_stats["comb_acc"]
             self.checkpointer.save_and_keep_only(
                 meta=stage_stats,
-                name=f"epoch_{epoch}_loss_{loss:.3f}_acc_{acc:.2f}",
+                name=f"epoch_{epoch}_loss_{stage_loss:.3f}",
                 min_keys=["comb_loss"],
                 max_keys=["comb_acc"],
             )
 
+            # When validation is finished, print more detailed stats
+            self.class_stats.write_stats(sys.stdout)
+
         # For test, we write our predictions in case we want to upload for competition
-        if stage == sb.Stage.TEST:
+        elif stage == sb.Stage.TEST:
             with open(self.hparams.test_predictions_file, "w", newline="") as f:
                 fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
                 w = csv.DictWriter(f, fieldnames=fields)
                 w.writeheader()
-                for uid, prediction in comb_preds.items():
+                for uid, prediction in self.predictions.items():
                     predictions = torch.softmax(prediction.squeeze(), dim=-1)
                     w.writerow({
                         "uid": uid,
@@ -175,48 +167,6 @@ class DetectBrain(sb.core.Brain):
                         w.write(str(weight))
                         w.write("\n")
 
-    def combine_predictions(self, predictions_raw, labels=False):
-        """Combine chunked predictions into sample predictions"""
-        if not self.hparams.chunk_size:
-            predictions = predictions_raw
-        else:
-            uids = [k.split("_")[0] for k in predictions_raw.keys()]
-            uid_counts = collections.Counter(uids)
-            predictions = {u: torch.tensor([[0., 0., 0.]]) for u in uid_counts}
-            for k, row in predictions_raw.items():
-                uid = k.split("_")[0]
-                if labels:
-                    predictions[uid] = row
-                else:
-                    predictions[uid] += row / uid_counts[uid]
-
-        return predictions
-
-    def combine_stats(self, predictions, labels):
-        """Compute statistics for combined predictions"""
-        stats = {"comb_loss": 0}
-        classification_stats = self.hparams.class_stats()
-
-        for uid in predictions:
-            # Add a batch dimension back in
-            prediction = predictions[uid].unsqueeze(0)
-            label = labels[uid].unsqueeze(0)
-            prediction_ls = self.hparams.log_softmax(prediction)
-            stats["comb_loss"] += self.hparams.compute_cost(prediction_ls, label)
-
-            # Classification
-            pred_class = torch.argmax(prediction, dim=-1)
-            pred_class = self.hparams.label_encoder.decode_torch(pred_class)
-            actual_class = self.hparams.label_encoder.decode_torch(label)
-            classification_stats.append([uid], pred_class[0], actual_class[0])
-
-        stats["comb_loss"] /= len(predictions)
-        stats["comb_acc"] = classification_stats.summarize("accuracy")
-
-        # Write summary of dataset to output
-        classification_stats.write_stats(sys.stdout)
-        return stats
-
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -229,13 +179,10 @@ def dataio_prep(hparams):
     hparams["label_encoder"].update_from_iterable(label_names)
 
     # Define audio pipeline
-    @sb.utils.data_pipeline.takes("filepath", "start", "duration")
+    @sb.utils.data_pipeline.takes("filepath")
     @sb.utils.data_pipeline.provides("sig")
-    def audio_pipeline(filepath, start, duration):
-        start = int(start * 16000)
-        stop = int((start + duration) * 16000)
-        file_obj = {"file": filepath, "start": start, "stop": stop}
-        return sb.dataio.dataio.read_audio(file_obj)
+    def audio_pipeline(filepath):
+        return sb.dataio.dataio.read_audio(filepath)
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes(*label_names)
@@ -244,9 +191,9 @@ def dataio_prep(hparams):
         return torch.argmax(torch.LongTensor(labels), dim=-1, keepdim=True)
 
     # Pretrained ssl feature pipeline
-    @sb.utils.data_pipeline.takes("ssl_path", "start", "duration")
+    @sb.utils.data_pipeline.takes("ssl_path")
     @sb.utils.data_pipeline.provides("ssl_feats")
-    def ssl_pipeline(ssl_path, start, duration):
+    def ssl_pipeline(ssl_path):
         return torch.load(ssl_path, map_location="cpu", weights_only=True).float()
 
     # Define datasets. We also connect the dataset with the data processing
@@ -269,6 +216,8 @@ def dataio_prep(hparams):
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=json_path, dynamic_items=items, output_keys=keys,
         )
+
+    # Sort test set so the predictions file is in the expected order
     datasets["test"] = datasets["test"].filtered_sorted(sort_key="id")
 
     return datasets
@@ -285,18 +234,13 @@ if __name__ == "__main__":
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
-    # Dataset prep including chunking etc.
     from prepare_prepare import prepare_prepare
 
-    chunk_size = hparams["chunk_size"] if "chunk_size" in hparams else None
-    hop_size = hparams["hop_size"] if "hop_size" in hparams else None
     run_on_main(
         prepare_prepare,
         kwargs={
             "data_folder": hparams["data_folder"],
             "manifests": hparams["manifests"],
-            "chunk_size": chunk_size,
-            "hop_size": hop_size,
             "prep_ssl": hparams["prep_ssl"],
         },
     )

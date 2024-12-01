@@ -22,17 +22,15 @@ manifests:
   valid: !ref <output_folder>/valid.json
   test: !ref <output_folder>/test.json
 test_predictions_file: !ref <output_folder>/test_predictions.csv
-chunk_size: 3.0
-hop_size: 1.5
 prep_ssl: True
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-epochs: 20
-batch_size: 64
-test_batch_size: 1
+epochs: 30
+batch_size: 8
+test_batch_size: 2
 base_lr: !ref <lr> / 1000
 max_lr: !ref <lr>
 step_size: 2000

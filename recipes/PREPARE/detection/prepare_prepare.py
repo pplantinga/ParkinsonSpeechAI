@@ -2,24 +2,12 @@ import csv
 import json
 import os
 import pathlib
-import torch
 import torchaudio
 
 
-def prepare_prepare(
-    data_folder,
-    manifests,
-    chunk_size=None,
-    hop_size=None,
-    valid_count=90,
-    prep_ssl=False,
-):
+def prepare_prepare(data_folder, manifests, valid_count=90, prep_ssl=False):
     assert manifests.keys() == {"train", "valid", "test"}
-    try:
-        os.listdir(data_folder)
-    except:
-        print("Data folder not found")
-        return
+    assert os.path.exists(data_folder)
 
     data_folder = pathlib.Path(data_folder)
     train_files = (data_folder / "train_audios").glob("*.flac")
@@ -41,6 +29,7 @@ def prepare_prepare(
     for dataset, path in manifests.items():
         if os.path.exists(path):
             continue
+
         create_json(
             dataset=dataset,
             path=path,
@@ -49,8 +38,6 @@ def prepare_prepare(
             demographics=demographics,
             annotations=annotations,
             prep_ssl=prep_ssl,
-            chunk_size=chunk_size,
-            hop_size=hop_size,
         )
 
 def select_validation(valid_count, annotations):
@@ -79,62 +66,34 @@ def read_csv(filepath, type_fn=None):
     return lines
 
 
-def create_json(
-    dataset, path, ids, files, demographics, annotations, prep_ssl, chunk_size, hop_size
-):
+def create_json(dataset, path, ids, files, demographics, annotations, prep_ssl):
     """Prepare a json manifest with all relevant info"""
     json_dict = {}
     
     for uid in ids:
         info = torchaudio.info(files[uid])
-        duration = info.num_frames / info.sample_rate
-        sample_max = info.num_frames - int(chunk_size * info.sample_rate) + 1
-        hop_samples = int(hop_size * info.sample_rate)
-        ssl = files[uid].with_suffix(".pt") if prep_ssl else None
-        annot = annotations[uid] if uid in annotations else None
 
-        if not chunk_size or duration < chunk_size:
-            json_dict[uid] = make_sample(
-                filepath=files[uid],
-                duration=duration,
-                demographics=demographics[uid],
-                start=0,
-                annotations=annot,
-                ssl=ssl,
-            )
-        else:
-            arange = torch.arange(0, duration - chunk_size + hop_size, hop_size)
-            for i, start in enumerate(arange):
-                json_dict[f"{uid}_{i}"] = make_sample(
-                    filepath=files[uid],
-                    duration=chunk_size,
-                    demographics=demographics[uid],
-                    start=start.item(),
-                    annotations=annot,
-                    ssl=ssl,
-                    chunk=i,
-                )
+        json_dict[uid] = make_sample(
+            filepath=files[uid],
+            duration=info.num_frames / info.sample_rate,
+            demographics=demographics[uid],
+            annotations=annotations[uid] if uid in annotations else None,
+            ssl=files[uid].with_suffix(".pt") if prep_ssl else None,
+        )
 
     # Writing the dictionary to the json file
     with open(path, mode="w") as json_f:
         json.dump(json_dict, json_f, indent=2)
 
-def make_sample(filepath, duration, demographics, start, annotations=None, ssl=None, chunk=None):
+def make_sample(filepath, duration, demographics, annotations=None, ssl=None, chunk=None):
     sample = {
         "filepath": str(filepath),
         "duration": duration,
-        "start": start,
         **demographics,
     }
     if annotations:
         sample.update(annotations)
     if ssl:
-        start_frame = int(start * 50)
-        dur_frames = int(duration * 50)
-        feats = torch.load(ssl, map_location="cpu")
-        chunk_path = ssl.with_stem(f"{ssl.stem}_{chunk}")
-        feat_part = feats[start_frame:start_frame + dur_frames].clone()
-        torch.save(feat_part, chunk_path)
-        sample["ssl_path"] = str(chunk_path)
+        sample["ssl_path"] = str(ssl)
 
     return sample
