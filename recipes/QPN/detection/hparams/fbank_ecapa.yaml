@@ -36,6 +36,7 @@ sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
 remove_keys: [""]
+loss_type: "aam"
 
 # Test parameters
 max_test_chunks: 24
@@ -106,6 +107,8 @@ modules:
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
+nll_loss: !name:speechbrain.nnet.losses.nll_loss
+
 KLD_Loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum
 
@@ -129,7 +132,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Error computation
 error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
     positive_label: 1
-error_metric: recall
+error_metric: F-score
 
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>

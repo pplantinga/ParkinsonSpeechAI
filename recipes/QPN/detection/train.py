@@ -80,6 +80,7 @@ class ParkinsonBrain(sb.core.Brain):
         weight_hc = self.hparams.weight_hc / max_weight
         weights = torch.tensor([weight_pd, weight_hc]).unsqueeze(0).to(self.device)
 
+        # Compute loss
         # Squeeze and ensure targets are one hot encoded (for AAM)
         preds = preds.squeeze(1)
         targets = labels.squeeze(1)
@@ -133,8 +134,8 @@ class ParkinsonBrain(sb.core.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta={"precision": stage_stats["ErrorRates"]["precision"]},
-                min_keys=["precision"],
+                meta={self.hparams.error_metric: stage_stats["ErrorRates"][self.hparams.error_metric]},
+                min_keys=[self.hparams.error_metric],
             )
 
         if stage == sb.Stage.TEST:
@@ -142,6 +143,7 @@ class ParkinsonBrain(sb.core.Brain):
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
+
 
     def custom_evaluate(self, test_set, max_key=None, min_key=None, progressbar=None, test_loader_kwargs={}):
         if progressbar is None:
@@ -217,6 +219,7 @@ class ParkinsonBrain(sb.core.Brain):
         loss = torch.stack(losses).mean()
         return loss.detach().cpu() # TODO make it possible to have batch_size > 1, (is this useful though)?
 
+
     def write_prediction(self, info):
         with open(self.hparams.predictions_file, "a") as f:
             writer = csv.writer(f)
@@ -231,6 +234,7 @@ def dataio_prep(hparams):
     # Initialization of the label encoder. The label encoder assigns to each
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
+    label_encoder.expect_len(hparams["out_neurons"])
 
     # Length of a chunk
     snt_len_sample = int(hparams["sample_rate"] * hparams["sentence_len"])
@@ -278,6 +282,11 @@ def dataio_prep(hparams):
 
             # Ensure the last chunk doesn't go beyond the end of the WAV file
             if stop > duration_sample:
+                # If the last chunk goes beyond end of wav by less than half snt_len_sample,
+                # then ignore this chunk (it will have too much overlap with previous chunk)
+                if stop - duration_sample < snt_len_sample // 2:
+                    continue
+
                 stop = duration_sample
                 start = stop - snt_len_sample
                 if start < 0:
@@ -340,6 +349,9 @@ def dataio_prep(hparams):
         from_didatasets=[datasets["train"]],
         output_key="patient_type",
     )
+    label_encoder.enforce_label("PD", 1)
+    label_encoder.enforce_label("HC", 0)
+    label_encoder.save(hparams["encoded_labels"])
 
     return datasets
 
@@ -402,13 +414,13 @@ if __name__ == "__main__":
     # Regular Testing
     regular_test_stats = parkinson_brain.evaluate(
         test_set=datasets["test"],
-        min_key="precision",
+        min_key=hparams["error_metric"],
         test_loader_kwargs=hparams["dataloader_options"],
     )
 
     # Chunk Testing
     chunk_test_stats = parkinson_brain.custom_evaluate(
         test_set=datasets["chunk_test"],
-        min_key="precision",
+        min_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )

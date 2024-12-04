@@ -106,9 +106,10 @@ def get_patient_traits(files, sheet, batch):
                 continue
 
             # Refactor language
-            if l1 == "FR":
+            # TODO fix excel to have unified language identifiers
+            if l1 == "FR" or "French" in l1 or "Fench" in l1:
                 l1 = "French"
-            elif l1 == "EN":
+            elif l1 == "EN" or "English" in l1:
                 l1 = "English"
             else:
                 l1 = "Other"
@@ -175,11 +176,11 @@ def create_json(json_file, path_type_dict, remove_keys):
 
         # Remove certain values for specific tests (i.e if we want to train only on men/women, only on an age group, etc)
         for value in info_dict.values():
-            if value in remove_keys and "train" in audiofile:
+            if value in remove_keys:
                 skip = True
 
         # Create entry for this utterance
-        if skip:
+        if skip and ("train" in audiofile or "valid" in audiofile):
             continue
 
         json_dict[uttid] = {
