@@ -4,7 +4,6 @@ import os
 import pathlib
 import torchaudio
 
-# test
 
 def prepare_prepare(data_folder, manifests, valid_count=90, prep_ssl=False):
     assert manifests.keys() == {"train", "valid", "test"}
@@ -27,6 +26,11 @@ def prepare_prepare(data_folder, manifests, valid_count=90, prep_ssl=False):
         "train": annotations.keys() - set(valid_ids),
     }
 
+    # Get opensmile features
+    opensmile_train = read_csv(data_folder / "train_features.csv", type_fn=float)
+    opensmile_test = read_csv(data_folder / "test_features.csv", type_fn=float)
+    opensmile = opensmile_train | opensmile_test
+
     for dataset, path in manifests.items():
         if os.path.exists(path):
             continue
@@ -39,6 +43,7 @@ def prepare_prepare(data_folder, manifests, valid_count=90, prep_ssl=False):
             demographics=demographics,
             annotations=annotations,
             prep_ssl=prep_ssl,
+            opensmile=opensmile
         )
 
 def select_validation(valid_count, annotations):
@@ -67,10 +72,10 @@ def read_csv(filepath, type_fn=None):
     return lines
 
 
-def create_json(dataset, path, ids, files, demographics, annotations, prep_ssl):
+def create_json(dataset, path, ids, files, demographics, annotations, prep_ssl, opensmile):
     """Prepare a json manifest with all relevant info"""
     json_dict = {}
-    
+
     for uid in ids:
         info = torchaudio.info(files[uid])
 
@@ -80,13 +85,14 @@ def create_json(dataset, path, ids, files, demographics, annotations, prep_ssl):
             demographics=demographics[uid],
             annotations=annotations[uid] if uid in annotations else None,
             ssl=files[uid].with_suffix(".pt") if prep_ssl else None,
+            opensmile=opensmile[uid] if uid in opensmile else None,
         )
 
     # Writing the dictionary to the json file
     with open(path, mode="w") as json_f:
         json.dump(json_dict, json_f, indent=2)
 
-def make_sample(filepath, duration, demographics, annotations=None, ssl=None, chunk=None):
+def make_sample(filepath, duration, demographics, annotations=None, ssl=None, opensmile=None):
     sample = {
         "filepath": str(filepath),
         "duration": duration,
@@ -96,5 +102,7 @@ def make_sample(filepath, duration, demographics, annotations=None, ssl=None, ch
         sample.update(annotations)
     if ssl:
         sample["ssl_path"] = str(ssl)
+    if opensmile:
+        sample["opensmile_feat_dict"] = opensmile
 
     return sample

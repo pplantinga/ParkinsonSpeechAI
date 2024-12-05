@@ -39,6 +39,7 @@ sentence_len: 15.0 # seconds
 shuffle: True
 weights: [0.15, 0.55, 0.3] # roughly 900 negs, 200 mild, 500 severe
 label_smoothing: 0.1
+fusion_type: add
 
 # Number of classes
 out_neurons: 3
@@ -74,6 +75,10 @@ classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
     out_neurons: !ref <out_neurons>
 
+opensmile_projector: !new:speechbrain.nnet.linear.Linear
+    input_size: 88
+    n_neurons: 2048
+
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <epochs>
 
@@ -84,6 +89,7 @@ mean_var_norm: !new:speechbrain.processing.features.InputNormalization
 modules:
     embedding_model: !ref <embedding_model>
     classifier: !ref <classifier>
+    opensmile_projector: !ref <opensmile_projector>
     mean_var_norm: !ref <mean_var_norm>
 
 softmax: !new:speechbrain.nnet.activations.Softmax

@@ -23,7 +23,6 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main
-from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
 
 
 class DetectBrain(sb.core.Brain):
@@ -43,28 +42,26 @@ class DetectBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
 
-        # Compute features
-        feats, lens = batch.ssl_feats
+        # Get WavLM features
+        wavlm_feats, lens = batch.ssl_feats
 
-        # Embeddings + speaker classifier
-        embeddings = self.modules.embedding_model(feats)
+        # Get OpenSmile features
+        opensmile_feats, _ = batch.opensmile_feats
+        opensmile_feats = self.modules.opensmile_projector(opensmile_feats)
+        opensmile_feats = opensmile_feats.unsqueeze(1).expand(-1, wavlm_feats.size(1), -1)
+
+        # Combine features, concat or add (to be tuned)
+        if self.hparams.fusion_type == "concat":
+            combined_features = torch.cat([wavlm_feats, opensmile_feats], dim=-1)
+        else:
+            combined_features = wavlm_feats + opensmile_feats
+
+        embeddings = self.modules.embedding_model(combined_features)
+
         outputs = self.modules.classifier(embeddings)
 
         # Outputs
         return outputs, lens
-
-    def compute_features(self, wavs, lens):
-        feats = self.modules.compute_features(wavs)
-
-        if hasattr(self.hparams, "vocal_features"):
-            f0, voiced, jit, shim, hnr = vocal_characteristics(wavs, step_size=0.02)
-            gne = compute_gne(wavs, hop_size=200)
-            vocal_feats = torch.stack((jit, shim, hnr, gne), dim=-1)
-            vocal_feats = self.modules.mean_var_norm(vocal_feats, lens)
-            vocal_feats = vocal_feats[:, :feats.size(1)]
-            feats = torch.cat((feats, vocal_feats), dim=-1)
-
-        return feats
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss using patient-type as label."""
@@ -196,6 +193,14 @@ def dataio_prep(hparams):
     def ssl_pipeline(ssl_path):
         return torch.load(ssl_path, map_location="cpu", weights_only=True).float()
 
+    # Pre-computed opensmile pipeline
+    @sb.utils.data_pipeline.takes("opensmile_feat_dict")
+    @sb.utils.data_pipeline.provides("opensmile_feats")
+    def opensmile_pipeline(opensmile_feat_dict):
+        opensmile_feat_dict.pop("segment_start_sec")
+        opensmile_feat_dict.pop("segment_end_sec")
+        return torch.tensor(list(opensmile_feat_dict.values()), dtype=torch.float32)
+
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
     datasets = {}
@@ -212,6 +217,9 @@ def dataio_prep(hparams):
         if hparams["prep_ssl"]:
             items.append(ssl_pipeline)
             keys.append("ssl_feats")
+
+        items.append(opensmile_pipeline)
+        keys.append("opensmile_feats")
 
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=json_path, dynamic_items=items, output_keys=keys,
