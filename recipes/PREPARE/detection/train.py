@@ -23,7 +23,14 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main
-from speechbrain.processing.voice_analysis import vocal_characteristics, compute_gne
+
+
+def llrd(encoder, name_of_layers_module, optimizer, lr, alpha=0.9):
+    params = []
+    for i, layer in enumerate(encoder.get_submodule(name_of_layers_module)):
+        params.append({"params": layer.parameters(), "lr": lr * alpha**i})
+
+    return optimizer(params)
 
 
 class DetectBrain(sb.core.Brain):
@@ -44,7 +51,10 @@ class DetectBrain(sb.core.Brain):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
 
         # Compute features
-        feats, lens = batch.ssl_feats
+        if self.hparams.prep_ssl:
+            feats, _ = batch.ssl_feats
+        else:
+            feats = self.modules.compute_features(wavs)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -52,19 +62,6 @@ class DetectBrain(sb.core.Brain):
 
         # Outputs
         return outputs, lens
-
-    def compute_features(self, wavs, lens):
-        feats = self.modules.compute_features(wavs)
-
-        if hasattr(self.hparams, "vocal_features"):
-            f0, voiced, jit, shim, hnr = vocal_characteristics(wavs, step_size=0.02)
-            gne = compute_gne(wavs, hop_size=200)
-            vocal_feats = torch.stack((jit, shim, hnr, gne), dim=-1)
-            vocal_feats = self.modules.mean_var_norm(vocal_feats, lens)
-            vocal_feats = vocal_feats[:, :feats.size(1)]
-            feats = torch.cat((feats, vocal_feats), dim=-1)
-
-        return feats
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss using patient-type as label."""
@@ -86,8 +83,6 @@ class DetectBrain(sb.core.Brain):
                 weight=self.weights,
                 label_smoothing=self.hparams.label_smoothing,
             )
-            if hasattr(self.hparams.lr_annealing, "on_batch_end"):
-                self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
         # Record stats for the validation samples, without weighting/smoothing etc.
         elif stage == sb.Stage.VALID:
@@ -100,21 +95,59 @@ class DetectBrain(sb.core.Brain):
             self.class_stats.append(batch.id, pred_class, actual_class)
 
         # Save prediction to be combined with same id predictions at the end
-        elif stage == sb.Stage.TEST:
+        if stage != sb.Stage.TRAIN:
             for uid, pred in zip(batch.id, predictions):
                 self.predictions[uid] = pred.cpu().detach()
 
             # Cannot compute loss for test because we don't have labels
-            loss = torch.zeros(1)
+            if stage == sb.Stage.TEST:
+                loss = torch.zeros(1)
 
         return loss
 
+    def on_fit_batch_end(self, batch, outputs, loss, should_step):
+        if not should_step:
+            return
+
+        if self.modules.compute_features.freeze == False:
+            self.wavlm_sched.step()
+        if hasattr(self.hparams.lr_annealing, "on_batch_end"):
+            self.hparams.lr_annealing.on_batch_end(self.optimizer)
+
+    def init_optimizers(self):
+        """Initialize optimizer for features and all else."""
+        all_params = []
+        wavlm_opt = None
+        for name, module in self.modules.items():
+            if name == "compute_features":
+                wavlm_opt = llrd(
+                    module,
+                    self.hparams.name_of_layers_module,
+                    self.hparams.wavlm_opt_class,
+                    self.hparams.lr_wavlm,
+                    alpha=self.hparams.llrd_alpha,
+                )
+                self.wavlm_sched = self.hparams.scheduler(wavlm_opt)
+
+            all_params.extend(module.parameters())
+
+        self.optimizer = self.opt_class(all_params)
+        self.optimizers_dict = {"opt_class": self.optimizer}
+        self.checkpointer.add_recoverable("optimizer", self.optimizer)
+
+        if wavlm_opt:
+            self.optimizers_dict["wavlm"] = wavlm_opt
+            self.checkpointer.add_recoverable("wavlm_opt", wavlm_opt)
+
     def on_stage_start(self, stage, epoch=None):
         """Initialize containers for metrics"""
-        if stage == sb.Stage.TEST:
+        if stage != sb.Stage.TRAIN:
             self.predictions = {}
-        elif stage == sb.Stage.VALID:
-            self.class_stats = self.hparams.class_stats()
+            if stage == sb.Stage.VALID:
+                self.class_stats = self.hparams.class_stats()
+        elif hasattr(self.hparams, "wavlm_unfreeze_epoch"):
+            if self.hparams.wavlm_unfreeze_epoch == epoch:
+                self.modules.compute_features.freeze = False
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -137,27 +170,17 @@ class DetectBrain(sb.core.Brain):
             self.checkpointer.save_and_keep_only(
                 meta=stage_stats,
                 name=f"epoch_{epoch}_loss_{stage_loss:.3f}",
-                min_keys=["comb_loss"],
-                max_keys=["comb_acc"],
+                min_keys=["loss"],
+                max_keys=["accuracy"],
             )
 
             # When validation is finished, print more detailed stats
             self.class_stats.write_stats(sys.stdout)
+            self.write_predictions(self.hparams.valid_predictions_file)
 
         # For test, we write our predictions in case we want to upload for competition
         elif stage == sb.Stage.TEST:
-            with open(self.hparams.test_predictions_file, "w", newline="") as f:
-                fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
-                w = csv.DictWriter(f, fieldnames=fields)
-                w.writeheader()
-                for uid, prediction in self.predictions.items():
-                    predictions = torch.softmax(prediction.squeeze(), dim=-1)
-                    w.writerow({
-                        "uid": uid,
-                        "diagnosis_control": predictions[0].numpy(),
-                        "diagnosis_mci": predictions[1].numpy(),
-                        "diagnosis_adrd": predictions[2].numpy(),
-                    })
+            self.write_predictions(self.hparams.test_predictions_file)
 
             # Also print ssl weights
             if hasattr(self.hparams, "ssl_weights_file"):
@@ -166,6 +189,23 @@ class DetectBrain(sb.core.Brain):
                     for weight in weights:
                         w.write(str(weight))
                         w.write("\n")
+
+    def write_predictions(self, filename):
+        """Write predictions to file for further analysis"""
+        with open(filename, "w", newline="") as f:
+            fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
+            w = csv.DictWriter(f, fieldnames=fields)
+            w.writeheader()
+            for uid, prediction in self.predictions.items():
+                predictions = torch.softmax(prediction.squeeze(), dim=-1)
+                w.writerow(
+                    {
+                        "uid": uid,
+                        "diagnosis_control": predictions[0].numpy(),
+                        "diagnosis_mci": predictions[1].numpy(),
+                        "diagnosis_adrd": predictions[2].numpy(),
+                    }
+                )
 
 
 def dataio_prep(hparams):
@@ -214,13 +254,14 @@ def dataio_prep(hparams):
             keys.append("ssl_feats")
 
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=json_path, dynamic_items=items, output_keys=keys,
+            json_path=json_path, dynamic_items=items, output_keys=keys
         )
 
     # Sort test set so the predictions file is in the expected order
     datasets["test"] = datasets["test"].filtered_sorted(sort_key="id")
 
     return datasets
+
 
 if __name__ == "__main__":
 
@@ -278,4 +319,4 @@ if __name__ == "__main__":
         valid_loader_kwargs=hparams["dataloader_options"],
     )
 
-    detector.evaluate(datasets["test"], min_key="comb_loss")
+    detector.evaluate(datasets["test"], min_key="loss")
