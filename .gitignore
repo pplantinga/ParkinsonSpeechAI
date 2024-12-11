@@ -11,3 +11,10 @@ __pycache__
 # other files
 *.wav
 **/results/
+
+# shell scripts
+*.sh
+
+# zip files
+*.zip
+
