@@ -6,7 +6,7 @@
 
 # Basic parameters
 lr_factor: 1
-seed: !ref 2030
+seed: !ref 2031
 lr: !ref 0.000001 * 3 ** <lr_factor>
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 experiment_name: two_class_four_params
@@ -62,6 +62,7 @@ test_dataloader_options:
 # sure of our preliminary results
 wavlm_size: 2048
 
+add_vocal_feats: False
 vocal_feats: !new:speechbrain.lobes.features.VocalFeatures
     step_size: 0.02
     log_scores: False
@@ -81,7 +82,7 @@ embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
     groups: [1, 1, 1, 1, 1]
     attention_channels: 128
     lin_neurons: 192
-    dropout: 0.1
+    dropout: 0.2
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192

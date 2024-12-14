@@ -33,6 +33,15 @@ def llrd(encoder, name_of_layers_module, optimizer, lr, alpha=0.9):
     return optimizer(params)
 
 
+def mixup(sample, lambdas):
+    bs = sample.size(0) // 2
+    return sample[:bs] * lambdas + sample[bs:] * (1 - lambdas)
+
+
+def sample_lamda(size, alpha):
+    return torch.beta(alpha, alpha)
+
+
 class DetectBrain(sb.core.Brain):
     """Class for training detector"""
 
@@ -45,6 +54,10 @@ class DetectBrain(sb.core.Brain):
 
         batch = batch.to(self.device)
         wavs, lens = batch.sig
+        if stage != sb.Stage.TEST:
+            labels, _ = batch.diagnosis
+        else:
+            labels = None
 
         # Augmentations, if specified
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
@@ -56,17 +69,24 @@ class DetectBrain(sb.core.Brain):
         else:
             feats = self.modules.compute_features(wavs)
 
+        with torch.no_grad():
+            if hasattr(self.hparams, "mixup_alpha") and stage == sb.Stage.TRAIN:
+                s = (feats.size(0) // 2, 1, 1)
+                lambdas = self.hparams.beta_sampler.rsample(s).to(self.device)
+                feats = mixup(feats, lambdas)
+                labels = mixup(labels, lambdas.squeeze(-1))
+
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
-        outputs = self.modules.classifier(embeddings)
+        outputs = self.modules.classifier(embeddings).squeeze()
 
         # Outputs
-        return outputs, lens
+        return outputs, labels, lens
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss using patient-type as label."""
 
-        predictions, lens = predictions
+        predictions, labels, lens = predictions
 
         # Concatenate labels in case of wav_augment
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
@@ -74,30 +94,24 @@ class DetectBrain(sb.core.Brain):
 
         # Compute loss with weights, but only for train
         if stage == sb.Stage.TRAIN:
-            labels, _ = batch.diagnosis
-            predictions = self.hparams.log_softmax(predictions)
-            loss = self.hparams.compute_cost(
-                predictions,
-                labels,
-                lens,
-                weight=self.weights,
-                label_smoothing=self.hparams.label_smoothing,
-            )
+            loss = self.hparams.compute_cost(predictions, labels)
 
         # Record stats for the validation samples, without weighting/smoothing etc.
         elif stage == sb.Stage.VALID:
-            predictions = self.hparams.log_softmax(predictions)
-            labels, _ = batch.diagnosis
-            loss = self.hparams.compute_cost(predictions, labels, lens)
+            loss = self.hparams.compute_cost(predictions, labels)
             pred_class = torch.argmax(predictions, dim=-1).squeeze()
             pred_class = self.hparams.label_encoder.decode_torch(pred_class)
-            actual_class = self.hparams.label_encoder.decode_torch(labels.squeeze())
+            actual_class = torch.argmax(labels, dim=-1).squeeze()
+            actual_class = self.hparams.label_encoder.decode_torch(actual_class)
             self.class_stats.append(batch.id, pred_class, actual_class)
 
         # Save prediction to be combined with same id predictions at the end
         if stage != sb.Stage.TRAIN:
-            for uid, pred in zip(batch.id, predictions):
-                self.predictions[uid] = pred.cpu().detach()
+            if len(batch.id) == 1:
+                self.predictions[batch.id[0]] = predictions.cpu().detach()
+            else:
+                for uid, pred in zip(batch.id, predictions):
+                    self.predictions[uid] = pred.cpu().detach()
 
             # Cannot compute loss for test because we don't have labels
             if stage == sb.Stage.TEST:
@@ -109,8 +123,9 @@ class DetectBrain(sb.core.Brain):
         if not should_step:
             return
 
-        if self.modules.compute_features.freeze == False:
-            self.wavlm_sched.step()
+        if hasattr(self.modules, "compute_features"):
+            if self.modules.compute_features.freeze == False:
+                self.wavlm_sched.step()
         if hasattr(self.hparams.lr_annealing, "on_batch_end"):
             self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
@@ -176,11 +191,10 @@ class DetectBrain(sb.core.Brain):
 
             # When validation is finished, print more detailed stats
             self.class_stats.write_stats(sys.stdout)
-            self.write_predictions(self.hparams.valid_predictions_file)
 
         # For test, we write our predictions in case we want to upload for competition
         elif stage == sb.Stage.TEST:
-            self.write_predictions(self.hparams.test_predictions_file)
+            self.write_predictions()
 
             # Also print ssl weights
             if hasattr(self.hparams, "ssl_weights_file"):
@@ -190,9 +204,9 @@ class DetectBrain(sb.core.Brain):
                         w.write(str(weight))
                         w.write("\n")
 
-    def write_predictions(self, filename):
+    def write_predictions(self):
         """Write predictions to file for further analysis"""
-        with open(filename, "w", newline="") as f:
+        with open(self.predictions_file, "w", newline="") as f:
             fields = ["uid", "diagnosis_control", "diagnosis_mci", "diagnosis_adrd"]
             w = csv.DictWriter(f, fieldnames=fields)
             w.writeheader()
@@ -228,7 +242,7 @@ def dataio_prep(hparams):
     @sb.utils.data_pipeline.takes(*label_names)
     @sb.utils.data_pipeline.provides("diagnosis")
     def label_pipeline(*labels):
-        return torch.argmax(torch.LongTensor(labels), dim=-1, keepdim=True)
+        return torch.FloatTensor(labels)
 
     # Pretrained ssl feature pipeline
     @sb.utils.data_pipeline.takes("ssl_path")
@@ -306,9 +320,9 @@ if __name__ == "__main__":
     )
 
     # Add weights for training balance
-    detector.weights = torch.tensor(
-        hparams["weights"], device=detector.device, requires_grad=False
-    )
+    #detector.weights = torch.tensor(
+    #    hparams["weights"], device=detector.device, requires_grad=False
+    #)
 
     # Training
     detector.fit(
@@ -319,4 +333,7 @@ if __name__ == "__main__":
         valid_loader_kwargs=hparams["dataloader_options"],
     )
 
+    detector.predictions_file = detector.hparams.valid_predictions_file
+    detector.evaluate(datasets["valid"], min_key="loss")
+    detector.predictions_file = detector.hparams.test_predictions_file
     detector.evaluate(datasets["test"], min_key="loss")

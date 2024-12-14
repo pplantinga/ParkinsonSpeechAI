@@ -46,10 +46,16 @@ def select_validation(valid_count, annotations):
     counts = {"diagnosis_control": 0, "diagnosis_mci": 0, "diagnosis_adrd": 0}
     for uid, row in annotations.items():
         for label in counts:
-            if row[label] > 0 and counts[label] < valid_count // 3:
+            if row[label] > 0:# and counts[label] < valid_count // 3:
                 valid_ids.append(uid)
                 counts[label] += 1
                 break
+
+        if sum(counts.values()) >= valid_count:
+            break
+
+    print("Validation distribution")
+    print(counts)
 
     return valid_ids
 
