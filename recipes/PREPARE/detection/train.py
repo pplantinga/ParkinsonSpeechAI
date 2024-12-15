@@ -320,9 +320,9 @@ if __name__ == "__main__":
     )
 
     # Add weights for training balance
-    #detector.weights = torch.tensor(
-    #    hparams["weights"], device=detector.device, requires_grad=False
-    #)
+    detector.weights = torch.tensor(
+        hparams["weights"], device=detector.device, requires_grad=False
+    )
 
     # Training
     detector.fit(

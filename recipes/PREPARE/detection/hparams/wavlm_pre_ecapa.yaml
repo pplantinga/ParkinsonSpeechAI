@@ -9,10 +9,9 @@ lr_factor: 1
 seed: !ref 2030
 lr: 0.00027
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-experiment_name: wavlm_ecapa_unbalanced
+experiment_name: wavlm_ecapa_mixup
 results_dir: results
-#output_folder: !ref <results_dir>/<experiment_name>/seed_<seed>_mixup_<lr_factor>
-output_folder: !ref <results_dir>/<experiment_name>/seed_<seed>_lr_0.00027
+output_folder: !ref <results_dir>/<experiment_name>/seed_<seed>_mixup_<lr_factor>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -40,10 +39,10 @@ sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
 #label_smoothing: 0.01
-#weights: [0.5, 2, 1.2]
+weights: [0.5, 2, 1.2]
 
 # Mixup params
-mixup_alpha: 0.2
+mixup_alpha: !ref 0.05 * <lr_factor>
 beta_sampler: !new:torch.distributions.beta.Beta
     concentration1: !ref <mixup_alpha>
     concentration0: !ref <mixup_alpha>
