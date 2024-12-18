@@ -25,7 +25,7 @@ def determine_weight(valid_labels, valid_scores1, valid_scores2):
 
 def combine_preds(scores1, scores2, weight=0.5):
     pred = scores1 * weight + scores2 * (1 - weight)
-    #pred /= pred.sum(dim=-1, keepdim=True)
+    pred = pred.div(pred.sum(axis=1), axis=0)
         
     return pred
 
@@ -61,7 +61,5 @@ if __name__ == "__main__":
     weight = determine_weight(valid_labels, valid_scores1, valid_scores2)
 
     preds = combine_preds(test_scores1, test_scores2, weight)
-    print(preds)
 
     preds.to_csv("test_predictions.csv")
-    
