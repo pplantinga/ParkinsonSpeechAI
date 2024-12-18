@@ -18,6 +18,7 @@ def prepare_prepare(data_folder, manifests, valid_count=90, prep_ssl=False):
 
     demographics = read_csv(data_folder / "metadata.csv")
     annotations = read_csv(data_folder / "train_labels.csv", type_fn=float)
+    transcriptions = read_transcriptions(data_folder)
     valid_ids = select_validation(valid_count, annotations)
 
     ids = {
@@ -37,6 +38,7 @@ def prepare_prepare(data_folder, manifests, valid_count=90, prep_ssl=False):
             files=files,
             demographics=demographics,
             annotations=annotations,
+            transcriptions=transcriptions,
             prep_ssl=prep_ssl,
         )
 
@@ -71,8 +73,20 @@ def read_csv(filepath, type_fn=None):
             lines = {row[index]: {k: row[k] for k in keys} for row in reader}
     return lines
 
+def read_transcriptions(data_folder):
+    """Read two transcriptions files."""
+    train_trans = data_folder / "train_audios_transcripts.json"
+    test_trans = data_folder / "test_audios_transcripts.json"
+    transcriptions = {}
+    if train_trans.exists() and test_trans.exists():
+        with open(train_trans) as f:
+            transcriptions.update(json.load(f))
+        with open(test_trans) as f:
+            transcriptions.update(json.load(f))
 
-def create_json(dataset, path, ids, files, demographics, annotations, prep_ssl):
+    return transcriptions
+
+def create_json(dataset, path, ids, files, demographics, annotations, transcriptions, prep_ssl):
     """Prepare a json manifest with all relevant info"""
     json_dict = {}
     
@@ -84,6 +98,7 @@ def create_json(dataset, path, ids, files, demographics, annotations, prep_ssl):
             duration=info.num_frames / info.sample_rate,
             demographics=demographics[uid],
             annotations=annotations[uid] if uid in annotations else None,
+            transcript=transcriptions[uid] if uid in transcriptions else None,
             ssl=files[uid].with_suffix(".pt") if prep_ssl else None,
         )
 
@@ -91,7 +106,7 @@ def create_json(dataset, path, ids, files, demographics, annotations, prep_ssl):
     with open(path, mode="w") as json_f:
         json.dump(json_dict, json_f, indent=2)
 
-def make_sample(filepath, duration, demographics, annotations=None, ssl=None, chunk=None):
+def make_sample(filepath, duration, demographics, annotations=None, transcript=None, ssl=None, chunk=None):
     sample = {
         "filepath": str(filepath),
         "duration": duration,
@@ -99,6 +114,8 @@ def make_sample(filepath, duration, demographics, annotations=None, ssl=None, ch
     }
     if annotations:
         sample.update(annotations)
+    if transcript:
+        sample["transcript"] = transcript
     if ssl:
         sample["ssl_path"] = str(ssl)
 
