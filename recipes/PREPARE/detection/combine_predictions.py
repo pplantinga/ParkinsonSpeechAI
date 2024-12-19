@@ -10,21 +10,26 @@ def determine_weight(valid_labels, valid_scores1, valid_scores2):
     # Try different weights and compute log loss
     min_score = 1.0
     min_weight = 0.5
-    for weight in numpy.arange(0.01, 1, 0.01):
-        pred = combine_preds(valid_scores1, valid_scores2, weight)
-        score = log_loss(valid_labels, pred)
+    min_alpha1 = 1.0
+    min_alpha2 = 1.0
+    for alpha in numpy.arange(1, 3, 0.1):
+        for weight in numpy.arange(0.01, 1, 0.01):
+            pred = combine_preds(valid_scores1, valid_scores2, alpha, weight)
+            score = log_loss(valid_labels, pred)
 
-        if score < min_score:
-            min_score = score
-            min_weight = weight
+            if score < min_score:
+                min_score = score
+                min_weight = weight
+                min_alpha = alpha
 
-    print("Best score:", min_score)
-    print("Best weight:", min_weight)
+    print("Best score:", round(min_score, 4))
+    print("Best weight:", round(min_weight, 2))
+    print("Best alpha:", round(min_alpha, 2))
 
-    return min_weight
+    return min_weight, min_alpha
 
-def combine_preds(scores1, scores2, weight=0.5):
-    pred = scores1 * weight + scores2 * (1 - weight)
+def combine_preds(scores1, scores2, alpha=1, weight=0.5):
+    pred = scores1 ** alpha * weight + scores2 ** alpha * (1 - weight)
     pred = pred.div(pred.sum(axis=1), axis=0)
         
     return pred
@@ -48,7 +53,7 @@ def load_valid_labels(path):
 
 
 if __name__ == "__main__":
-    assert len(sys.argv) == 3, "Expected dir1, dir2 as arguments"
+    assert len(sys.argv) in [3, 4], "Expected dir1, dir2[, dir3] as arguments"
 
     path1 = Path(sys.argv[1])
     path2 = Path(sys.argv[2])
@@ -58,8 +63,15 @@ if __name__ == "__main__":
 
     valid_labels = load_valid_labels("valid.json")
 
-    weight = determine_weight(valid_labels, valid_scores1, valid_scores2)
+    weight, alpha = determine_weight(valid_labels, valid_scores1, valid_scores2)
 
-    preds = combine_preds(test_scores1, test_scores2, weight)
+    valid_preds = combine_preds(valid_scores1, valid_scores2, alpha, weight)
+    test_preds = combine_preds(test_scores1, test_scores2, alpha, weight)
 
-    preds.to_csv("test_predictions.csv")
+    if len(sys.argv) == 4:
+        path3 = Path(sys.argv[3])
+        valid_scores3, test_scores3 = load_scores(path3)
+        weight, alpha = determine_weight(valid_labels, valid_preds, valid_scores3)
+        test_preds = combine_preds(test_preds, test_scores3, alpha, weight)
+
+    test_preds.to_csv("test_predictions.csv")
