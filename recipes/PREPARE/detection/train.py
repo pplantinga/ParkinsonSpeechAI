@@ -77,8 +77,10 @@ class DetectBrain(sb.core.Brain):
                 labels = mixup(labels, lambdas.squeeze(-1))
 
         # Embeddings + speaker classifier
-        embeddings = self.modules.embedding_model(feats)
-        outputs = self.modules.classifier(embeddings).squeeze()
+        #embeddings = self.modules.embedding_model(feats)
+        #outputs = self.modules.classifier(embeddings).squeeze()
+        outputs = feats.squeeze()
+        print(outputs.shape)
 
         # Outputs
         return outputs, labels, lens
@@ -94,7 +96,9 @@ class DetectBrain(sb.core.Brain):
 
         # Compute loss with weights, but only for train
         if stage == sb.Stage.TRAIN:
-            loss = self.hparams.compute_cost(predictions, labels)
+            loss = self.hparams.compute_cost(
+                predictions, labels, label_smoothing=self.hparams.label_smoothing
+            )
 
         # Record stats for the validation samples, without weighting/smoothing etc.
         elif stage == sb.Stage.VALID:
@@ -134,7 +138,7 @@ class DetectBrain(sb.core.Brain):
         all_params = []
         wavlm_opt = None
         for name, module in self.modules.items():
-            if name == "compute_features":
+            if name == "compute_features" and not self.hparams.freeze_wavlm:
                 wavlm_opt = llrd(
                     module,
                     self.hparams.name_of_layers_module,

@@ -191,7 +191,7 @@ class WavRx(nn.Module):
 
         # Classification
         output = self.fc(torch.cat((feat_t,feat_x),axis=-1))
-        output = output.view(output.shape[0],1)
+        #output = output.view(output.shape[0],1)
         return output
 
     def weight_layer(self, features, branch, return_sum=False):

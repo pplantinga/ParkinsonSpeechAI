@@ -72,22 +72,25 @@ test_dataloader_options:
 # sure of our preliminary results
 
 # Functions
-projection_size: 768
+projection_size: 1024
 compute_features: !new:wavrx.WavRx
-    #ssl_encoder_source: !ref <wavlm_hub>
+  ssl_encoder_source: !ref <wavlm_hub>
+  #num_ssl_feat: !ref <projection_size>
+  #num_fc_neurons: !ref <projection_size>
+  #num_classes: !ref <out_neurons>
 
-embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: !ref <projection_size>
-    channels: [1024, 1024, 1024, 1024, 3072]
-    kernel_sizes: [5, 3, 3, 3, 1]
-    dilations: [1, 2, 3, 4, 1]
-    groups: [1, 1, 1, 1, 1]
-    attention_channels: 128
-    lin_neurons: 192
+#embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
+#    input_size: !ref <projection_size>
+#    channels: [1024, 1024, 1024, 1024, 3072]
+#    kernel_sizes: [5, 3, 3, 3, 1]
+#    dilations: [1, 2, 3, 4, 1]
+#    groups: [1, 1, 1, 1, 1]
+#    attention_channels: 128
+#    lin_neurons: 192
 
-classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
-    input_size: 192
-    out_neurons: !ref <out_neurons>
+#classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+#    input_size: 192
+#    out_neurons: !ref <out_neurons>
 
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <epochs>
@@ -98,16 +101,15 @@ mean_var_norm: !new:speechbrain.processing.features.InputNormalization
 
 modules:
     compute_features: !ref <compute_features>
-    embedding_model: !ref <embedding_model>
-    classifier: !ref <classifier>
+      #embedding_model: !ref <embedding_model>
+      #classifier: !ref <classifier>
     mean_var_norm: !ref <mean_var_norm>
 
 softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-compute_cost: !name:speechbrain.nnet.losses.nll_loss
-    allowed_len_diff: 0
+compute_cost: !name:torch.nn.functional.cross_entropy
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
@@ -140,8 +142,8 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>
     recoverables:
         #compute_features: !ref <compute_features>
-        embedding_model: !ref <embedding_model>
-        classifier: !ref <classifier>
+        #embedding_model: !ref <embedding_model>
+        #classifier: !ref <classifier>
         normalizer: !ref <mean_var_norm>
         counter: !ref <epoch_counter>
         lr_annealing: !ref <lr_annealing>

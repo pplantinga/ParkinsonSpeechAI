@@ -6,12 +6,12 @@
 
 # Basic parameters
 lr_factor: 1
-seed: !ref 2030
-lr: 0.00027
+seed: !ref 2030 + <lr_factor>
+lr: 0.0001
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 experiment_name: wavlm_ecapa_mixup
 results_dir: results
-output_folder: !ref <results_dir>/<experiment_name>/seed_<seed>_mixup_<lr_factor>
+output_folder: !ref <results_dir>/<experiment_name>/seed_<seed>_mixup_0.1_nodrop
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
@@ -29,8 +29,8 @@ skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-epochs: 90
-batch_size: 32
+epochs: 50
+batch_size: 16
 test_batch_size: 1
 base_lr: !ref <lr> / 1000
 max_lr: !ref <lr>
@@ -42,7 +42,7 @@ shuffle: True
 weights: [0.5, 2, 1.2]
 
 # Mixup params
-mixup_alpha: !ref 0.05 * <lr_factor>
+mixup_alpha: 0.1
 beta_sampler: !new:torch.distributions.beta.Beta
     concentration1: !ref <mixup_alpha>
     concentration0: !ref <mixup_alpha>
@@ -84,7 +84,7 @@ embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
     groups: [1, 1, 1, 1, 1]
     attention_channels: 128
     lin_neurons: 192
-    dropout: 0.2
+    dropout: 0
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
