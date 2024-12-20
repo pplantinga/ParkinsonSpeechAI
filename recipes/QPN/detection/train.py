@@ -74,29 +74,34 @@ class ParkinsonBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
             patient_type = self.hparams.wav_augment.replicate_labels(labels)
 
-        # Normalize weights
+        # Normalize and tensorize weights
         max_weight = max(self.hparams.weight_pd, self.hparams.weight_hc)
         weight_pd = self.hparams.weight_pd / max_weight
         weight_hc = self.hparams.weight_hc / max_weight
         weights = torch.tensor([weight_pd, weight_hc]).unsqueeze(0).to(self.device)
 
         # Compute loss
-        # Squeeze and ensure targets are one hot encoded (for AAM)
-        preds = preds.squeeze(1)
-        targets = labels.squeeze(1)
-        targets = F.one_hot(targets.long(), preds.shape[1]).float()
+        if self.hparams.loss == "aam":
+            # Squeeze and ensure targets are one hot encoded (for AAM)
+            preds = preds.squeeze(1)
+            targets = labels.squeeze(1)
+            targets = F.one_hot(targets.long(), preds.shape[1]).float()
 
-        # Compute loss with weights
-        preds = self.hparams.AAM_loss(preds, targets)
+            # Compute loss with weights
+            preds = self.hparams.AAM_loss(preds, targets)
 
-        # Pass through log softmax
-        preds = F.log_softmax(preds, dim=1)
+            # Pass through log softmax
+            preds = F.log_softmax(preds, dim=1)
 
-        # Pass through KLDiv Loss, apply weight and average
-        KLDLoss = torch.nn.KLDivLoss(reduction="none")
-        loss = KLDLoss(preds, targets)
-        loss = loss * weights
-        loss = loss.sum() / targets.sum()
+            # Pass through KLDiv Loss, apply weight and average
+            KLDLoss = torch.nn.KLDivLoss(reduction="none")
+            loss = KLDLoss(preds, targets) * weights
+            loss = loss.sum() / targets.sum()
+
+        elif self.hparams.loss == "focal":
+            loss = self.hparams.focal_loss(preds, labels, weights)
+        else:
+            print("Unknown loss specified, please specify either focal or AAM loss")
 
         if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
             self.hparams.lr_annealing.on_batch_end(self.optimizer)

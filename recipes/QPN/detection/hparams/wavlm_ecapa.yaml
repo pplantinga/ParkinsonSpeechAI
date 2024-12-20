@@ -36,7 +36,7 @@ sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
 remove_keys: [""]
-loss_type: "aam"
+loss: "focal"
 
 # Test parameters
 max_test_chunks: 24
@@ -105,12 +105,12 @@ modules:
     classifier: !ref <classifier>
     mean_var_norm: !ref <mean_var_norm>
 
-# Trying AAM loss
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-nll_loss: !new:speechbrain.nnet.losses.nll_loss
+focal_loss: !new:focal_loss.focal_loss
 
+# AAM loss
 KLD_Loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum
 
