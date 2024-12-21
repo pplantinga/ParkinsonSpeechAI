@@ -30,6 +30,7 @@ import speechbrain as sb
 from speechbrain.dataio.encoder import CategoricalEncoder
 from speechbrain.dataio.dataloader import LoopedLoader
 from speechbrain.utils.distributed import run_on_main, main_process_only, if_main_process
+from focal_loss import FocalLoss
 
 
 class ParkinsonBrain(sb.core.Brain):
@@ -99,7 +100,7 @@ class ParkinsonBrain(sb.core.Brain):
             loss = loss.sum() / targets.sum()
 
         elif self.hparams.loss == "focal":
-            loss = self.hparams.focal_loss(preds, labels, weights)
+            loss = self.hparams.focal_loss(preds, labels)
         else:
             print("Unknown loss specified, please specify either focal or AAM loss")
 
