@@ -1,4 +1,3 @@
-
 # ################################
 # Model: Parkinson's identification with ECAPA
 # Author: Briac Cordelle
@@ -9,7 +8,7 @@ seed: 2002
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Save folders and paths
-experiment_name: wavlm_ecapa
+experiment_name: fbank_ecapa
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/<seed>
 save_folder: !ref <output_folder>/save
@@ -19,10 +18,9 @@ encoded_labels: !ref <save_folder>/label_encoder.txt
 
 # Data files
 data_folder: !PLACEHOLDER
-train_annotation: annotation/train.json
-test_fr_annotation: annotation/test_fr.json
-test_en_annotation: annotation/test_en.json
-valid_annotation: annotation/valid.json
+train_annotation: !ref <output_folder>/train.json
+test_annotation: !ref <output_folder>/test.json
+valid_annotation: !ref <output_folder>/valid.json
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
@@ -38,18 +36,17 @@ sample_rate: 16000
 sentence_len: 15.0 # seconds
 shuffle: True
 remove_keys: [""]
-loss: "focal"
+loss_type: "aam"
 
 # Test parameters
 max_test_chunks: 24
 test_batch_size: 1
 
 # Feature parameters
-wavlm_hub: !PLACEHOLDER #path/to/wavlm/checkpoint
-wavlm_folder: !ref <output_folder>/wavlm-large
-freeze_wavlm_extractor: True
-freeze_wavlm: True
-lr_wavlm: 0.0001
+n_mels: 80
+left_frames: 0
+right_frames: 0
+deltas: False
 
 # Number of classes (pd/non-pd)
 weight_hc: 86.79
@@ -74,15 +71,14 @@ test_dataloader_options:
 # sure of our preliminary results
 
 # Functions
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-   source: !ref <wavlm_hub>
-   output_norm: True
-   freeze_feature_extractor: !ref <freeze_wavlm_extractor>
-   freeze: !ref <freeze_wavlm>
-   save_path: !ref <wavlm_folder>
+compute_features: !new:speechbrain.lobes.features.Fbank
+    n_mels: !ref <n_mels>
+    left_frames: !ref <left_frames>
+    right_frames: !ref <right_frames>
+    deltas: !ref <deltas>
 
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: 1024
+    input_size: !ref <n_mels>
     channels: [1024, 1024, 1024, 1024, 3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]
@@ -107,15 +103,12 @@ modules:
     classifier: !ref <classifier>
     mean_var_norm: !ref <mean_var_norm>
 
-softmax: !new:speechbrain.nnet.activations.Softmax
+# Trying AAM loss
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-focal_loss: !new:focal_loss.focal_loss
-    gamma: 2.0
-    alpha: [!ref <weight_hc>, !ref <weight_pd>]
+nll_loss: !name:speechbrain.nnet.losses.nll_loss
 
-# AAM loss
 KLD_Loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum
 
@@ -127,19 +120,10 @@ opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
     weight_decay: 0.0001
 
-wavlm_opt_class: !name:torch.optim.Adam
-   lr: !ref <lr_wavlm>
-
 lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
     base_lr: !ref <base_lr>
     max_lr: !ref <max_lr>
     step_size: !ref <step_size>
-
-lr_annealing_wavlm: !new:speechbrain.nnet.schedulers.NewBobScheduler
-   initial_value: !ref <lr_wavlm>
-   improvement_threshold: 0.0025
-   annealing_factor: 0.9
-   patient: 0
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
@@ -153,7 +137,7 @@ error_metric: F-score
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>
     recoverables:
-        #compute_features: !ref <compute_features>
+        compute_features: !ref <compute_features>
         embedding_model: !ref <embedding_model>
         classifier: !ref <classifier>
         normalizer: !ref <mean_var_norm>

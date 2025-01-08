@@ -1,4 +1,3 @@
-import torch
 import json
 import os
 import glob
@@ -6,8 +5,8 @@ import torchaudio
 import openpyxl
 
 
-def prepare_neuro(data_folder, train_annotation, valid_annotation, test_annotation,
-                  keep_short_recordings, chunk_length=30):
+def prepare_neuro(data_folder, train_annotation, test_annotation, valid_annotation,
+                  remove_keys):
     try:
         os.listdir(data_folder)
     except:
@@ -16,9 +15,9 @@ def prepare_neuro(data_folder, train_annotation, valid_annotation, test_annotati
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], keep_short_recordings, chunk_length)
-    create_json(valid_annotation, path_type_dict["valid"], keep_short_recordings, chunk_length)
-    create_json(test_annotation, path_type_dict["test"], keep_short_recordings, chunk_length)
+    create_json(train_annotation, path_type_dict["train"], remove_keys)
+    create_json(test_annotation, path_type_dict["test"], remove_keys)
+    create_json(valid_annotation, path_type_dict["valid"], remove_keys)
 
 
 def get_path_type_dicts(data_folder):
@@ -69,49 +68,55 @@ def get_patient_traits(files, sheet, batch):
     patients = {}
 
     for row in range(2, sheet.max_row + 1):  # Start from row 2 to skip the header
-        patient_id = sheet.cell(row=row, column=1).value
+        pid = sheet.cell(row=row, column=1).value
+        ptype = sheet.cell(row=row, column=2).value
+        sex = sheet.cell(row=row, column=3).value
+        l1 = sheet.cell(row=row, column=4).value
+        updrs = sheet.cell(row=row, column=5).value
 
         if batch == "Batch1":
-            patient_type = sheet.cell(row=row, column=2).value
-            patient_gender = sheet.cell(row=row, column=3).value
-            patient_age = sheet.cell(row=row, column=5).value
-            patient_l1 = sheet.cell(row=row, column=4).value
+            age = sheet.cell(row=row, column=6).value
         else:
-            patient_type = sheet.cell(row=row, column=4).value
-            patient_gender = sheet.cell(row=row, column=5).value
-            patient_age = 0
-            patient_l1 = sheet.cell(row=row, column=6).value
+            age = 0
 
         # Check if the patient ID is in the recordings, if it is add to dict
-        if patient_id is not None and patient_id.rstrip() in pids:
-            print(batch)
-            print(patient_id)
-            print(patient_gender)
+        if pid is not None and pid.rstrip() in pids:
 
             # rstrip() everything
-            patient_type = patient_type.rstrip()
-            patient_gender = patient_gender.rstrip()
-            patient_l1 = patient_l1.rstrip()
+            ptype = ptype.rstrip()
+            sex = sex.rstrip()
+            l1 = l1.rstrip()
 
             # Refactor patient type
-            if patient_type == "CTRL" or patient_type == "control":
-                patient_type = "HC"
-            elif patient_type == "PD" or patient_type == "patient":
-                patient_type = "PD"
+            if ptype == "CTRL" or ptype == "control":
+                ptype = "HC"
+            elif ptype == "PD" or ptype == "patient":
+                ptype = "PD"
             else:
+                print(f"Unknown key found: {ptype}")
                 continue
 
             # Refactor language
-            if patient_l1 == "FR":
-                patient_l1 = "French"
-            elif patient_l1 == "EN":
-                patient_l1 = "English"
+            # TODO fix excel to have unified language identifiers
+            if l1 == "FR" or "French" in l1 or "Fench" in l1:
+                l1 = "French"
+            elif l1 == "EN" or "English" in l1:
+                l1 = "English"
             else:
-                patient_l1 = "Other"
+                l1 = "Other"
+
+            # TODO Convert UPDRS score to category, waiting for answer from Jen-Kai on B1 scores
+
 
             # Save to dict
-            patient_traits = [patient_type, patient_gender, patient_age, patient_l1]
-            patients[patient_id] = patient_traits
+            patient_traits = {
+                "ptype": ptype,
+                "sex": sex,
+                "age": age,
+                "l1": l1,
+                "updrs": updrs,
+            }
+            patients[pid] = patient_traits
 
     # Change pids to paths
     updated_dict = {}
@@ -122,24 +127,20 @@ def get_patient_traits(files, sheet, batch):
 
     return updated_dict
 
-def create_json(json_file, path_type_dict, keep_short_recordings, chunk_length):
+
+def create_json(json_file, path_type_dict, remove_keys):
     json_dict = {}
     
     for audiofile in path_type_dict.keys():
+        # Get info dict
+        info_dict = path_type_dict[audiofile].copy()
+
+        # Skip condition
+        skip = False
 
         # Remove 'l1' files as they are duplicates
         if 'l1' in audiofile:
-            continue
-
-        # Keep/remove short recordings from the data (repeats/vowels)
-        if not keep_short_recordings:
-            if 'repeat' in audiofile:
-                continue
-            if 'a1' in audiofile or 'a2' in audiofile or 'a3' in audiofile or 'a4' in audiofile:
-                continue
-
-        # Get PD or HC
-        patient_type = path_type_dict[audiofile][0]
+            skip = True
 
         # Get uttid
         uttid = audiofile.split("/")[-1].split(".")[0] + "_" + audiofile.split("/")[-2]
@@ -148,48 +149,37 @@ def create_json(json_file, path_type_dict, keep_short_recordings, chunk_length):
         audioinfo = torchaudio.info(audiofile)
         duration = audioinfo.num_frames / audioinfo.sample_rate
 
-        # Get gender, age and l1
-        patient_gender = path_type_dict[audiofile][1]
-        patient_age = path_type_dict[audiofile][2]
-        patient_l1 = path_type_dict[audiofile][3]
-
         # Get test type
-        test_type = ""
-
         if 'repeat' in audiofile:
-            test_type = "repeat"
+            info_dict["test"] = "repeat"
         if 'a1' in audiofile or 'a2' in audiofile or 'a3' in audiofile or 'a4' in audiofile:
-            test_type = "vowel_repeat"
+            info_dict["test"] = "vowel_repeat"
         if 'recall' in audiofile:
-            test_type = "recall"
+            info_dict["test"] = "recall"
         if 'read' in audiofile:
-            test_type = "read_text"
+            info_dict["test"] = "read_text"
         if 'dpt' in audiofile:
-            test_type = "dpt"
+            info_dict["test"] = "dpt"
         if 'hbd' in audiofile:
-            test_type = "hbd"
-        if test_type == "":
-            test_type = "unk"
-            print(f"Unknown test found, {audiofile}")
+            info_dict["test"] = "hbd"
 
-        # Create slow voice features
-        audio, fs = torchaudio.load(audiofile)
+        # Add pid to the patient traits
+        info_dict["pid"] = uttid.split("_")[1]
 
-        # Create entry or entries for this utterance
-        base_dict = {
+        # Remove certain values for specific tests (i.e if we want to train only on men/women, only on an age group, etc)
+        for value in info_dict.values():
+            if value in remove_keys:
+                skip = True
+
+        # Create entry for this utterance
+        if skip and ("train" in audiofile or "valid" in audiofile):
+            continue
+
+        json_dict[uttid] = {
             "wav": audiofile,
-            "patient_type": patient_type,
-            "patient_gender": patient_gender,
-            "patient_age": patient_age,
-            "patient_l1": patient_l1,
-            "test_type": test_type,
             "duration": duration,
+            "info_dict": info_dict,
         }
-        if duration < chunk_length:
-            json_dict[uttid] = {**base_dict, "start": 0}
-        else:
-            for i in range(int(duration // chunk_length)):
-                json_dict[f"{uttid}_{i}"] = {**base_dict, "start": i * chunk_length}
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:
