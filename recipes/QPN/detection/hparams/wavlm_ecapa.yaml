@@ -7,11 +7,12 @@
 # Basic parameters
 seed: 2002
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
+lr_factor: 1
 
 # Save folders and paths
-experiment_name: wavlm_ecapa
+experiment_name: wavlm_base_ecapa
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
-output_folder: !ref <storage_folder>/<experiment_name>/<seed>
+output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>_lrx_<lr_factor>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
@@ -27,12 +28,12 @@ skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-epochs: 65
-batch_size: 8
-lr: 0.001
+epochs: 32
+batch_size: 16
+lr: !ref 0.00001 * 3 ** <lr_factor>
 base_lr: 0.000001
 max_lr: !ref <lr>
-step_size: 2000
+step_size: 500
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 shuffle: True
@@ -50,8 +51,8 @@ freeze_wavlm_extractor: True
 freeze_wavlm: True
 
 # Number of classes (pd/non-pd)
-weight_hc: 86.79
-weight_pd: 13.21
+weight_hc: 1.5
+weight_pd: 0.6
 out_neurons: 2
 
 # Dataloader options
@@ -87,6 +88,7 @@ embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
     groups: [1, 1, 1, 1, 1]
     attention_channels: 128
     lin_neurons: 192
+    dropout: 0.1
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: 192
@@ -122,6 +124,7 @@ aam_loss: !new:speechbrain.nnet.losses.AdditiveAngularMargin
 
 nll_loss: !name:speechbrain.nnet.losses.nll_loss
     allowed_len_diff: 0
+    label_smoothing: 0.01
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>

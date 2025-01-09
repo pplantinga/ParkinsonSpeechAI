@@ -10,3 +10,6 @@ __pycache__
 # other files
 *.wav
 **/results/
+
+# Run scripts
+**/run_scripts/

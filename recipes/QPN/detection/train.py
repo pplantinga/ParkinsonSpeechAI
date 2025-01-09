@@ -70,12 +70,6 @@ class ParkinsonBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
             patient_type = self.hparams.wav_augment.replicate_labels(labels)
 
-        # Normalize and tensorize weights
-        max_weight = max(self.hparams.weight_pd, self.hparams.weight_hc)
-        weight_pd = self.hparams.weight_pd / max_weight
-        weight_hc = self.hparams.weight_hc / max_weight
-        weights = torch.tensor([weight_pd, weight_hc]).unsqueeze(0).to(self.device)
-
         # Compute loss
         if self.hparams.loss == "aam":
             # Squeeze and ensure targets are one hot encoded (for AAM)
@@ -98,9 +92,9 @@ class ParkinsonBrain(sb.core.Brain):
             loss = self.hparams.focal_loss(outputs, labels)
         elif self.hparams.loss == "nll":
             preds = self.hparams.log_softmax(outputs)
-            loss = self.hparams.nll_loss(preds, labels)
+            loss = self.hparams.nll_loss(preds, labels, weight=self.weight)
         else:
-            print("Unknown loss specified, please specify either focal or AAM loss")
+            print("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
 
         if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
             self.hparams.lr_annealing.on_batch_end(self.optimizer)
@@ -120,11 +114,13 @@ class ParkinsonBrain(sb.core.Brain):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
-        metric = self.hparams.error_metric
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            stage_stats[metric] = self.error_metrics.summarize(metric, threshold=0.5)
+            for metric in ["F-score", "precision", "recall"]:
+                stage_stats[metric] = self.error_metrics.summarize(
+                    field=metric, threshold=0.5
+                )
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -137,7 +133,7 @@ class ParkinsonBrain(sb.core.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta=stage_stats, min_keys=[metric],
+                meta=stage_stats, max_keys=[self.hparams.error_metric],
             )
 
         if stage == sb.Stage.TEST:
@@ -249,6 +245,12 @@ if __name__ == "__main__":
         hparams=hparams,
         run_opts=run_opts,
         checkpointer=hparams["checkpointer"],
+    )
+
+    parkinson_brain.weight = torch.tensor(
+        [[hparams["weight_hc"], hparams["weight_pd"]]],
+        device=parkinson_brain.device,
+        dtype=torch.float32,
     )
 
     # Training
