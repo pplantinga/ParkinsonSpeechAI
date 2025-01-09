@@ -3,21 +3,22 @@ import os
 import glob
 import torchaudio
 import openpyxl
+import numpy as np
 
 
-def prepare_neuro(data_folder, train_annotation, test_annotation, valid_annotation,
-                  remove_keys):
-    try:
-        os.listdir(data_folder)
-    except:
-        print("Data folder not found")
+def prepare_neuro(
+    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size
+):
+    assert os.path.exists(data_folder), "Data folder not found"
+
+    if os.path.exists(train_annotation):
         return
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], remove_keys)
-    create_json(test_annotation, path_type_dict["test"], remove_keys)
-    create_json(valid_annotation, path_type_dict["valid"], remove_keys)
+    create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=0)
+    create_json(test_annotation, path_type_dict["test"], chunk_size)
+    create_json(valid_annotation, path_type_dict["valid"], chunk_size)
 
 
 def get_path_type_dicts(data_folder):
@@ -128,7 +129,8 @@ def get_patient_traits(files, sheet, batch):
     return updated_dict
 
 
-def create_json(json_file, path_type_dict, remove_keys):
+def create_json(json_file, path_type_dict, chunk_size, overlap=None):
+    hop_size = chunk_size / 2 if overlap is None else chunk_size - overlap
     json_dict = {}
     
     for audiofile in path_type_dict.keys():
@@ -140,7 +142,7 @@ def create_json(json_file, path_type_dict, remove_keys):
 
         # Remove 'l1' files as they are duplicates
         if 'l1' in audiofile:
-            skip = True
+            continue
 
         # Get uttid
         uttid = audiofile.split("/")[-1].split(".")[0] + "_" + audiofile.split("/")[-2]
@@ -151,35 +153,29 @@ def create_json(json_file, path_type_dict, remove_keys):
 
         # Get test type
         if 'repeat' in audiofile:
-            info_dict["test"] = "repeat"
+            info_dict["task"] = "repeat"
         if 'a1' in audiofile or 'a2' in audiofile or 'a3' in audiofile or 'a4' in audiofile:
-            info_dict["test"] = "vowel_repeat"
+            info_dict["task"] = "vowel_repeat"
         if 'recall' in audiofile:
-            info_dict["test"] = "recall"
+            info_dict["task"] = "recall"
         if 'read' in audiofile:
-            info_dict["test"] = "read_text"
+            info_dict["task"] = "read_text"
         if 'dpt' in audiofile:
-            info_dict["test"] = "dpt"
+            info_dict["task"] = "dpt"
         if 'hbd' in audiofile:
-            info_dict["test"] = "hbd"
+            info_dict["task"] = "hbd"
 
         # Add pid to the patient traits
         info_dict["pid"] = uttid.split("_")[1]
 
-        # Remove certain values for specific tests (i.e if we want to train only on men/women, only on an age group, etc)
-        for value in info_dict.values():
-            if value in remove_keys:
-                skip = True
-
-        # Create entry for this utterance
-        if skip and ("train" in audiofile or "valid" in audiofile):
-            continue
-
-        json_dict[uttid] = {
-            "wav": audiofile,
-            "duration": duration,
-            "info_dict": info_dict,
-        }
+        for i, start in enumerate(np.arange(0, duration - hop_size, hop_size)):
+            chunk_duration = min(chunk_size, duration - i * hop_size)
+            json_dict[f"{uttid}_{i}"] = {
+                "wav": audiofile,
+                "start": start,
+                "duration": chunk_duration,
+                "info_dict": info_dict,
+            }
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:

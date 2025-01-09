@@ -19,26 +19,25 @@ encoded_labels: !ref <save_folder>/label_encoder.txt
 
 # Data files
 data_folder: !PLACEHOLDER
-train_annotation: annotation/train.json
-test_fr_annotation: annotation/test_fr.json
-test_en_annotation: annotation/test_en.json
-valid_annotation: annotation/valid.json
+train_annotation: !ref <storage_folder>/train.json
+valid_annotation: !ref <storage_folder>/valid.json
+test_annotation: !ref <storage_folder>/test.json
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 epochs: 65
-batch_size: 16
+batch_size: 8
 lr: 0.001
 base_lr: 0.000001
 max_lr: !ref <lr>
 step_size: 2000
 sample_rate: 16000
-sentence_len: 15.0 # seconds
+chunk_size: 30.0 # seconds
 shuffle: True
-remove_keys: [""]
-loss: "focal"
+remove_keys: {}
+loss: "nll"
 
 # Test parameters
 max_test_chunks: 24
@@ -49,7 +48,6 @@ wavlm_hub: !PLACEHOLDER #path/to/wavlm/checkpoint
 wavlm_folder: !ref <output_folder>/wavlm-large
 freeze_wavlm_extractor: True
 freeze_wavlm: True
-lr_wavlm: 0.0001
 
 # Number of classes (pd/non-pd)
 weight_hc: 86.79
@@ -82,8 +80,8 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.W
    save_path: !ref <wavlm_folder>
 
 embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: 1024
-    channels: [1024, 1024, 1024, 1024, 3072]
+    input_size: 768
+    channels: [1024, 1024, 1024, 1024, 1024] #3072]
     kernel_sizes: [5, 3, 3, 3, 1]
     dilations: [1, 2, 3, 4, 1]
     groups: [1, 1, 1, 1, 1]
@@ -111,35 +109,28 @@ softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-focal_loss: !new:focal_loss.focal_loss
+focal_loss: !new:focal_loss.FocalLoss
     gamma: 2.0
     alpha: [!ref <weight_hc>, !ref <weight_pd>]
 
-# AAM loss
-KLD_Loss: !name:speechbrain.nnet.losses.kldiv_loss
+kld_loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum
 
-AAM_loss: !new:speechbrain.nnet.losses.AdditiveAngularMargin
+aam_loss: !new:speechbrain.nnet.losses.AdditiveAngularMargin
     margin: 0.2
     scale: 30
+
+nll_loss: !name:speechbrain.nnet.losses.nll_loss
+    allowed_len_diff: 0
 
 opt_class: !name:torch.optim.Adam
     lr: !ref <lr>
     weight_decay: 0.0001
 
-wavlm_opt_class: !name:torch.optim.Adam
-   lr: !ref <lr_wavlm>
-
 lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
     base_lr: !ref <base_lr>
     max_lr: !ref <max_lr>
     step_size: !ref <step_size>
-
-lr_annealing_wavlm: !new:speechbrain.nnet.schedulers.NewBobScheduler
-   initial_value: !ref <lr_wavlm>
-   improvement_threshold: 0.0025
-   annealing_factor: 0.9
-   patient: 0
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
