@@ -29,6 +29,7 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 epochs: 32
+samples_per_epoch: 2048 # Roughly the size of the dataset
 batch_size: 16
 lr: !ref 0.00001 * 3 ** <lr_factor>
 base_lr: 0.000001
@@ -51,8 +52,8 @@ freeze_wavlm_extractor: True
 freeze_wavlm: True
 
 # Number of classes (pd/non-pd)
-weight_hc: 1.5
-weight_pd: 0.6
+#weight_hc: 1.5
+#weight_pd: 0.6
 out_neurons: 2
 
 # Dataloader options
@@ -111,9 +112,9 @@ softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-focal_loss: !new:focal_loss.FocalLoss
-    gamma: 2.0
-    alpha: [!ref <weight_hc>, !ref <weight_pd>]
+#focal_loss: !new:focal_loss.FocalLoss
+#    gamma: 2.0
+#    alpha: [!ref <weight_hc>, !ref <weight_pd>]
 
 kld_loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum

@@ -24,12 +24,16 @@ import torchaudio
 from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
-from speechbrain.utils.data_utils import download_file
-from speechbrain.dataio.dataloader import LoopedLoader
-from speechbrain.utils.distributed import run_on_main, main_process_only, if_main_process
+from speechbrain.dataio.sampler import BalancingDataSampler
+from speechbrain.utils.distributed import (
+    run_on_main,
+    main_process_only,
+    if_main_process,
+)
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
@@ -84,7 +88,7 @@ class ParkinsonBrain(sb.core.Brain):
             preds = F.log_softmax(preds, dim=1)
 
             # Pass through KLDiv Loss, apply weight and average
-            #KLDLoss = torch.nn.KLDivLoss(reduction="none")
+            # KLDLoss = torch.nn.KLDivLoss(reduction="none")
             loss = KLDLoss(preds, targets) * weights
             loss = loss.sum() / targets.sum()
 
@@ -92,11 +96,13 @@ class ParkinsonBrain(sb.core.Brain):
             loss = self.hparams.focal_loss(outputs, labels)
         elif self.hparams.loss == "nll":
             preds = self.hparams.log_softmax(outputs)
-            loss = self.hparams.nll_loss(preds, labels, weight=self.weight)
+            loss = self.hparams.nll_loss(preds, labels)  # , weight=self.weight)
         else:
             print("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
 
-        if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
+        if stage == sb.Stage.TRAIN and hasattr(
+            self.hparams.lr_annealing, "on_batch_end"
+        ):
             self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
         if stage != sb.Stage.TRAIN:
@@ -133,7 +139,8 @@ class ParkinsonBrain(sb.core.Brain):
                 valid_stats=stage_stats,
             )
             self.checkpointer.save_and_keep_only(
-                meta=stage_stats, max_keys=[self.hparams.error_metric],
+                meta=stage_stats,
+                max_keys=[self.hparams.error_metric],
             )
 
         if stage == sb.Stage.TEST:
@@ -141,6 +148,7 @@ class ParkinsonBrain(sb.core.Brain):
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
+
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -157,16 +165,18 @@ def dataio_prep(hparams):
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, duration, start):
         sig, fs = torchaudio.load(
-            wav, 
+            wav,
             num_frames=int(duration * hparams["sample_rate"]),
             frame_offset=int(start * hparams["sample_rate"]),
         )
 
-        return sig.squeeze(0) 
+        return sig.squeeze(0)
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("info_dict")
-    @sb.utils.data_pipeline.provides("patient_type", "patient_type_encoded")
+    @sb.utils.data_pipeline.provides(
+        "patient_type", "patient_type_encoded", "ptype_sex"
+    )
     def label_pipeline(info_dict):
         """Defines the pipeline to process the patient type labels.
         Note that we have to assign a different integer to each class
@@ -175,6 +185,9 @@ def dataio_prep(hparams):
         yield info_dict["ptype"]
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
+
+        # For re-balancing, let's use both patient type and patient sex
+        yield info_dict["ptype"] + "_" + info_dict["sex"]
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
@@ -185,13 +198,23 @@ def dataio_prep(hparams):
         "test": hparams["test_annotation"],
     }
 
-    hparams["dataloader_options"]["shuffle"] = True
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
-            output_keys=["id", "sig", "patient_type_encoded", "info_dict"],
+            output_keys=["id", "sig", "patient_type_encoded", "info_dict", "ptype_sex"],
         )
+
+    # Define sampler based on sex and patient type, shuffle must be None
+    # Unfortunately I think we need replacement here since HC_M is so small
+    hparams["dataloader_options"]["shuffle"] = None
+    hparams["train_dataloader_options"] = hparams["dataloader_options"]
+    hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
+        dataset=datasets["train"],
+        key="ptype_sex",
+        num_samples=hparams["samples_per_epoch"],
+        replacement=True,
+    )
 
     # Remove keys from training data for e.g. training only on men
     for key, value in hparams["remove_keys"]:
@@ -200,6 +223,7 @@ def dataio_prep(hparams):
         )
 
     return datasets
+
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
@@ -247,24 +271,24 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
 
-    parkinson_brain.weight = torch.tensor(
-        [[hparams["weight_hc"], hparams["weight_pd"]]],
-        device=parkinson_brain.device,
-        dtype=torch.float32,
-    )
+    # parkinson_brain.weight = torch.tensor(
+    #    [[hparams["weight_hc"], hparams["weight_pd"]]],
+    #    device=parkinson_brain.device,
+    #    dtype=torch.float32,
+    # )
 
     # Training
     parkinson_brain.fit(
         parkinson_brain.hparams.epoch_counter,
         train_set=datasets["train"],
         valid_set=datasets["valid"],
-        train_loader_kwargs=hparams["dataloader_options"],
+        train_loader_kwargs=hparams["train_dataloader_options"],
         valid_loader_kwargs=hparams["dataloader_options"],
     )
 
     # Regular Testing
     regular_test_stats = parkinson_brain.evaluate(
         test_set=datasets["test"],
-        min_key=hparams["error_metric"],
+        max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["dataloader_options"],
     )
