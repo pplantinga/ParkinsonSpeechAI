@@ -25,11 +25,6 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.dataio.sampler import BalancingDataSampler
-from speechbrain.utils.distributed import (
-    run_on_main,
-    main_process_only,
-    if_main_process,
-)
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -72,7 +67,7 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Concatenate labels in case of wav_augment
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
-            patient_type = self.hparams.wav_augment.replicate_labels(labels)
+            labels = self.hparams.wav_augment.replicate_labels(labels)
 
         # Compute loss
         if self.hparams.loss == "aam":
@@ -96,7 +91,7 @@ class ParkinsonBrain(sb.core.Brain):
             loss = self.hparams.focal_loss(outputs, labels)
         elif self.hparams.loss == "nll":
             preds = self.hparams.log_softmax(outputs)
-            loss = self.hparams.nll_loss(preds, labels)  # , weight=self.weight)
+            loss = self.hparams.nll_loss(preds, labels, weight=self.weight)
         else:
             print("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
 
@@ -108,6 +103,7 @@ class ParkinsonBrain(sb.core.Brain):
         if stage != sb.Stage.TRAIN:
             probs = self.hparams.softmax(outputs).squeeze(1)
             self.error_metrics.append(batch.id, probs[:, 1], labels.squeeze(1))
+            self.error_metrics.info_dicts.extend(batch.info_dict)
 
         return loss
 
@@ -115,6 +111,9 @@ class ParkinsonBrain(sb.core.Brain):
         """Gets called at the beginning of an epoch."""
         if stage != sb.Stage.TRAIN:
             self.error_metrics = self.hparams.error_stats()
+
+            # Add this list so we can store the info dict
+            self.error_metrics.info_dicts = []
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -124,9 +123,20 @@ class ParkinsonBrain(sb.core.Brain):
             self.train_stats = stage_stats
         else:
             for metric in ["F-score", "precision", "recall"]:
-                stage_stats[metric] = self.error_metrics.summarize(
+                stage_stats[metric] = 100 * self.error_metrics.summarize(
                     field=metric, threshold=0.5
                 )
+            combined = self.combine_chunks()
+
+            # Log results split by given categories
+            for category in self.hparams.result_categories:
+                result_breakdown = self.results_by_category(combined, category)
+                print(result_breakdown)
+
+            # Dump results to file only on test
+            if stage == sb.Stage.TEST:
+                with open(self.results_json, "w") as f:
+                    json.dump(combined, f)
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -145,9 +155,58 @@ class ParkinsonBrain(sb.core.Brain):
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                {"Epoch loaded": self.hparams.epoch_counter.current},
+                {
+                    "Epoch loaded": self.hparams.epoch_counter.current,
+                    "Results stored": self.results_json,
+                },
                 test_stats=stage_stats,
             )
+
+    def combine_chunks(self):
+        """Aggregates predictions made on all individual chunks"""
+        ids = self.error_metrics.ids
+        scores = self.error_metrics.scores
+        labels = self.error_metrics.labels
+        info_dicts = self.error_metrics.info_dicts
+
+        combined_scores = {}
+        for i, score, label, info_dict in zip(ids, scores, labels, info_dicts):
+            utt_id, chunk = i.rsplit("_", 1)
+
+            if utt_id not in combined_scores:
+                combined_scores[utt_id] = {
+                    "scores": [score], "label": label, **info_dict
+                }
+            else:
+                combined_scores[utt_id]["scores"].append(score)
+
+        # For now just take the average. Perhaps do something fancier later
+        for utt_id in combined_scores:
+            scores = combined_scores[utt_id]["scores"]
+            combined_scores[utt_id]["combined"] = sum(scores) / len(scores)
+
+        return combined_scores
+
+    def results_by_category(self, results, target_category):
+        """Divides results by a given category."""
+        options = set(t[target_category] for t in results.values())
+        metrics = {option: self.hparams.error_stats() for option in options}
+
+        for utt_id, categories in results.items():
+            option = categories[target_category]
+            metrics[option].ids.append(utt_id)
+            metrics[option].scores.append(categories["combined"])
+            metrics[option].labels.append(categories["label"])
+
+        breakdown = {}
+        for option in options:
+            breakdown[option] = {
+                "F-score": metrics[option].summarize("F-score"),
+                "precision": metrics[option].summarize("precision"),
+                "recall": metrics[option].summarize("recall"),
+            }
+
+        return breakdown
 
 
 def dataio_prep(hparams):
@@ -207,8 +266,6 @@ def dataio_prep(hparams):
 
     # Define sampler based on sex and patient type, shuffle must be None
     # Unfortunately I think we need replacement here since HC_M is so small
-    hparams["dataloader_options"]["shuffle"] = None
-    hparams["train_dataloader_options"] = hparams["dataloader_options"]
     hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
         dataset=datasets["train"],
         key="ptype_sex",
@@ -241,7 +298,7 @@ if __name__ == "__main__":
     # Dataset prep (parsing KCL MDVR and annotation into json files)
     from prepare_neuro import prepare_neuro
 
-    run_on_main(
+    sb.utils.distributed.run_on_main(
         prepare_neuro,
         kwargs={
             "data_folder": hparams["data_folder"],
@@ -251,6 +308,8 @@ if __name__ == "__main__":
             "chunk_size": hparams["chunk_size"],
         },
     )
+    sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
+    sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
@@ -271,11 +330,11 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
 
-    # parkinson_brain.weight = torch.tensor(
-    #    [[hparams["weight_hc"], hparams["weight_pd"]]],
-    #    device=parkinson_brain.device,
-    #    dtype=torch.float32,
-    # )
+    parkinson_brain.weight = torch.tensor(
+        [[hparams["weight_hc"], hparams["weight_pd"]]],
+        device=parkinson_brain.device,
+        dtype=torch.float32,
+    )
 
     # Training
     parkinson_brain.fit(
@@ -283,12 +342,21 @@ if __name__ == "__main__":
         train_set=datasets["train"],
         valid_set=datasets["valid"],
         train_loader_kwargs=hparams["train_dataloader_options"],
-        valid_loader_kwargs=hparams["dataloader_options"],
+        valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
-    # Regular Testing
-    regular_test_stats = parkinson_brain.evaluate(
-        test_set=datasets["test"],
+    # Run validation and test set to get the predictions
+    self.results_json = hparams["valid_results_json"]
+    parkinson_brain.evaluate(
+        test_set=datasets["valid"],
         max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["dataloader_options"],
+        test_loader_kwargs=hparams["test_dataloader_options"],
+    )
+
+    self.results_json = hparams["test_results_json"]
+    parkinson_brain.evaluate(
+        test_set=datasets["test"],
+        # Correct checkpoint already loaded for validation
+        #max_key=hparams["error_metric"], 
+        test_loader_kwargs=hparams["test_dataloader_options"],
     )
