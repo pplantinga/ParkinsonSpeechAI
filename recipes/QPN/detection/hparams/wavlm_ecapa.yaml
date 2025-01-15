@@ -53,7 +53,8 @@ loss: "nll"
 # Test parameters
 max_test_chunks: 24
 test_batch_size: 1
-result_categories: ["sex"]
+result_categories: ["sex", "task"]
+threshold: 0.5
 
 # Feature parameters
 wavlm_hub: !PLACEHOLDER #path/to/wavlm/checkpoint
@@ -62,8 +63,8 @@ freeze_wavlm_extractor: True
 freeze_wavlm: True
 
 # Number of classes (pd/non-pd)
-weight_hc: 1.5
-weight_pd: 0.6
+weight_hc: 1.
+weight_pd: 1.
 out_neurons: 2
 
 # Dataloader options

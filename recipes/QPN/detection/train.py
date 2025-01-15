@@ -18,6 +18,8 @@ import os
 import random
 import sys
 import csv
+import json
+import logging
 
 import torch
 import torchaudio
@@ -28,6 +30,8 @@ from speechbrain.dataio.sampler import BalancingDataSampler
 
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+logger = sb.utils.logger.get_logger(__name__)
 
 
 class ParkinsonBrain(sb.core.Brain):
@@ -93,7 +97,7 @@ class ParkinsonBrain(sb.core.Brain):
             preds = self.hparams.log_softmax(outputs)
             loss = self.hparams.nll_loss(preds, labels, weight=self.weight)
         else:
-            print("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
+            raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
 
         if stage == sb.Stage.TRAIN and hasattr(
             self.hparams.lr_annealing, "on_batch_end"
@@ -124,19 +128,21 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             for metric in ["F-score", "precision", "recall"]:
                 stage_stats[metric] = 100 * self.error_metrics.summarize(
-                    field=metric, threshold=0.5
+                    field=metric, threshold=self.hparams.threshold
                 )
             combined = self.combine_chunks()
 
             # Log results split by given categories
             for category in self.hparams.result_categories:
                 result_breakdown = self.results_by_category(combined, category)
-                print(result_breakdown)
+                logger.info(f"Breakdown by {category}:")
+                logger.info(json.dumps(result_breakdown, indent=2))
 
             # Dump results to file only on test
             if stage == sb.Stage.TEST:
                 with open(self.results_json, "w") as f:
                     json.dump(combined, f)
+                logger.info(f"Results stored {self.results_json}")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -155,10 +161,7 @@ class ParkinsonBrain(sb.core.Brain):
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
-                {
-                    "Epoch loaded": self.hparams.epoch_counter.current,
-                    "Results stored": self.results_json,
-                },
+                {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
 
@@ -175,10 +178,12 @@ class ParkinsonBrain(sb.core.Brain):
 
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
-                    "scores": [score], "label": label, **info_dict
+                    "scores": [score.item()],
+                    "label": label.item(),
+                    **info_dict
                 }
             else:
-                combined_scores[utt_id]["scores"].append(score)
+                combined_scores[utt_id]["scores"].append(score.item())
 
         # For now just take the average. Perhaps do something fancier later
         for utt_id in combined_scores:
@@ -189,21 +194,23 @@ class ParkinsonBrain(sb.core.Brain):
 
     def results_by_category(self, results, target_category):
         """Divides results by a given category."""
+
+        # Separate the scores into individual metrics objects
         options = set(t[target_category] for t in results.values())
         metrics = {option: self.hparams.error_stats() for option in options}
-
         for utt_id, categories in results.items():
             option = categories[target_category]
             metrics[option].ids.append(utt_id)
-            metrics[option].scores.append(categories["combined"])
-            metrics[option].labels.append(categories["label"])
+            metrics[option].scores.append(torch.tensor(categories["combined"]))
+            metrics[option].labels.append(torch.tensor(categories["label"]))
 
+        # Iterate all options for this category and summarize metrics
         breakdown = {}
+        threshold = self.hparams.threshold
         for option in options:
             breakdown[option] = {
-                "F-score": metrics[option].summarize("F-score"),
-                "precision": metrics[option].summarize("precision"),
-                "recall": metrics[option].summarize("recall"),
+                metric: metrics[option].summarize(metric, threshold=threshold)
+                for metric in ["F-score", "precision", "recall"]
             }
 
         return breakdown
@@ -346,17 +353,18 @@ if __name__ == "__main__":
     )
 
     # Run validation and test set to get the predictions
-    self.results_json = hparams["valid_results_json"]
+    logger.info("Final validation result:")
+    parkinson_brain.results_json = hparams["valid_results_json"]
     parkinson_brain.evaluate(
         test_set=datasets["valid"],
         max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
-    self.results_json = hparams["test_results_json"]
+    logger.info("Final test result:")
+    parkinson_brain.results_json = hparams["test_results_json"]
     parkinson_brain.evaluate(
         test_set=datasets["test"],
-        # Correct checkpoint already loaded for validation
-        #max_key=hparams["error_metric"], 
+        max_key=hparams["error_metric"], 
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
