@@ -1,0 +1,136 @@
+
+# ################################
+# Model: WavLM + ECAPA_TDNN
+# Author: Peter Plantinga, Briac Cordelle, others
+# ################################
+
+# Basic parameters
+lr_factor: 1
+seed: !ref 2030 + <lr_factor>
+lr: 0.0001
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+experiment_name: wavlm_ecapa_mixup
+results_dir: results
+output_folder: !ref <results_dir>/<experiment_name>/seed_<seed>_mixup_0.1_nodrop
+save_folder: !ref <output_folder>/save
+train_log: !ref <output_folder>/train_log.txt
+
+# Data files
+data_folder: !PLACEHOLDER
+manifests:
+  train: !ref <output_folder>/train.json
+  valid: !ref <output_folder>/valid.json
+  test: !ref <output_folder>/test.json
+valid_predictions_file: !ref <output_folder>/valid_predictions.csv
+test_predictions_file: !ref <output_folder>/test_predictions.csv
+prep_ssl: True
+
+skip_prep: False
+ckpt_interval_minutes: 15 # save checkpoint every N min
+
+# Training parameters
+epochs: 50
+batch_size: 16
+test_batch_size: 1
+base_lr: !ref <lr> / 1000
+max_lr: !ref <lr>
+step_size: 2000
+sample_rate: 16000
+sentence_len: 15.0 # seconds
+shuffle: True
+#label_smoothing: 0.01
+weights: [0.5, 2, 1.2]
+
+# Mixup params
+mixup_alpha: 0.1
+beta_sampler: !new:torch.distributions.beta.Beta
+    concentration1: !ref <mixup_alpha>
+    concentration0: !ref <mixup_alpha>
+
+# Number of classes
+out_neurons: 3
+
+# Dataloader options
+num_workers: 4
+dataloader_options:
+    batch_size: !ref <batch_size>
+    shuffle: !ref <shuffle>
+    num_workers: !ref <num_workers>
+
+test_dataloader_options:
+    batch_size: !ref <test_batch_size>
+    shuffle: !ref <shuffle>
+    num_workers: !ref <num_workers>
+
+# Augmentations would be here
+# See voxceleb recipe to add them back
+# For now we are going without and we will add them (one at a time) once we are
+# sure of our preliminary results
+wavlm_size: 2048
+
+vocal_feats: !new:speechbrain.lobes.features.VocalFeatures
+    step_size: 0.02
+    log_scores: False
+
+vocal_proj: !new:speechbrain.nnet.linear.Linear
+    input_size: 17
+    n_neurons: !ref <wavlm_size>
+
+embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
+    input_size: !ref <wavlm_size>
+    channels: [1024, 1024, 1024, 1024, 3072]
+    kernel_sizes: [5, 3, 3, 3, 1]
+    dilations: [1, 2, 3, 4, 1]
+    groups: [1, 1, 1, 1, 1]
+    attention_channels: 128
+    lin_neurons: 192
+    dropout: 0
+
+classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+    input_size: 192
+    out_neurons: !ref <out_neurons>
+
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <epochs>
+
+mean_var_norm: !new:speechbrain.processing.features.InputNormalization
+    norm_type: sentence
+    std_norm: False
+
+modules:
+    vocal_feats: !ref <vocal_feats>
+    vocal_proj: !ref <vocal_proj>
+    embedding_model: !ref <embedding_model>
+    classifier: !ref <classifier>
+    mean_var_norm: !ref <mean_var_norm>
+
+softmax: !new:speechbrain.nnet.activations.Softmax
+log_softmax: !new:speechbrain.nnet.activations.Softmax
+    apply_log: True
+
+#compute_cost: !name:speechbrain.nnet.losses.nll_loss
+compute_cost: !new:torch.nn.CrossEntropyLoss
+
+opt_class: !name:torch.optim.Adam
+    lr: !ref <lr>
+
+lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
+    base_lr: !ref <base_lr>
+    max_lr: !ref <max_lr>
+    step_size: !ref <step_size>
+
+# Logging + checkpoints
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <train_log>
+
+class_stats: !name:speechbrain.utils.metric_stats.ClassificationStats
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <save_folder>
+    recoverables:
+        vocal_proj: !ref <vocal_proj>
+        embedding_model: !ref <embedding_model>
+        classifier: !ref <classifier>
+        normalizer: !ref <mean_var_norm>
+        counter: !ref <epoch_counter>
+        lr_annealing: !ref <lr_annealing>

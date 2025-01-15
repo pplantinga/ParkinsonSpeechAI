@@ -1,8 +1,15 @@
 .ipynb_checkpoints
+__pycache__
+
+# vim files
+*.sw*
+
+# slurm files
+*.out
+
+# other files
 *.wav
+**/results/
 
-recipes/QPN/detection/*
-
-!recipes/QPN/detection/*.py
-!recipes/QPN/detection/hparams/
-
+# Run scripts
+**/run_scripts/
