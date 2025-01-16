@@ -178,17 +178,17 @@ class ParkinsonBrain(sb.core.Brain):
 
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
-                    "scores": [score.item()],
+                    "scores": [round(score.item(), 3)],
                     "label": label.item(),
                     **info_dict
                 }
             else:
-                combined_scores[utt_id]["scores"].append(score.item())
+                combined_scores[utt_id]["scores"].append(round(score.item(), 3))
 
         # For now just take the average. Perhaps do something fancier later
         for utt_id in combined_scores:
             scores = combined_scores[utt_id]["scores"]
-            combined_scores[utt_id]["combined"] = sum(scores) / len(scores)
+            combined_scores[utt_id]["combined"] = round(sum(scores) / len(scores), 3)
 
         return combined_scores
 
@@ -205,11 +205,15 @@ class ParkinsonBrain(sb.core.Brain):
             metrics[option].labels.append(torch.tensor(categories["label"]))
 
         # Iterate all options for this category and summarize metrics
+        def summarize(metric, option):
+            threshold = self.hparams.threshold
+            score = metrics[option].summarize(metric, threshold=threshold)
+            return round(100 * score, 2)
+
         breakdown = {}
-        threshold = self.hparams.threshold
         for option in options:
             breakdown[option] = {
-                metric: metrics[option].summarize(metric, threshold=threshold)
+                metric: summarize(metric, option)
                 for metric in ["F-score", "precision", "recall"]
             }
 
@@ -270,6 +274,8 @@ def dataio_prep(hparams):
             dynamic_items=[audio_pipeline, label_pipeline],
             output_keys=["id", "sig", "patient_type_encoded", "info_dict", "ptype_sex"],
         )
+        repeat_filtered = datasets[dataset].filtered_sorted(key_test={"info_dict": lambda x: x["task"] == "repeat"})
+        print(f"Found {len(repeat_filtered)} 'repeat' samples in {dataset} set")
 
     # Define sampler based on sex and patient type, shuffle must be None
     # Unfortunately I think we need replacement here since HC_M is so small
