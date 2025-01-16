@@ -168,7 +168,8 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
         # Add pid to the patient traits
         info_dict["pid"] = uttid.split("_")[1]
 
-        for i, start in enumerate(np.arange(0, duration - hop_size, hop_size)):
+        max_start = max(duration - hop_size, 1)
+        for i, start in enumerate(np.arange(0, max_start, hop_size)):
             chunk_duration = min(chunk_size, duration - i * hop_size)
             json_dict[f"{uttid}_{i}"] = {
                 "wav": audiofile,
