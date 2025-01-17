@@ -274,8 +274,17 @@ def dataio_prep(hparams):
             dynamic_items=[audio_pipeline, label_pipeline],
             output_keys=["id", "sig", "patient_type_encoded", "info_dict", "ptype_sex"],
         )
-        repeat_filtered = datasets[dataset].filtered_sorted(key_test={"info_dict": lambda x: x["task"] == "repeat"})
-        print(f"Found {len(repeat_filtered)} 'repeat' samples in {dataset} set")
+
+    # Remove keys from training data for e.g. training only on men
+    for key, values in hparams["train_keep_keys"].items():
+        datasets["train"] = datasets["train"].filtered_sorted(
+            key_test={"info_dict": lambda x: x[key] in values},
+        )
+    for key, values in hparams["test_keep_keys"].items():
+        for dataset in ["valid", "test"]:
+            datasets[dataset] = datasets[dataset].filtered_sorted(
+                key_test={"info_dict": lambda x: x[key] in values},
+            )
 
     # Define sampler based on sex and patient type, shuffle must be None
     # Unfortunately I think we need replacement here since HC_M is so small
@@ -285,12 +294,6 @@ def dataio_prep(hparams):
         num_samples=hparams["samples_per_epoch"],
         replacement=True,
     )
-
-    # Remove keys from training data for e.g. training only on men
-    for key, value in hparams["remove_keys"]:
-        datasets["train"] = datasets["train"].filtered_sorted(
-            key_test=lambda x: x["info_dict"][key] != value,
-        )
 
     return datasets
 

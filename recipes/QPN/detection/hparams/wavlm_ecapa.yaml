@@ -5,14 +5,14 @@
 # ################################
 
 # Basic parameters
-seed: 2002
+seed: 2004
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: wavlm_base_ecapa
+experiment_name: whisper_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
-output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>_lrx_<lr_factor>
+output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
@@ -38,33 +38,40 @@ NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.z
 RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?rlkey=pg9cu8vrpn2u173vhiqyu743u&dl=1
 
 # Training parameters
-epochs: 24
-samples_per_epoch: 2048 # Roughly the size of the dataset
+epochs: 10
+samples_per_epoch: 1024
 batch_size: 2
-lr: !ref 0.00001 * 3 ** <lr_factor>
+lr: 0.0001
 base_lr: 0.000001
 max_lr: !ref <lr>
 step_size: 500
 sample_rate: 16000
 chunk_size: 30.0 # seconds
-remove_keys: {}
-loss: "nll"
+loss: nll
+
+# This is formatted as key => list of values to keep
+train_keep_keys:
+    task: [dpt]
+test_keep_keys:
+    task: [dpt]
 
 # Test parameters
 max_test_chunks: 24
 test_batch_size: 1
-result_categories: ["sex", "task"]
+result_categories: [sex]
 threshold: 0.5
 
-# Feature parameters
-wavlm_hub: !PLACEHOLDER #path/to/wavlm/checkpoint
-wavlm_folder: !ref <output_folder>/wavlm-large
-freeze_wavlm_extractor: True
-freeze_wavlm: True
+# Model parameters
+# For the pretrained_source, use the path to the model dir
+pretrained_source: !PLACEHOLDER
+freeze_pretrained: True
+feature_size: 1024
+embedding_size: 1024
+dnn_blocks: 2
 
 # Number of classes (pd/non-pd)
-weight_hc: 1.
-weight_pd: 1.
+weight_hc: 1
+weight_pd: 1
 out_neurons: 2
 
 # Dataloader options
@@ -136,33 +143,56 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
 wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     parallel_augment: True
     concat_original: True
-    min_augmentations: 3
-    max_augmentations: 3
+    min_augmentations: 2
+    max_augmentations: 2
     augment_prob: 1.0
-    augmentations: [!ref <add_noise>, !ref <add_reverb>, !ref <drop_freq>]
+    augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
-# Functions
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-    source: !ref <wavlm_hub>
-    output_norm: True
-    freeze_feature_extractor: !ref <freeze_wavlm_extractor>
-    freeze: !ref <freeze_wavlm>
-    save_path: !ref <wavlm_folder>
+# Models
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+#    source: !ref <pretrained_source>
+#    output_norm: True
+#    freeze_feature_extractor: True
+#    freeze: !ref <freeze_pretrained>
+#    save_path: !ref <output_folder>/wavlm-large
 
-embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: 768
-    channels: [1024, 1024, 1024, 1024, 3072]
-    kernel_sizes: [5, 3, 3, 3, 1]
-    dilations: [1, 2, 3, 4, 1]
-    groups: [1, 1, 1, 1, 1]
-    attention_channels: 128
-    lin_neurons: 192
-    dropout: 0.2
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
+    source: !ref <pretrained_source>
+    encoder_only: True
+    freeze: !ref <freeze_pretrained>
+    save_path: !ref <output_folder>/whisper
+
+#embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
+#    input_size: !ref <feature_size>
+#    channels: [1024, 1024, 1024, 1024, 3072]
+#    kernel_sizes: [5, 3, 3, 3, 1]
+#    dilations: [1, 2, 3, 4, 1]
+#    groups: [1, 1, 1, 1, 1]
+#    attention_channels: 128
+#    lin_neurons: !ref <embedding_size>
+#    dropout: 0.2
+#
+#embedding_model: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
+#    input_shape: [null, null, !ref <feature_size>]
+#    dnn_blocks: !ref <dnn_blocks>
+#    dnn_neurons: !ref <embedding_size>
+embedding_model: !new:torch.nn.Sequential
+    - !new:speechbrain.nnet.linear.Linear
+        input_size: !ref <feature_size>
+        n_neurons: !ref <embedding_size>
+    - !new:torch.nn.LeakyReLU
+    - !new:speechbrain.nnet.pooling.AttentionPooling
+        input_dim: !ref <embedding_size>
+    - !new:speechbrain.nnet.linear.Linear
+        input_size: !ref <embedding_size>
+        n_neurons: !ref <embedding_size>
+    - !new:torch.nn.LeakyReLU
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
-    input_size: 192
+    input_size: !ref <embedding_size>
     out_neurons: !ref <out_neurons>
 
+# Functions
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <epochs>
 
