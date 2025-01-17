@@ -53,7 +53,7 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs)
-        feats = self.modules.mean_var_norm(feats, lens)
+        #feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -99,10 +99,10 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
 
-        if stage == sb.Stage.TRAIN and hasattr(
-            self.hparams.lr_annealing, "on_batch_end"
-        ):
-            self.hparams.lr_annealing.on_batch_end(self.optimizer)
+        #if stage == sb.Stage.TRAIN and hasattr(
+        #    self.hparams.lr_annealing, "on_batch_end"
+        #):
+        #    self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
         if stage != sb.Stage.TRAIN:
             probs = self.hparams.softmax(outputs).squeeze(1)
@@ -146,11 +146,12 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            old_lr, new_lr = self.hparams.lr_annealing(epoch)
-            sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            #old_lr, new_lr = self.hparams.lr_annealing(epoch)
+            #sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
 
             self.hparams.train_logger.log_stats(
-                stats_meta={"epoch": epoch, "lr": old_lr},
+                #stats_meta={"epoch": epoch, "lr": old_lr},
+                stats_meta={"epoch": epoch},
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
@@ -325,7 +326,7 @@ if __name__ == "__main__":
         },
     )
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
-    sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
+    #sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
