@@ -27,8 +27,8 @@ valid_annotation: !ref <storage_folder>/valid.json
 test_annotation: !ref <storage_folder>/test.json
 noise_annotation: !ref <save_folder>/noise.csv
 rir_annotation: !ref <save_folder>/rir.csv
-valid_results_json: !ref <output_folder>/valid_results.json
-test_results_json: !ref <output_folder>/test_results.json
+valid_metrics_json: !ref <output_folder>/valid_metrics.json
+test_metrics_json: !ref <output_folder>/test_metrics.json
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
@@ -58,7 +58,7 @@ test_keep_keys:
 # Test parameters
 max_test_chunks: 24
 test_batch_size: 1
-result_categories: [sex]
+metric_categories: [sex]
 threshold: 0.5
 
 # Model parameters
@@ -145,7 +145,7 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     concat_original: False
     min_augmentations: 2
     max_augmentations: 2
-    augment_prob: 1.0
+    augment_prob: 0.9
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
@@ -183,20 +183,8 @@ embedding_model: !new:torch.nn.Sequential
     - !new:torch.nn.Dropout
         p: !ref <dropout>
     - !new:torch.nn.LeakyReLU
-    - !new:speechbrain.nnet.linear.Linear
-        input_size: !ref <embedding_size>
-        n_neurons: !ref <embedding_size>
-    - !new:torch.nn.Dropout
-        p: !ref <dropout>
-    - !new:torch.nn.LeakyReLU
     - !new:speechbrain.nnet.pooling.AttentionPooling
         input_dim: !ref <embedding_size>
-    - !new:speechbrain.nnet.linear.Linear
-        input_size: !ref <embedding_size>
-        n_neurons: !ref <embedding_size>
-    - !new:torch.nn.Dropout
-        p: !ref <dropout>
-    - !new:torch.nn.LeakyReLU
     - !new:speechbrain.nnet.linear.Linear
         input_size: !ref <embedding_size>
         n_neurons: !ref <embedding_size>
@@ -257,7 +245,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Error computation
 error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
     positive_label: 1
-error_metric: F-score
+error_metric: chunk_F-score
 
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>

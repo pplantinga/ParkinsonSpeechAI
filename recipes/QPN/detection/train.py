@@ -20,6 +20,7 @@ import sys
 import csv
 import json
 import logging
+import pprint
 
 import torch
 import torchaudio
@@ -53,7 +54,7 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs)
-        #feats = self.modules.mean_var_norm(feats, lens)
+        # feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -99,9 +100,9 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
 
-        #if stage == sb.Stage.TRAIN and hasattr(
+        # if stage == sb.Stage.TRAIN and hasattr(
         #    self.hparams.lr_annealing, "on_batch_end"
-        #):
+        # ):
         #    self.hparams.lr_annealing.on_batch_end(self.optimizer)
 
         if stage != sb.Stage.TRAIN:
@@ -126,31 +127,64 @@ class ParkinsonBrain(sb.core.Brain):
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats
         else:
-            for metric in ["F-score", "precision", "recall"]:
-                stage_stats[metric] = 100 * self.error_metrics.summarize(
-                    field=metric, threshold=self.hparams.threshold
+            # Combine chunks using two strategies
+            combined_avg = self.combine_chunks(how="avg")
+            combined_max = self.combine_chunks(how="max")
+
+            # Generate overall metrics, using stored threshold for test set
+            avg_threshold = None if stage == sb.Stage.VALID else self.avg_threshold
+            max_threshold = None if stage == sb.Stage.VALID else self.max_threshold
+            metrics_comb_avg = self.metrics_by_category(
+                combined_avg, target_category=None, threshold=avg_threshold
+            )
+            metrics_comb_max = self.metrics_by_category(
+                combined_max, target_category=None, threshold=max_threshold
+            )
+            self.avg_threshold = metrics_comb_avg["overall"]["threshold"]
+            self.max_threshold = metrics_comb_max["overall"]["threshold"]
+
+            # Log overall metrics
+            chunk_stats = self.summarize_metrics(
+                self.error_metrics, self.hparams.threshold
+            )
+            stage_stats.update({f"chunk_{k}": v for k, v in chunk_stats.items()})
+            stage_stats.update(
+                {f"comb_avg_{k}": v for k, v in metrics_comb_avg["overall"].items()}
+            )
+            stage_stats.update(
+                {f"comb_max_{k}": v for k, v in metrics_comb_max["overall"].items()}
+            )
+
+            # Log metrics split by given categories
+            for category in self.hparams.metric_categories:
+                cat_metrics = self.metrics_by_category(
+                    combined_scores=combined_avg,
+                    target_category=category,
+                    threshold=self.hparams.threshold,
                 )
-            combined = self.combine_chunks()
+                logger.info(f"Comb avg breakdown by {category}")
+                logger.info(pprint.pformat(cat_metrics, indent=2))
+                cat_metrics = self.metrics_by_category(
+                    combined_scores=combined_max,
+                    target_category=category,
+                    threshold=self.hparams.threshold,
+                )
+                logger.info(f"Comb max breakdown by {category}")
+                logger.info(pprint.pformat(cat_metrics, indent=2))
 
-            # Log results split by given categories
-            for category in self.hparams.result_categories:
-                result_breakdown = self.results_by_category(combined, category)
-                logger.info(f"Breakdown by {category}:")
-                logger.info(json.dumps(result_breakdown, indent=2))
-
-            # Dump results to file only on test
+            # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
-                with open(self.results_json, "w") as f:
-                    json.dump(combined, f)
-                logger.info(f"Results stored {self.results_json}")
+                with open(self.metrics_json, "w") as f:
+                    json.dump(combined_avg, f)
+                logger.info(f"Results stored {self.metrics_json}")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            #old_lr, new_lr = self.hparams.lr_annealing(epoch)
-            #sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            # old_lr, new_lr = self.hparams.lr_annealing(epoch)
+            # sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
 
             self.hparams.train_logger.log_stats(
-                #stats_meta={"epoch": epoch, "lr": old_lr},
+                # stats_meta={"epoch": epoch, "lr": old_lr},
                 stats_meta={"epoch": epoch},
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
@@ -166,7 +200,7 @@ class ParkinsonBrain(sb.core.Brain):
                 test_stats=stage_stats,
             )
 
-    def combine_chunks(self):
+    def combine_chunks(self, how="avg"):
         """Aggregates predictions made on all individual chunks"""
         ids = self.error_metrics.ids
         scores = self.error_metrics.scores
@@ -181,44 +215,58 @@ class ParkinsonBrain(sb.core.Brain):
                 combined_scores[utt_id] = {
                     "scores": [round(score.item(), 3)],
                     "label": label.item(),
-                    **info_dict
+                    **info_dict,
                 }
             else:
                 combined_scores[utt_id]["scores"].append(round(score.item(), 3))
 
-        # For now just take the average. Perhaps do something fancier later
+        # For now just take the average or max. Perhaps do something fancier later
         for utt_id in combined_scores:
             scores = combined_scores[utt_id]["scores"]
-            combined_scores[utt_id]["combined"] = round(sum(scores) / len(scores), 3)
+            if how == "avg":
+                combined_scores[utt_id]["combined"] = round(
+                    sum(scores) / len(scores), 3
+                )
+            elif how == "max":
+                combined_scores[utt_id]["combined"] = round(max(scores), 3)
+            else:
+                raise ValueError("Expected 'avg' or 'max'")
 
         return combined_scores
 
-    def results_by_category(self, results, target_category):
-        """Divides results by a given category."""
+    def metrics_by_category(
+        self, combined_scores, target_category=None, threshold=None
+    ):
+        """Divides metrics by a given category."""
+
+        # Collect available elements in the target_category, or "overall"
+        options = {"overall"}
+        if target_category:
+            options = set(t[target_category] for t in combined_scores.values())
 
         # Separate the scores into individual metrics objects
-        options = set(t[target_category] for t in results.values())
         metrics = {option: self.hparams.error_stats() for option in options}
-        for utt_id, categories in results.items():
-            option = categories[target_category]
+        for utt_id, categories in combined_scores.items():
+            option = categories[target_category] if target_category else "overall"
             metrics[option].ids.append(utt_id)
             metrics[option].scores.append(torch.tensor(categories["combined"]))
             metrics[option].labels.append(torch.tensor(categories["label"]))
 
-        # Iterate all options for this category and summarize metrics
-        def summarize(metric, option):
-            threshold = self.hparams.threshold
-            score = metrics[option].summarize(metric, threshold=threshold)
-            return round(100 * score, 2)
-
-        breakdown = {}
-        for option in options:
-            breakdown[option] = {
-                metric: summarize(metric, option)
-                for metric in ["F-score", "precision", "recall"]
-            }
+        # Summarize scores
+        breakdown = {
+            option: self.summarize_metrics(metrics[option], threshold=threshold)
+            for option in options
+        }
 
         return breakdown
+
+    def summarize_metrics(self, metrics, threshold):
+        """Simplify metrics to round(100 * (P, R, F1)) and threshold"""
+        all_metrics = metrics.summarize(threshold=threshold)
+        target_metrics = ["precision", "recall", "F-score"]
+        metrics = {k: round(100 * all_metrics[k], 2) for k in target_metrics}
+        metrics["threshold"] = round(all_metrics["threshold"], 3)
+        return metrics
 
 
 def dataio_prep(hparams):
@@ -326,7 +374,7 @@ if __name__ == "__main__":
         },
     )
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
-    #sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
+    # sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
@@ -364,7 +412,7 @@ if __name__ == "__main__":
 
     # Run validation and test set to get the predictions
     logger.info("Final validation result:")
-    parkinson_brain.results_json = hparams["valid_results_json"]
+    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
     parkinson_brain.evaluate(
         test_set=datasets["valid"],
         max_key=hparams["error_metric"],
@@ -372,9 +420,9 @@ if __name__ == "__main__":
     )
 
     logger.info("Final test result:")
-    parkinson_brain.results_json = hparams["test_results_json"]
+    parkinson_brain.metrics_json = hparams["test_metrics_json"]
     parkinson_brain.evaluate(
         test_set=datasets["test"],
-        max_key=hparams["error_metric"], 
+        max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
