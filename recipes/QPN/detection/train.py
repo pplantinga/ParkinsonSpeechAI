@@ -140,8 +140,6 @@ class ParkinsonBrain(sb.core.Brain):
             metrics_comb_max = self.metrics_by_category(
                 combined_max, target_category=None, threshold=max_threshold
             )
-            self.avg_threshold = metrics_comb_avg["overall"]["threshold"]
-            self.max_threshold = metrics_comb_max["overall"]["threshold"]
 
             # Log overall metrics
             chunk_stats = self.summarize_metrics(
@@ -199,6 +197,15 @@ class ParkinsonBrain(sb.core.Brain):
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
             )
+
+    def on_evaluate_start(self, max_key=None, min_key=None):
+        """Recover best checkpoint for evaluation, keeping track of threshold"""
+        if self.checkpointer is not None:
+            checkpoint = self.checkpointer.recover_if_possible(
+                max_key=max_key, min_key=min_key
+            )
+            self.avg_threshold = checkpoint.meta["comb_avg_threshold"]
+            self.max_threshold = checkpoint.meta["comb_max_threshold"]
 
     def combine_chunks(self, how="avg"):
         """Aggregates predictions made on all individual chunks"""
