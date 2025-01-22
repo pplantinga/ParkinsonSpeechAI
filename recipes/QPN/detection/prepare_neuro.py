@@ -4,6 +4,7 @@ import glob
 import torchaudio
 import openpyxl
 import numpy as np
+import pathlib
 
 
 def prepare_neuro(
@@ -39,7 +40,7 @@ def get_path_type_dicts(data_folder):
     batch1_workbook = openpyxl.load_workbook(batch1_excel_path)
     batch1_sheet = batch1_workbook.active
     batch2_workbook = openpyxl.load_workbook(batch2_excel_path)
-    batch2_sheet = batch2_workbook['Demographic']
+    batch2_sheet = batch2_workbook["Demographic"]
 
     for dataset in datasets:
         dataset_path = os.path.join(data_folder, dataset)
@@ -108,7 +109,6 @@ def get_patient_traits(files, sheet, batch):
 
             # TODO Convert UPDRS score to category, waiting for answer from Jen-Kai on B1 scores
 
-
             # Save to dict
             patient_traits = {
                 "ptype": ptype,
@@ -132,7 +132,7 @@ def get_patient_traits(files, sheet, batch):
 def create_json(json_file, path_type_dict, chunk_size, overlap=None):
     hop_size = chunk_size / 2 if overlap is None else chunk_size - overlap
     json_dict = {}
-    
+
     for audiofile in path_type_dict.keys():
         # Get info dict
         info_dict = path_type_dict[audiofile].copy()
@@ -141,32 +141,26 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
         skip = False
 
         # Remove 'l1' files as they are duplicates
-        if 'l1' in audiofile:
+        if "l1" in audiofile:
             continue
 
-        # Get uttid
-        uttid = audiofile.split("/")[-1].split(".")[0] + "_" + audiofile.split("/")[-2]
+        # Get utterance info from the file name
+        audiopath = pathlib.Path(audiofile)
+        uttid = audiopath.stem + "_" + audiopath.parent.name
+
+        # Second and third items are the PID and task, last is usually the language
+        items = audiopath.stem.split("_")
+        info_dict.update({"pid": items[1], "task": items[2], "lang": items[-1]})
+
+        # Corrections
+        if info_dict["task"] in ["a1", "a2", "a3", "a4"]:
+            info_dict["task"] = "vowel_repeat"
+        if info_dict["lang"] not in ["en", "fr"]:
+            info_dict["lang"] = "other"
 
         # Get duration
         audioinfo = torchaudio.info(audiofile)
         duration = audioinfo.num_frames / audioinfo.sample_rate
-
-        # Get test type
-        if 'repeat' in audiofile:
-            info_dict["task"] = "repeat"
-        if 'a1' in audiofile or 'a2' in audiofile or 'a3' in audiofile or 'a4' in audiofile:
-            info_dict["task"] = "vowel_repeat"
-        if 'recall' in audiofile:
-            info_dict["task"] = "recall"
-        if 'read' in audiofile:
-            info_dict["task"] = "read_text"
-        if 'dpt' in audiofile:
-            info_dict["task"] = "dpt"
-        if 'hbd' in audiofile:
-            info_dict["task"] = "hbd"
-
-        # Add pid to the patient traits
-        info_dict["pid"] = uttid.split("_")[1]
 
         max_start = max(duration - hop_size, 1)
         for i, start in enumerate(np.arange(0, max_start, hop_size)):

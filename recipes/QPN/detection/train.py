@@ -129,16 +129,11 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             # Combine chunks using two strategies
             combined_avg = self.combine_chunks(how="avg")
-            combined_max = self.combine_chunks(how="max")
 
             # Generate overall metrics, using stored threshold for test set
             avg_threshold = None if stage == sb.Stage.VALID else self.avg_threshold
-            max_threshold = None if stage == sb.Stage.VALID else self.max_threshold
             metrics_comb_avg = self.metrics_by_category(
                 combined_avg, target_category=None, threshold=avg_threshold
-            )
-            metrics_comb_max = self.metrics_by_category(
-                combined_max, target_category=None, threshold=max_threshold
             )
 
             # Log overall metrics
@@ -149,9 +144,6 @@ class ParkinsonBrain(sb.core.Brain):
             stage_stats.update(
                 {f"comb_avg_{k}": v for k, v in metrics_comb_avg["overall"].items()}
             )
-            stage_stats.update(
-                {f"comb_max_{k}": v for k, v in metrics_comb_max["overall"].items()}
-            )
 
             # Log metrics split by given categories
             for category in self.hparams.metric_categories:
@@ -161,14 +153,7 @@ class ParkinsonBrain(sb.core.Brain):
                     threshold=self.hparams.threshold,
                 )
                 logger.info(f"Comb avg breakdown by {category}")
-                logger.info(pprint.pformat(cat_metrics, indent=2))
-                cat_metrics = self.metrics_by_category(
-                    combined_scores=combined_max,
-                    target_category=category,
-                    threshold=self.hparams.threshold,
-                )
-                logger.info(f"Comb max breakdown by {category}")
-                logger.info(pprint.pformat(cat_metrics, indent=2))
+                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
 
             # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
@@ -190,6 +175,7 @@ class ParkinsonBrain(sb.core.Brain):
             self.checkpointer.save_and_keep_only(
                 meta=stage_stats,
                 max_keys=[self.hparams.error_metric],
+                min_keys=["loss"],
             )
 
         if stage == sb.Stage.TEST:
@@ -205,7 +191,27 @@ class ParkinsonBrain(sb.core.Brain):
                 max_key=max_key, min_key=min_key
             )
             self.avg_threshold = checkpoint.meta["comb_avg_threshold"]
-            self.max_threshold = checkpoint.meta["comb_max_threshold"]
+
+    def init_optimizers(self):
+        """Called during ``on_fit_start()``, initialize optimizers
+        after parameters are fully configured (e.g. DDP, jit).
+        """
+
+        all_params = self.modules.parameters()
+
+        if self.opt_class is not None:
+            self.optimizer = self.opt_class(all_params)
+            self.optimizers_dict = {"opt_class": self.optimizer}
+
+            if self.checkpointer is not None:
+                self.checkpointer.add_recoverable("optimizer", self.optimizer)
+
+            self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
+
+    def on_fit_batch_end(self, batch, outputs, loss, should_step):
+        """Update scheduler if an update was made."""
+        if should_step:
+            self.lr_scheduler.step()
 
     def combine_chunks(self, how="avg"):
         """Aggregates predictions made on all individual chunks"""

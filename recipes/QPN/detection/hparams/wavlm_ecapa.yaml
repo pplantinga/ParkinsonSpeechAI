@@ -5,7 +5,7 @@
 # ################################
 
 # Basic parameters
-seed: 2008
+seed: 2013
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
@@ -38,9 +38,10 @@ NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.z
 RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?rlkey=pg9cu8vrpn2u173vhiqyu743u&dl=1
 
 # Training parameters
-epochs: 15
+epochs: 16
 samples_per_epoch: 1024
 batch_size: 32
+grad_accumulation_factor: 1
 lr: 0.0001
 base_lr: 0.000001
 max_lr: !ref <lr>
@@ -56,9 +57,8 @@ test_keep_keys:
     task: [dpt]
 
 # Test parameters
-max_test_chunks: 24
 test_batch_size: 1
-metric_categories: [sex]
+metric_categories: [sex, lang]
 threshold: 0.5
 
 # Model parameters
@@ -229,7 +229,10 @@ nll_loss: !name:speechbrain.nnet.losses.nll_loss
     allowed_len_diff: 0
     label_smoothing: 0.01
 
-opt_class: !name:torch.optim.Adam
+#opt_class: !name:torch.optim.Adam
+#    lr: !ref <lr>
+#    weight_decay: 0.0001
+opt_class: !name:bitsandbytes.optim.Adam8bit
     lr: !ref <lr>
     weight_decay: 0.0001
 
@@ -237,6 +240,10 @@ opt_class: !name:torch.optim.Adam
 #    base_lr: !ref <base_lr>
 #    max_lr: !ref <max_lr>
 #    step_size: !ref <step_size>
+
+lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
+    num_warmup_steps: 32
+    num_training_steps: !ref <epochs> * 32
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
