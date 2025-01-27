@@ -1,16 +1,15 @@
-
 # ################################
 # Model: Parkinson's identification with ECAPA
-# Author: Briac Cordelle
+# Author: Briac Cordelle & Peter Plantinga
 # ################################
 
 # Basic parameters
-seed: 2013
+seed: 2022
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_dnn
+experiment_name: whisper_weighted_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -38,17 +37,19 @@ NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.z
 RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?rlkey=pg9cu8vrpn2u173vhiqyu743u&dl=1
 
 # Training parameters
-epochs: 16
+epochs: 20
+warmup_epochs: 2
 samples_per_epoch: 1024
-batch_size: 32
-grad_accumulation_factor: 1
+total_batch_size: 32
+batch_size: 16
+grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
 lr: 0.0001
 base_lr: 0.000001
 max_lr: !ref <lr>
 step_size: 50
 sample_rate: 16000
 chunk_size: 30.0 # seconds
-loss: nll
+loss: bce
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
@@ -66,13 +67,9 @@ threshold: 0.5
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
 feature_size: 1024
-embedding_size: 1024
+embedding_size: 1280
 dropout: 0.2
-
-# Number of classes (pd/non-pd)
-weight_hc: 1.5
-weight_pd: 0.5
-out_neurons: 2
+out_neurons: 1
 
 # Dataloader options
 # Shuffling handled by sampler in train.py
@@ -225,7 +222,7 @@ aam_loss: !new:speechbrain.nnet.losses.AdditiveAngularMargin
     margin: 0.2
     scale: 30
 
-nll_loss: !name:speechbrain.nnet.losses.nll_loss
+bce_loss: !name:speechbrain.nnet.losses.bce_loss
     allowed_len_diff: 0
     label_smoothing: 0.01
 
@@ -242,8 +239,8 @@ opt_class: !name:bitsandbytes.optim.Adam8bit
 #    step_size: !ref <step_size>
 
 lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
-    num_warmup_steps: 32
-    num_training_steps: !ref <epochs> * 32
+    num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
+    num_training_steps: !ref <epochs> * <samples_per_epoch> // <total_batch_size>
 
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger

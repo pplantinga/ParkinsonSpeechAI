@@ -1,13 +1,12 @@
 # !/usr/bin/python3
-"""Recipe for training speaker embeddings (e.g, xvectors, ecapa-tdnn) on the McGill Neuro Parkinson's dataset.
-We employ an encoder followed by a speaker classifier.
+"""Recipe for training a detector on the McGill Neuro Parkinson's dataset.
+We employ an encoder followed by a classifier.
 
 To run this recipe, use the following command:
 > python train_ecapa_tdnn.py {hyperparameter_file}
 
 Using your own hyperparameter file or one of the following:
     hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
-    hparams/fbank_ecapa.yaml (for fbank + ecapa)
 
 Author
     * Briac Cordelle 2024
@@ -21,18 +20,20 @@ import csv
 import json
 import logging
 import pprint
+import collections
 
 import torch
 import torchaudio
 from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
-from speechbrain.dataio.sampler import BalancingDataSampler
+from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeightedRandomSampler
 
 from torch.utils.data import DataLoader
+from torch.nn.functional import binary_cross_entropy
 from tqdm import tqdm
 
-logger = sb.utils.logger.get_logger(__name__)
+logger = sb.utils.logger.get_logger("train.py")
 
 
 class ParkinsonBrain(sb.core.Brain):
@@ -75,40 +76,39 @@ class ParkinsonBrain(sb.core.Brain):
             labels = self.hparams.wav_augment.replicate_labels(labels)
 
         # Compute loss
-        if self.hparams.loss == "aam":
-            # Squeeze and ensure targets are one hot encoded (for AAM)
-            preds = outputs.squeeze(1)
-            targets = labels.squeeze(1)
-            targets = F.one_hot(targets.long(), preds.shape[1]).float()
+        if stage == sb.Stage.TRAIN:
+            if self.hparams.loss == "aam":
+                # Squeeze and ensure targets are one hot encoded (for AAM)
+                preds = outputs.squeeze(1)
+                targets = labels.squeeze(1)
+                targets = F.one_hot(targets.long(), preds.shape[1]).float()
 
-            # Compute loss with weights
-            preds = self.hparams.AAM_loss(preds, targets)
+                # Compute loss with weights
+                preds = self.hparams.AAM_loss(preds, targets)
 
-            # Pass through log softmax
-            preds = F.log_softmax(preds, dim=1)
+                # Pass through log softmax
+                preds = F.log_softmax(preds, dim=1)
 
-            # Pass through KLDiv Loss, apply weight and average
-            # KLDLoss = torch.nn.KLDivLoss(reduction="none")
-            loss = KLDLoss(preds, targets) * weights
-            loss = loss.sum() / targets.sum()
+                # Pass through KLDiv Loss, apply weight and average
+                # KLDLoss = torch.nn.KLDivLoss(reduction="none")
+                loss = KLDLoss(preds, targets) * weights
+                loss = loss.sum() / targets.sum()
 
-        elif self.hparams.loss == "focal":
-            loss = self.hparams.focal_loss(outputs, labels)
-        elif self.hparams.loss == "nll":
-            preds = self.hparams.log_softmax(outputs)
-            loss = self.hparams.nll_loss(preds, labels, weight=self.weight)
+            elif self.hparams.loss == "focal":
+                loss = self.hparams.focal_loss(outputs, labels)
+            elif self.hparams.loss == "bce":
+                loss = self.hparams.bce_loss(outputs, labels, weight=batch.weight)
+            else:
+                raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'bce'")
+
+        # Validation / Test
         else:
-            raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'nll'")
-
-        # if stage == sb.Stage.TRAIN and hasattr(
-        #    self.hparams.lr_annealing, "on_batch_end"
-        # ):
-        #    self.hparams.lr_annealing.on_batch_end(self.optimizer)
-
-        if stage != sb.Stage.TRAIN:
-            probs = self.hparams.softmax(outputs).squeeze(1)
-            self.error_metrics.append(batch.id, probs[:, 1], labels.squeeze(1))
+            probs = torch.sigmoid(outputs.view(-1))
+            self.error_metrics.append(batch.id, probs, labels.view(-1))
             self.error_metrics.info_dicts.extend(batch.info_dict)
+
+            # Use unweighted, unsmoothed score for comparable results across hparams
+            loss = binary_cross_entropy(probs, labels.view(-1).float())
 
         return loss
 
@@ -148,9 +148,7 @@ class ParkinsonBrain(sb.core.Brain):
             # Log metrics split by given categories
             for category in self.hparams.metric_categories:
                 cat_metrics = self.metrics_by_category(
-                    combined_scores=combined_avg,
-                    target_category=category,
-                    threshold=self.hparams.threshold,
+                    combined_scores=combined_avg, target_category=category
                 )
                 logger.info(f"Comb avg breakdown by {category}")
                 logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
@@ -163,12 +161,10 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            # old_lr, new_lr = self.hparams.lr_annealing(epoch)
-            # sb.nnet.schedulers.update_learning_rate(self.optimizer, new_lr)
+            lr = self.lr_scheduler.get_last_lr()
 
             self.hparams.train_logger.log_stats(
-                # stats_meta={"epoch": epoch, "lr": old_lr},
-                stats_meta={"epoch": epoch},
+                stats_meta={"epoch": epoch, "lr": lr},
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
@@ -274,12 +270,14 @@ class ParkinsonBrain(sb.core.Brain):
         return breakdown
 
     def summarize_metrics(self, metrics, threshold):
-        """Simplify metrics to round(100 * (P, R, F1)) and threshold"""
+        """Simplify metrics to round(100 * (P, R, F1)), x-ent, and threshold"""
         all_metrics = metrics.summarize(threshold=threshold)
         target_metrics = ["precision", "recall", "F-score"]
-        metrics = {k: round(100 * all_metrics[k], 2) for k in target_metrics}
-        metrics["threshold"] = round(all_metrics["threshold"], 3)
-        return metrics
+        summary = {k: round(100 * all_metrics[k], 2) for k in target_metrics}
+        summary["threshold"] = round(all_metrics["threshold"], 3)
+        cross_ent = binary_cross_entropy(metrics.scores, metrics.labels.float())
+        summary["bce"] = round(cross_ent.item(), 3)
+        return summary
 
 
 def dataio_prep(hparams):
@@ -288,7 +286,7 @@ def dataio_prep(hparams):
     # Initialization of the label encoder. The label encoder assigns to each
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
-    label_encoder.expect_len(hparams["out_neurons"])
+    label_encoder.expect_len(2)
     label_encoder.enforce_label("PD", 1)
     label_encoder.enforce_label("HC", 0)
 
@@ -307,7 +305,7 @@ def dataio_prep(hparams):
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("info_dict")
     @sb.utils.data_pipeline.provides(
-        "patient_type", "patient_type_encoded", "ptype_sex"
+        "patient_type", "patient_type_encoded", "weight", "to_balance"
     )
     def label_pipeline(info_dict):
         """Defines the pipeline to process the patient type labels.
@@ -318,7 +316,10 @@ def dataio_prep(hparams):
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
 
-        # For re-balancing, let's use both patient type and patient sex
+        # Weight PD less since there's more in the data
+        yield 0.5 if patient_type_encoded else 1.5
+
+        # Balance on ptype and sex
         yield info_dict["ptype"] + "_" + info_dict["sex"]
 
     # Define datasets. We also connect the dataset with the data processing
@@ -330,11 +331,12 @@ def dataio_prep(hparams):
         "test": hparams["test_annotation"],
     }
 
+    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
-            output_keys=["id", "sig", "patient_type_encoded", "info_dict", "ptype_sex"],
+            output_keys=out_keys,
         )
 
     # Remove keys from training data for e.g. training only on men
@@ -348,14 +350,18 @@ def dataio_prep(hparams):
                 key_test={"info_dict": lambda x: x[key] in values},
             )
 
-    # Define sampler based on sex and patient type, shuffle must be None
-    # Unfortunately I think we need replacement here since HC_M is so small
     hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
         dataset=datasets["train"],
-        key="ptype_sex",
+        key="to_balance",
         num_samples=hparams["samples_per_epoch"],
         replacement=True,
     )
+    #hparams["train_dataloader_options"]["sampler"] = ReproducibleWeightedRandomSampler(
+    #    weights=[d["weight"] for d in datasets["train"]],
+    #    num_samples=hparams["samples_per_epoch"],
+    #    replacement=True,
+    #    seed=hparams["seed"],
+    #)
 
     return datasets
 
@@ -408,12 +414,6 @@ if __name__ == "__main__":
         checkpointer=hparams["checkpointer"],
     )
 
-    parkinson_brain.weight = torch.tensor(
-        [[hparams["weight_hc"], hparams["weight_pd"]]],
-        device=parkinson_brain.device,
-        dtype=torch.float32,
-    )
-
     # Training
     parkinson_brain.fit(
         parkinson_brain.hparams.epoch_counter,
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     parkinson_brain.metrics_json = hparams["valid_metrics_json"]
     parkinson_brain.evaluate(
         test_set=datasets["valid"],
-        max_key=hparams["error_metric"],
+        #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
@@ -436,6 +436,6 @@ if __name__ == "__main__":
     parkinson_brain.metrics_json = hparams["test_metrics_json"]
     parkinson_brain.evaluate(
         test_set=datasets["test"],
-        max_key=hparams["error_metric"],
+        #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
