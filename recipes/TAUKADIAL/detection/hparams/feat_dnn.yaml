@@ -1,15 +1,15 @@
 # ################################
-# Model: Parkinson's identification with ECAPA
+# Model: Alzheimer's identification
 # Author: Briac Cordelle & Peter Plantinga
 # ################################
 
 # Basic parameters
-seed: 2027
+seed: 2028
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: canary_dnn
+experiment_name: whisper_weighted_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -39,36 +39,29 @@ RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?r
 # Training parameters
 epochs: 20
 warmup_epochs: 2
-samples_per_epoch: 1024
+samples_per_epoch: 600
 total_batch_size: 32
-batch_size: 8
+batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.0001
+lr: 0.0002
 base_lr: 0.000001
 max_lr: !ref <lr>
 step_size: 50
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 loss: bce
-
-# This is formatted as key => list of values to keep
-train_keep_keys:
-    task: [dpt]
-    #lang: [fr]
-test_keep_keys:
-    task: [dpt]
+train_keep_keys: {}
+test_keep_keys: {}
 
 # Test parameters
 test_batch_size: 1
-metric_categories: [sex, lang]
-threshold: 0.5
 
 # Model parameters
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 1024
-embedding_size: 1280
+feature_size: 768
+embedding_size: 768
 dropout: 0.2
 out_neurons: 1
 
@@ -78,6 +71,7 @@ num_workers: 4
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>
+    shuffle: True
 
 valid_dataloader_options:
     batch_size: !ref <test_batch_size>
@@ -154,17 +148,15 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/wavlm-large
 
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
-#    source: !ref <pretrained_source>
-#    encoder_only: True
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/whisper
-
-compute_features: !new:nemo_encoder.NeMoEncoder
-    source: !ref <pretrained_source> / canary-1b.nemo
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
+    source: !ref <pretrained_source>
+    encoder_only: True
     freeze: !ref <freeze_pretrained>
-    nemo_type: "MultiTask"
-    source_dir: !ref <pretrained_source>
+    save_path: !ref <output_folder>/whisper
+
+#compute_features: !new:nemo_ctc.NeMoCTC
+#    source: !ref <pretrained_source>
+#    freeze: !ref <freeze_pretrained>
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>

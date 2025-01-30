@@ -1,16 +1,15 @@
 # !/usr/bin/python3
-"""Recipe for training a detector on the McGill Neuro Parkinson's dataset.
+"""Recipe for training a detector on TAUKADIAL set.
 We employ an encoder followed by a classifier.
 
 To run this recipe, use the following command:
-> python train_ecapa_tdnn.py {hyperparameter_file}
+> python train.py {hyperparameter_file}
 
 Using your own hyperparameter file or one of the following:
-    hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
+    hparams/feat_dnn.yaml
 
 Author
-    * Briac Cordelle 2024
-    * Peter Plantinga 2024
+    * Peter Plantinga 2025
 """
 
 import os
@@ -36,12 +35,12 @@ from tqdm import tqdm
 logger = sb.utils.logger.get_logger("train.py")
 
 
-class ParkinsonBrain(sb.core.Brain):
+class AlzheimerBrain(sb.core.Brain):
     """Class for speaker embedding training"""
 
     def compute_forward(self, batch, stage):
         """
-        Computation pipeline based on a encoder + speaker classifier for parkinson's detection.
+        Computation pipeline based on a encoder + speaker classifier for alzheimer's detection.
         Data augmentation and environmental corruption are applied to the
         input speech if present.
         """
@@ -55,7 +54,6 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
-        # feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -65,10 +63,10 @@ class ParkinsonBrain(sb.core.Brain):
         return outputs, lens
 
     def compute_objectives(self, outputs, batch, stage):
-        """Computes the loss using patient-type as label."""
+        """Computes the loss using diagnosis as label."""
 
         # Get predictions and labels
-        labels, _ = batch.patient_type_encoded
+        labels, _ = batch.dx_encoded
         outputs, lens = outputs
 
         # Concatenate labels in case of wav_augment
@@ -97,7 +95,7 @@ class ParkinsonBrain(sb.core.Brain):
             elif self.hparams.loss == "focal":
                 loss = self.hparams.focal_loss(outputs, labels)
             elif self.hparams.loss == "bce":
-                loss = self.hparams.bce_loss(outputs, labels, weight=batch.weight)
+                loss = self.hparams.bce_loss(outputs, labels)
             else:
                 raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'bce'")
 
@@ -105,7 +103,6 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             probs = torch.sigmoid(outputs.view(-1))
             self.error_metrics.append(batch.id, probs, labels.view(-1))
-            self.error_metrics.info_dicts.extend(batch.info_dict)
 
             # Use unweighted, unsmoothed score for comparable results across hparams
             loss = binary_cross_entropy(probs, labels.view(-1).float())
@@ -116,9 +113,6 @@ class ParkinsonBrain(sb.core.Brain):
         """Gets called at the beginning of an epoch."""
         if stage != sb.Stage.TRAIN:
             self.error_metrics = self.hparams.error_stats()
-
-            # Add this list so we can store the info dict
-            self.error_metrics.info_dicts = []
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -137,21 +131,19 @@ class ParkinsonBrain(sb.core.Brain):
             )
 
             # Log overall metrics
-            chunk_stats = self.summarize_metrics(
-                self.error_metrics, self.hparams.threshold
-            )
+            chunk_stats = self.summarize_metrics(self.error_metrics, threshold=None)
             stage_stats.update({f"chunk_{k}": v for k, v in chunk_stats.items()})
             stage_stats.update(
                 {f"comb_avg_{k}": v for k, v in metrics_comb_avg["overall"].items()}
             )
 
             # Log metrics split by given categories
-            for category in self.hparams.metric_categories:
-                cat_metrics = self.metrics_by_category(
-                    combined_scores=combined_avg, target_category=category
-                )
-                logger.info(f"Comb avg breakdown by {category}")
-                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
+            #for category in self.hparams.metric_categories:
+            #    cat_metrics = self.metrics_by_category(
+            #        combined_scores=combined_avg, target_category=category
+            #    )
+            #    logger.info(f"Comb avg breakdown by {category}")
+            #    logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
 
             # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
@@ -214,17 +206,15 @@ class ParkinsonBrain(sb.core.Brain):
         ids = self.error_metrics.ids
         scores = self.error_metrics.scores
         labels = self.error_metrics.labels
-        info_dicts = self.error_metrics.info_dicts
 
         combined_scores = {}
-        for i, score, label, info_dict in zip(ids, scores, labels, info_dicts):
-            utt_id, chunk = i.rsplit("_", 1)
+        for i, score, label in zip(ids, scores, labels):
+            utt_id, chunk = i.rsplit("-", 1)
 
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
                     "scores": [round(score.item(), 3)],
                     "label": label.item(),
-                    **info_dict,
                 }
             else:
                 combined_scores[utt_id]["scores"].append(round(score.item(), 3))
@@ -287,8 +277,8 @@ def dataio_prep(hparams):
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("PD", 1)
-    label_encoder.enforce_label("HC", 0)
+    label_encoder.enforce_label("MCI", 1)
+    label_encoder.enforce_label("NC", 0)
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -303,29 +293,15 @@ def dataio_prep(hparams):
         return sig.squeeze(0)
 
     # Define label pipeline:
-    @sb.utils.data_pipeline.takes("info_dict")
-    @sb.utils.data_pipeline.provides(
-        "patient_type", "patient_type_encoded", "weight", "to_balance"
-    )
-    def label_pipeline(info_dict):
-        """Defines the pipeline to process the patient type labels.
+    @sb.utils.data_pipeline.takes("dx")
+    @sb.utils.data_pipeline.provides("dx_encoded")
+    def label_pipeline(dx):
+        """Defines the pipeline to process the diagnosis labels.
         Note that we have to assign a different integer to each class
         through the label encoder.
         """
-        yield info_dict["ptype"]
-        patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
-        yield patient_type_encoded
-
-        # Weight PD less since there's more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
-        #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
-        yield weight
-
-        # Balance on ptype and sex
-        balance = info_dict["ptype"] + "_" + info_dict["sex"]
-        #balance += "_FR" if info_dict["lang"] == "fr" else "_EN/O"
-        yield balance
+        l = label_encoder.encode_label_torch(dx)
+        return l
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
@@ -336,37 +312,12 @@ def dataio_prep(hparams):
         "test": hparams["test_annotation"],
     }
 
-    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
-            output_keys=out_keys,
+            output_keys=["id", "sig", "dx_encoded", "pid"],
         )
-
-    # Remove keys from training data for e.g. training only on men
-    for key, values in hparams["train_keep_keys"].items():
-        datasets["train"] = datasets["train"].filtered_sorted(
-            key_test={"info_dict": lambda x: x[key] in values},
-        )
-    for key, values in hparams["test_keep_keys"].items():
-        for dataset in ["valid", "test"]:
-            datasets[dataset] = datasets[dataset].filtered_sorted(
-                key_test={"info_dict": lambda x: x[key] in values},
-            )
-
-    hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
-        dataset=datasets["train"],
-        key="to_balance",
-        num_samples=hparams["samples_per_epoch"],
-        replacement=True,
-    )
-    #hparams["train_dataloader_options"]["sampler"] = ReproducibleWeightedRandomSampler(
-    #    weights=[d["weight"] for d in datasets["train"]],
-    #    num_samples=hparams["samples_per_epoch"],
-    #    replacement=True,
-    #    seed=hparams["seed"],
-    #)
 
     return datasets
 
@@ -385,10 +336,10 @@ if __name__ == "__main__":
         hparams = load_hyperpyyaml(fin, overrides)
 
     # Dataset prep (parsing KCL MDVR and annotation into json files)
-    from prepare_neuro import prepare_neuro
+    from prepare_taukadial import prepare_taukadial
 
     sb.utils.distributed.run_on_main(
-        prepare_neuro,
+        prepare_taukadial,
         kwargs={
             "data_folder": hparams["data_folder"],
             "train_annotation": hparams["train_annotation"],
@@ -411,7 +362,7 @@ if __name__ == "__main__":
     )
 
     # Brain class initialization
-    parkinson_brain = ParkinsonBrain(
+    alzheimer_brain = AlzheimerBrain(
         modules=hparams["modules"],
         opt_class=hparams["opt_class"],
         hparams=hparams,
@@ -420,8 +371,8 @@ if __name__ == "__main__":
     )
 
     # Training
-    parkinson_brain.fit(
-        parkinson_brain.hparams.epoch_counter,
+    alzheimer_brain.fit(
+        alzheimer_brain.hparams.epoch_counter,
         train_set=datasets["train"],
         valid_set=datasets["valid"],
         train_loader_kwargs=hparams["train_dataloader_options"],
@@ -430,16 +381,16 @@ if __name__ == "__main__":
 
     # Run validation and test set to get the predictions
     logger.info("Final validation result:")
-    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
-    parkinson_brain.evaluate(
+    alzheimer_brain.metrics_json = hparams["valid_metrics_json"]
+    alzheimer_brain.evaluate(
         test_set=datasets["valid"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
     logger.info("Final test result:")
-    parkinson_brain.metrics_json = hparams["test_metrics_json"]
-    parkinson_brain.evaluate(
+    alzheimer_brain.metrics_json = hparams["test_metrics_json"]
+    alzheimer_brain.evaluate(
         test_set=datasets["test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
