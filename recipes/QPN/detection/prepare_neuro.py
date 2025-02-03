@@ -5,9 +5,9 @@ import torchaudio
 import openpyxl
 import numpy as np
 
-
 def prepare_neuro(
-    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size
+    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size,
+    transcript_folder=None
 ):
     assert os.path.exists(data_folder), "Data folder not found"
 
@@ -16,9 +16,10 @@ def prepare_neuro(
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=0)
-    create_json(test_annotation, path_type_dict["test"], chunk_size)
-    create_json(valid_annotation, path_type_dict["valid"], chunk_size)
+    create_json(train_annotation, path_type_dict["train"], chunk_size,
+                overlap=0, transcript_folder=transcript_folder)
+    create_json(test_annotation, path_type_dict["test"], chunk_size, transcript_folder=transcript_folder)
+    create_json(valid_annotation, path_type_dict["valid"], chunk_size, transcript_folder=transcript_folder)
 
 
 def get_path_type_dicts(data_folder):
@@ -108,7 +109,6 @@ def get_patient_traits(files, sheet, batch):
 
             # TODO Convert UPDRS score to category, waiting for answer from Jen-Kai on B1 scores
 
-
             # Save to dict
             patient_traits = {
                 "ptype": ptype,
@@ -129,16 +129,22 @@ def get_patient_traits(files, sheet, batch):
     return updated_dict
 
 
-def create_json(json_file, path_type_dict, chunk_size, overlap=None):
+def get_transcript(transcript_folder, uttid):
+    assert os.path.exists(transcript_folder), "Transcription folder does not exist!"
+
+    for f in os.listdir(transcript_folder):
+        transcriptions = json.load(f)
+        if uttid in json.load(f):
+            return transcriptions[uttid]
+
+
+def create_json(json_file, path_type_dict, chunk_size, overlap=None, transcript_folder=None):
     hop_size = chunk_size / 2 if overlap is None else chunk_size - overlap
     json_dict = {}
     
     for audiofile in path_type_dict.keys():
         # Get info dict
         info_dict = path_type_dict[audiofile].copy()
-
-        # Skip condition
-        skip = False
 
         # Remove 'l1' files as they are duplicates
         if 'l1' in audiofile:
@@ -176,6 +182,14 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
                 "duration": chunk_duration,
                 "info_dict": info_dict,
             }
+
+            # Add transcript if requested
+            if transcript_folder is not None:
+                transcript = get_transcript(transcript_folder, uttid)
+                json_dict[f"{uttid}_{i}"]["transcript"] = transcript
+
+                # Skip other chunks since chunking is irrelevant for transcript experiments
+                continue
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:

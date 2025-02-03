@@ -3,7 +3,7 @@
 We employ an encoder followed by a speaker classifier.
 
 To run this recipe, use the following command:
-> python train.py {hyperparameter_file}
+> python train_ecapa.py {hyperparameter_file}
 
 Using your own hyperparameter file or one of the following:
     hparams/wavlm_ecapa.yaml (for wavlm + ecapa)

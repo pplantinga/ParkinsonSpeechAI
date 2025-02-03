@@ -68,7 +68,7 @@ weight_pd: 1.
 out_neurons: 2
 
 # Dataloader options
-# Shuffling handled by sampler in train.py
+# Shuffling handled by sampler in train_ecapa.py
 num_workers: 4
 train_dataloader_options:
     batch_size: !ref <batch_size>
