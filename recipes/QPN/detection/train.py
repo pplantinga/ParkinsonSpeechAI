@@ -147,8 +147,9 @@ class ParkinsonBrain(sb.core.Brain):
 
             # Log metrics split by given categories
             for category in self.hparams.metric_categories:
+                threshold = metrics_comb_avg["overall"]["threshold"]
                 cat_metrics = self.metrics_by_category(
-                    combined_scores=combined_avg, target_category=category
+                    combined_scores=combined_avg, target_category=category, threshold=threshold
                 )
                 logger.info(f"Comb avg breakdown by {category}")
                 logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))

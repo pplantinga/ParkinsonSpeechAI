@@ -4,12 +4,12 @@
 # ################################
 
 # Basic parameters
-seed: 2029
+seed: 2028
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_weighted_dnn
+experiment_name: wavlm_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -43,7 +43,7 @@ samples_per_epoch: 400
 total_batch_size: 32
 batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.0001
+lr: 0.00005
 base_lr: 0.000001
 max_lr: !ref <lr>
 step_size: 50
@@ -141,18 +141,18 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-#    source: !ref <pretrained_source>
-#    output_norm: True
-#    freeze_feature_extractor: True
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/wavlm-large
-
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
     source: !ref <pretrained_source>
-    encoder_only: True
+    output_norm: True
+    freeze_feature_extractor: True
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/whisper
+    save_path: !ref <output_folder>/wavlm-large
+
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
+#    source: !ref <pretrained_source>
+#    encoder_only: True
+#    freeze: !ref <freeze_pretrained>
+#    save_path: !ref <output_folder>/whisper
 
 #compute_features: !new:nemo_ctc.NeMoCTC
 #    source: !ref <pretrained_source>

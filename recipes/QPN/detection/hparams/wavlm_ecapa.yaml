@@ -4,12 +4,12 @@
 # ################################
 
 # Basic parameters
-seed: 2027
+seed: 2026
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: canary_dnn
+experiment_name: xeus_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -41,7 +41,7 @@ epochs: 20
 warmup_epochs: 2
 samples_per_epoch: 1024
 total_batch_size: 32
-batch_size: 8
+batch_size: 1
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
 lr: 0.0001
 base_lr: 0.000001
@@ -54,9 +54,11 @@ loss: bce
 # This is formatted as key => list of values to keep
 train_keep_keys:
     task: [dpt]
+    #task: [vowel_repeat]
     #lang: [fr]
 test_keep_keys:
     task: [dpt]
+    #task: [vowel_repeat]
 
 # Test parameters
 test_batch_size: 1
@@ -130,7 +132,6 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
     drop_freq_width: 0.05
 
 # Time drop: randomly drops a number of temporal chunks.
-# LEFT OUT BECAUSE PAUSES CAN INDICATE PATHOLOGY
 #drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
 #    drop_length_low: 1000
 #    drop_length_high: 2000
@@ -160,11 +161,21 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/whisper
 
-compute_features: !new:nemo_encoder.NeMoEncoder
-    source: !ref <pretrained_source> / canary-1b.nemo
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.hubert.HuBERT
+#    source: !ref <pretrained_source>
+#    freeze: !ref <freeze_pretrained>
+#    save_path: !ref <output_folder>/whisper
+
+#compute_features: !new:nemo_encoder.NeMoEncoder
+#    source: !ref <pretrained_source> / canary-1b.nemo
+#    freeze: !ref <freeze_pretrained>
+#    nemo_type: "MultiTask"
+#    source_dir: !ref <pretrained_source>
+
+compute_features: !new:xeus_encoder.XEUS_Encoder
+    source: !ref <pretrained_source>
     freeze: !ref <freeze_pretrained>
-    nemo_type: "MultiTask"
-    source_dir: !ref <pretrained_source>
+    save_path: !ref <output_folder>/xeus
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>
