@@ -46,16 +46,18 @@ class ParkinsonBrain(sb.core.Brain):
 
         batch = batch.to(self.device)
         tokens, lens = batch.tokens
+        tokens = tokens[:,:512] # there's probably a more elegant way to do this
+        # (this) bert can only take a maximum size of 512
 
         # Compute features
         feats = self.modules.compute_features(tokens)
 
         # Embeddings + speaker classifier
-        embeddings = self.modules.embedding_model(feats.hidden_states[-1])
-        outputs = self.modules.classifier(embeddings).squeeze()
+        embeddings = self.modules.embedding_model(feats.last_hidden_state)
+        outputs = self.modules.classifier(embeddings)
 
         # Outputs
-        return outputs, lens
+        return outputs.squeeze(1), lens
 
     def compute_objectives(self, predictions, batch, stage):
         """Computes the loss using patient-type as label."""
@@ -65,7 +67,7 @@ class ParkinsonBrain(sb.core.Brain):
         predictions, lens = predictions
 
         # Compute loss
-        loss = self.hparams.compute_cost(predictions, labels, weight=self.weights,
+        loss = self.hparams.compute_cost(predictions, labels.squeeze(1), weight=self.weight,
                                          label_smoothing=self.hparams.label_smoothing)
 
         if stage == sb.Stage.TRAIN and hasattr(self.hparams.lr_annealing, "on_batch_end"):
@@ -221,16 +223,16 @@ def dataio_prep(hparams):
     # functions defined above.
     datasets = {}
     train_info = {
-        "train": hparams["train_annotation"],
-        "valid": hparams["valid_annotation"],
-        "test": hparams["test_annotation"],
+        "train": hparams["manifests"]["train"],
+        "valid": hparams["manifests"]["valid"],
+        "test": hparams["manifests"]["test"],
     }
 
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[text_pipeline, label_pipeline],
-            output_keys=["id", "sig", "patient_type_encoded", "info_dict", "ptype_sex"],
+            output_keys=["id", "tokens", "patient_type_encoded", "info_dict", "ptype_sex"],
         )
 
     # Define sampler based on sex and patient type, shuffle must be None
@@ -243,10 +245,12 @@ def dataio_prep(hparams):
     )
 
     # Remove keys from training data for e.g. training only on men
-    for key, value in hparams["remove_keys"]:
-        datasets["train"] = datasets["train"].filtered_sorted(
-            key_test=lambda x: x["info_dict"][key] != value,
-        )
+    # TODO, come back to this (wasn't working, unsure if I'm passing the wrong thing or if broken)
+    #for key, value in hparams["remove_keys"]:
+    #    print(f"Key is {key}, value is {value}")
+    #    datasets["train"] = datasets["train"].filtered_sorted(
+    #        key_test={"info_dict": lambda x: x[key] != value},
+    #    )
 
     return datasets
 
@@ -271,9 +275,9 @@ if __name__ == "__main__":
         prepare_neuro,
         kwargs={
             "data_folder": hparams["data_folder"],
-            "train_annotation": hparams["train_annotation"],
-            "test_annotation": hparams["test_annotation"],
-            "valid_annotation": hparams["valid_annotation"],
+            "train_annotation": hparams["manifests"]["train"],
+            "test_annotation": hparams["manifests"]["test"],
+            "valid_annotation": hparams["manifests"]["valid"],
             "chunk_size": hparams["chunk_size"],
             "transcript_folder": hparams["transcript_folder"]
         },
@@ -299,7 +303,7 @@ if __name__ == "__main__":
     )
 
     parkinson_brain.weight = torch.tensor(
-        [[hparams["weight_hc"], hparams["weight_pd"]]],
+        [hparams["weight_hc"], hparams["weight_pd"]],
         device=parkinson_brain.device,
         dtype=torch.float32,
     )
@@ -319,7 +323,7 @@ if __name__ == "__main__":
     parkinson_brain.evaluate(
         test_set=datasets["valid"],
         max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["test_dataloader_options"],
+        test_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
     logger.info("Final test result:")

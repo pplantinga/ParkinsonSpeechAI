@@ -132,10 +132,11 @@ def get_patient_traits(files, sheet, batch):
 def get_transcript(transcript_folder, uttid):
     assert os.path.exists(transcript_folder), "Transcription folder does not exist!"
 
-    for f in os.listdir(transcript_folder):
-        transcriptions = json.load(f)
-        if uttid in json.load(f):
-            return transcriptions[uttid]
+    for transcribed_split in os.listdir(transcript_folder):
+        with open(os.path.join(transcript_folder, transcribed_split)) as transcript:
+            transcriptions = json.load(transcript)
+            if uttid in transcriptions:
+                return transcriptions[uttid]
 
 
 def create_json(json_file, path_type_dict, chunk_size, overlap=None, transcript_folder=None):
@@ -174,6 +175,11 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None, transcript_
         # Add pid to the patient traits
         info_dict["pid"] = uttid.split("_")[1]
 
+        # TODO, come back to this
+        if transcript_folder is not None and info_dict["task"] != "dpt":
+            continue
+            
+
         for i, start in enumerate(np.arange(0, duration - hop_size, hop_size)):
             chunk_duration = min(chunk_size, duration - i * hop_size)
             json_dict[f"{uttid}_{i}"] = {
@@ -189,7 +195,7 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None, transcript_
                 json_dict[f"{uttid}_{i}"]["transcript"] = transcript
 
                 # Skip other chunks since chunking is irrelevant for transcript experiments
-                continue
+                break
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:

@@ -4,6 +4,8 @@ from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 import os
 import argparse
 import json
+from tqdm.auto import tqdm
+from pathlib import Path
 
 
 def load_model(model_name, size=None):
@@ -33,21 +35,34 @@ def load_model(model_name, size=None):
         return pipe
 
     else:
-        return whisper.load_model(size, download_root=os.environ['WHISPER_CACHE'])
+        return whisper.load_model(size, download_root=os.environ['WHISPER_CACHE'], device="cuda" if torch.cuda.is_available() else "cpu")
 
 
 def transcribe_folder(audio_folder, split, save_path, model, model_name):
     audio_path = os.path.join(audio_folder, split)
+    audio_path = Path(audio_path)
+    save_path = Path(save_path)
+    save_path.mkdir(parents=True, exist_ok=True)
     transcripts = {}
 
     for i in range(2):
-        batch_path = os.path.join(audio_path, f"Batch{i + 1}")
-        for f in batch_path:
-            uttid = f.split(".")[0] + "_" + f"Batch{i + 1}"
+        batch_path = audio_path / f"Batch{i + 1}"
+
+        wav_files = list(batch_path.rglob("*.wav"))
+        wav_files = [f for f in wav_files if "dpt" in str(f) and "l1" not in str(f)]
+
+        for wav_file in tqdm(wav_files):         
+            uttid = str(wav_file).split("/")[-1].split(".")[0] + "_" + f"Batch{i + 1}"
+
             if model_name == "crisper":
-                transcripts[uttid] = model(f)
+                transcripts[uttid] = model(wav_file)
             else:
-                transcripts[uttid] = model.transcribe(f)
+                if "en" in str(wav_file):
+                    lang = "en"
+                else:
+                    lang = "fr"
+
+                transcripts[uttid] = model.transcribe(str(wav_file), language=lang, prompt="Umm, uhh, hmm... I, I, I'm...uhh")["text"]
 
     with open(os.path.join(save_path, f"{split}.json"), 'w') as f:
         json.dump(transcripts, f)
