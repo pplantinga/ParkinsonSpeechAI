@@ -8,7 +8,7 @@ import pathlib
 
 
 def prepare_neuro(
-    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size
+    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size, transcript_folder=None
 ):
     assert os.path.exists(data_folder), "Data folder not found"
 
@@ -17,9 +17,29 @@ def prepare_neuro(
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=0)
-    create_json(test_annotation, path_type_dict["test"], chunk_size)
-    create_json(valid_annotation, path_type_dict["valid"], chunk_size)
+    train_transcripts, valid_transcripts, test_transcripts, train_translations = read_transcripts(transcript_folder)
+    create_json(train_annotation, path_type_dict["train"], chunk_size, train_transcripts, train_translations, overlap=0)
+    create_json(test_annotation, path_type_dict["test"], chunk_size, test_transcripts)
+    create_json(valid_annotation, path_type_dict["valid"], chunk_size, valid_transcripts)
+
+
+def read_transcripts(transcript_dir):
+    """Read the transcripts from file."""
+    if transcript_dir is None:
+        return None, None, None, None
+
+    d = pathlib.Path(transcript_dir)
+    assert d.exists(), "Transcript dict must exist and hold train.json etc."
+    with open(d / "train.json") as f:
+        train_dict = json.load(f)
+    with open(d / "valid.json") as f:
+        valid_dict = json.load(f)
+    with open(d / "test.json") as f:
+        test_dict = json.load(f)
+    with open(d / "train_translation.json") as f:
+        train_translations = json.load(f)
+
+    return train_dict, valid_dict, test_dict, train_translations
 
 
 def get_path_type_dicts(data_folder):
@@ -129,7 +149,7 @@ def get_patient_traits(files, sheet, batch):
     return updated_dict
 
 
-def create_json(json_file, path_type_dict, chunk_size, overlap=None):
+def create_json(json_file, path_type_dict, chunk_size, transcripts=None, translations=None, overlap=None):
     hop_size = chunk_size / 2 if overlap is None else chunk_size - overlap
     json_dict = {}
 
@@ -162,15 +182,25 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
         audioinfo = torchaudio.info(audiofile)
         duration = audioinfo.num_frames / audioinfo.sample_rate
 
-        max_start = max(duration - hop_size, 1)
-        for i, start in enumerate(np.arange(0, max_start, hop_size)):
-            chunk_duration = min(chunk_size, duration - i * hop_size)
-            json_dict[f"{uttid}_{i}"] = {
-                "wav": audiofile,
-                "start": start,
-                "duration": chunk_duration,
-                "info_dict": info_dict,
+        if transcripts is not None:
+            transcript = transcripts[uttid] if uttid in transcripts else ""
+            json_dict[uttid] = {
+                "wav": audiofile, "info_dict": info_dict, "transcript": transcript
             }
+            if translations is not None:
+                translation = translations[uttid] if uttid in translations else ""
+                json_dict[uttid]["translation"] = translation
+
+        else:
+            max_start = max(duration - hop_size, 1)
+            for i, start in enumerate(np.arange(0, max_start, hop_size)):
+                chunk_duration = min(chunk_size, duration - i * hop_size)
+                json_dict[f"{uttid}_{i}"] = {
+                    "wav": audiofile,
+                    "start": start,
+                    "duration": chunk_duration,
+                    "info_dict": info_dict,
+                }
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:

@@ -4,44 +4,39 @@
 # ################################
 
 # Basic parameters
-seed: 2028
+seed: 2042
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: wavlm_large_dnn
+experiment_name: fmmb_be_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
 encoded_labels: !ref <save_folder>/label_encoder.txt
+transcript_folder: !PLACEHOLDER
 
 # Data files
 data_folder: !PLACEHOLDER
 noise_folder: !ref <data_folder>/noise
 rir_folder: !ref <data_folder>/rir
-train_annotation: !ref <storage_folder>/train.json
-valid_annotation: !ref <storage_folder>/valid.json
-test_annotation: !ref <storage_folder>/test.json
-noise_annotation: !ref <save_folder>/noise.csv
-rir_annotation: !ref <save_folder>/rir.csv
+train_annotation: !ref <storage_folder>/train_text.json
+valid_annotation: !ref <storage_folder>/valid_text.json
+test_annotation: !ref <storage_folder>/test_text.json
 valid_metrics_json: !ref <output_folder>/valid_metrics.json
 test_metrics_json: !ref <output_folder>/test_metrics.json
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
-# Data for augmentation
-NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.zip?rlkey=j8b0n9kdjdr32o1f06t0cw5b7&dl=1
-RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?rlkey=pg9cu8vrpn2u173vhiqyu743u&dl=1
-
 # Training parameters
-epochs: 20
+epochs: 12
 warmup_epochs: 2
 samples_per_epoch: 1024
-total_batch_size: 32
-batch_size: 4
+total_batch_size: 64
+batch_size: 8
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
 lr: 0.0001
 base_lr: 0.000001
@@ -50,6 +45,9 @@ step_size: 50
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 loss: bce
+input_translate_prob: 0.3
+input_drop_frac: 0.2
+input_swap_frac: 0.1
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
@@ -69,8 +67,8 @@ threshold: 0.5
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 1024
-embedding_size: 1280
+feature_size: 768
+embedding_size: 768
 dropout: 0.2
 out_neurons: 1
 
@@ -89,108 +87,11 @@ test_dataloader_options:
     batch_size: !ref <test_batch_size>
     num_workers: !ref <num_workers>
 
-# AUGMENTATIONS
-# -------------
-# Download and prepare the dataset of noisy sequences for augmentation
-prepare_noise_data: !name:speechbrain.augment.preparation.prepare_dataset_from_URL
-    URL: !ref <NOISE_DATASET_URL>
-    dest_folder: !ref <noise_folder>
-    ext: wav
-    csv_file: !ref <noise_annotation>
-    max_length: !ref <chunk_size>
-
-# Add noise to input signal
-add_noise: !new:speechbrain.augment.time_domain.AddNoise
-    csv_file: !ref <noise_annotation>
-    snr_low: 0
-    snr_high: 15
-    noise_sample_rate: !ref <sample_rate>
-    clean_sample_rate: !ref <sample_rate>
-    num_workers: !ref <num_workers>
-
-# Download and prepare the dataset of room impulse responses for augmentation
-#prepare_rir_data: !name:speechbrain.augment.preparation.prepare_dataset_from_URL
-#    URL: !ref <RIR_DATASET_URL>
-#    dest_folder: !ref <rir_folder>
-#    ext: wav
-#    csv_file: !ref <rir_annotation>
-#    max_length: !ref <chunk_size>
-
-# Add reverberation to input signal
-#add_reverb: !new:speechbrain.augment.time_domain.AddReverb
-#    csv_file: !ref <rir_annotation>
-#    reverb_sample_rate: !ref <sample_rate>
-#    clean_sample_rate: !ref <sample_rate>
-#    num_workers: !ref <num_workers>
-
-# Frequency drop: randomly drops a number of frequency bands to zero.
-drop_freq: !new:speechbrain.augment.time_domain.DropFreq
-    drop_freq_low: 0
-    drop_freq_high: 1
-    drop_freq_count_low: 1
-    drop_freq_count_high: 3
-    drop_freq_width: 0.05
-
-# Time drop: randomly drops a number of temporal chunks.
-#drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
-#    drop_length_low: 1000
-#    drop_length_high: 2000
-#    drop_count_low: 1
-#    drop_count_high: 5
-
-# Augmenter: Combines previously defined augmentations to perform data augmentation
-wav_augment: !new:speechbrain.augment.augmenter.Augmenter
-    parallel_augment: False
-    concat_original: False
-    min_augmentations: 2
-    max_augmentations: 2
-    augment_prob: 0.9
-    augmentations: [!ref <add_noise>, !ref <drop_freq>]
-
-# Models
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-    source: !ref <pretrained_source>
-    output_norm: True
-    freeze_feature_extractor: True
+# Functions
+compute_features: !new:llm_encoder.LLM_Encoder
+    pretrained_source: !ref <pretrained_source>
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/wavlm-large
 
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
-#    source: !ref <pretrained_source>
-#    encoder_only: True
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/whisper
-
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.hubert.HuBERT
-#    source: !ref <pretrained_source>
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/whisper
-
-#compute_features: !new:nemo_encoder.NeMoEncoder
-#    source: !ref <pretrained_source> / canary-1b.nemo
-#    freeze: !ref <freeze_pretrained>
-#    nemo_type: "MultiTask"
-#    source_dir: !ref <pretrained_source>
-
-#compute_features: !new:xeus_encoder.XEUS_Encoder
-#    source: !ref <pretrained_source>
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/xeus
-
-#embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-#    input_size: !ref <feature_size>
-#    channels: [1024, 1024, 1024, 1024, 3072]
-#    kernel_sizes: [5, 3, 3, 3, 1]
-#    dilations: [1, 2, 3, 4, 1]
-#    groups: [1, 1, 1, 1, 1]
-#    attention_channels: 128
-#    lin_neurons: !ref <embedding_size>
-#    dropout: 0.2
-#
-#embedding_model: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-#    input_shape: [null, null, !ref <feature_size>]
-#    dnn_blocks: !ref <dnn_blocks>
-#    dnn_neurons: !ref <embedding_size>
 embedding_model: !new:torch.nn.Sequential
     - !new:speechbrain.nnet.linear.Linear
         input_size: !ref <feature_size>
@@ -267,7 +168,7 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Error computation
 error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
     positive_label: 1
-error_metric: chunk_F-score
+error_metric: comb_avg_F-score
 
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>

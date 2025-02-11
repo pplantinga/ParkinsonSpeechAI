@@ -4,12 +4,12 @@
 # ################################
 
 # Basic parameters
-seed: 2028
+seed: 2032
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: wavlm_dnn
+experiment_name: whisper_large_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -37,13 +37,13 @@ NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.z
 RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?rlkey=pg9cu8vrpn2u173vhiqyu743u&dl=1
 
 # Training parameters
-epochs: 20
+epochs: 30
 warmup_epochs: 2
 samples_per_epoch: 400
 total_batch_size: 32
 batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.00005
+lr: 0.0001
 base_lr: 0.000001
 max_lr: !ref <lr>
 step_size: 50
@@ -60,7 +60,7 @@ test_batch_size: 1
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 768
+feature_size: 1280
 embedding_size: 768
 dropout: 0.2
 out_neurons: 1
@@ -141,22 +141,28 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+#    source: !ref <pretrained_source>
+#    output_norm: True
+#    freeze_feature_extractor: True
+#    freeze: !ref <freeze_pretrained>
+#    save_path: !ref <output_folder>/wavlm-large
+
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
     source: !ref <pretrained_source>
-    output_norm: True
-    freeze_feature_extractor: True
+    encoder_only: True
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/wavlm-large
+    save_path: !ref <output_folder>/whisper
 
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
-#    source: !ref <pretrained_source>
-#    encoder_only: True
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/whisper
-
-#compute_features: !new:nemo_ctc.NeMoCTC
+#compute_features: !new:nemo_encoder.NeMoEncoder
 #    source: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
+#    nemo_type: "CTC"
+
+#compute_features: !new:xeus_encoder.XEUS_Encoder
+#    source: !ref <pretrained_source>
+#    freeze: !ref <freeze_pretrained>
+#    save_path: !ref <output_folder>/xeus
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>
