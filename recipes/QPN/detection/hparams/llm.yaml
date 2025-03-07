@@ -4,12 +4,12 @@
 # ################################
 
 # Basic parameters
-seed: 2042
+seed: 2096
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: fmmb_be_dnn
+experiment_name: llama_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -32,10 +32,10 @@ skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
-epochs: 12
+epochs: 20
 warmup_epochs: 2
-samples_per_epoch: 1024
-total_batch_size: 64
+samples_per_epoch: 256
+total_batch_size: 32
 batch_size: 8
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
 lr: 0.0001
@@ -67,7 +67,7 @@ threshold: 0.5
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 768
+feature_size: 2048
 embedding_size: 768
 dropout: 0.2
 out_neurons: 1
@@ -91,6 +91,26 @@ test_dataloader_options:
 compute_features: !new:llm_encoder.LLM_Encoder
     pretrained_source: !ref <pretrained_source>
     freeze: !ref <freeze_pretrained>
+
+concat_vocal: False
+#vocal_features: !new:speechbrain.lobes.features.VocalFeatures
+#    sample_rate: !ref <sample_rate>
+
+#vocal_embedding_model: !new:torch.nn.Sequential
+#    - !new:speechbrain.nnet.linear.Linear
+#        input_size: 17
+#        n_neurons: !ref <embedding_size>
+#    - !new:torch.nn.Dropout
+#        p: !ref <dropout>
+#    - !new:torch.nn.LeakyReLU
+#    - !new:speechbrain.nnet.pooling.AttentionPooling
+#        input_dim: !ref <embedding_size>
+#    - !new:speechbrain.nnet.linear.Linear
+#        input_size: !ref <embedding_size>
+#        n_neurons: !ref <embedding_size>
+#    - !new:torch.nn.Dropout
+#        p: !ref <dropout>
+#    - !new:torch.nn.LeakyReLU
 
 embedding_model: !new:torch.nn.Sequential
     - !new:speechbrain.nnet.linear.Linear
@@ -124,6 +144,8 @@ modules:
     compute_features: !ref <compute_features>
     embedding_model: !ref <embedding_model>
     classifier: !ref <classifier>
+    #vocal_features: !ref <vocal_features>
+    #vocal_embedding_model: !ref <vocal_embedding_model>
     #mean_var_norm: !ref <mean_var_norm>
 
 softmax: !new:speechbrain.nnet.activations.Softmax
