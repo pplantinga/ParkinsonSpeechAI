@@ -17,16 +17,16 @@ def prepare_neuro(
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    train_transcripts, valid_transcripts, test_transcripts, train_translations = read_transcripts(transcript_folder)
-    create_json(train_annotation, path_type_dict["train"], chunk_size, train_transcripts, train_translations, overlap=0)
-    create_json(test_annotation, path_type_dict["test"], chunk_size, test_transcripts)
-    create_json(valid_annotation, path_type_dict["valid"], chunk_size, valid_transcripts)
+    train_transcripts, valid_transcripts, test_transcripts, train_translations, manual = read_transcripts(transcript_folder)
+    create_json(train_annotation, path_type_dict["train"], chunk_size, train_transcripts, manual, train_translations, overlap=0)
+    create_json(test_annotation, path_type_dict["test"], chunk_size, test_transcripts, manual)
+    create_json(valid_annotation, path_type_dict["valid"], chunk_size, valid_transcripts, manual)
 
 
 def read_transcripts(transcript_dir):
     """Read the transcripts from file."""
     if transcript_dir is None:
-        return None, None, None, None
+        return None, None, None, None, None
 
     d = pathlib.Path(transcript_dir)
     assert d.exists(), "Transcript dict must exist and hold train.json etc."
@@ -38,8 +38,10 @@ def read_transcripts(transcript_dir):
         test_dict = json.load(f)
     with open(d / "train_translation.json") as f:
         train_translations = json.load(f)
+    with open(d / "manual.json") as f:
+        manual = json.load(f)
 
-    return train_dict, valid_dict, test_dict, train_translations
+    return train_dict, valid_dict, test_dict, train_translations, manual
 
 
 def get_path_type_dicts(data_folder):
@@ -149,7 +151,7 @@ def get_patient_traits(files, sheet, batch):
     return updated_dict
 
 
-def create_json(json_file, path_type_dict, chunk_size, transcripts=None, translations=None, overlap=None):
+def create_json(json_file, path_type_dict, chunk_size, transcripts=None, manual=None, translations=None, overlap=None):
     hop_size = chunk_size / 2 if overlap is None else chunk_size - overlap
     json_dict = {}
 
@@ -190,6 +192,14 @@ def create_json(json_file, path_type_dict, chunk_size, transcripts=None, transla
             if translations is not None:
                 translation = translations[uttid] if uttid in translations else ""
                 json_dict[uttid]["translation"] = translation
+
+            # Manual transcription
+            patientid, langid = uttid.split("_")[1], uttid.split("_")[-2]
+            manual_id = patientid + "_" + langid
+            if manual is not None and manual_id in manual:
+                json_dict[uttid]["manual"] = manual[manual_id]
+            else:
+                json_dict[uttid]["manual"] = ""
 
         else:
             max_start = max(duration - hop_size, 1)
