@@ -20,6 +20,7 @@ import csv
 import json
 import logging
 import pprint
+import tempfile
 import collections
 
 import torch
@@ -32,9 +33,15 @@ from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeighte
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
 from tqdm import tqdm
+import opensmile
 
 logger = sb.utils.logger.get_logger("train.py")
 
+
+smile = opensmile.Smile(
+    feature_set=opensmile.FeatureSet.ComParE_2016,
+    feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
+)
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
@@ -294,6 +301,22 @@ def dataio_prep(hparams):
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
     @sb.utils.data_pipeline.provides("sig")
+    def opensmile_pipeline(wav, duration, start):
+        sig, fs = torchaudio.load(
+            wav,
+            num_frames=int(duration * hparams["sample_rate"]),
+            frame_offset=int(start * hparams["sample_rate"]),
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
+            torchaudio.save(f.name, sig, fs)
+            feats = smile.process_file(f.name)
+
+        return torch.tensor(feats.to_numpy())
+
+    # Define audio pipeline
+    @sb.utils.data_pipeline.takes("wav", "duration", "start")
+    @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, duration, start):
         sig, fs = torchaudio.load(
             wav,
@@ -342,6 +365,7 @@ def dataio_prep(hparams):
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
+            #dynamic_items=[opensmile_pipeline, label_pipeline],
             output_keys=out_keys,
         )
 
