@@ -20,9 +20,9 @@ import csv
 import json
 import logging
 import pprint
-import tempfile
 import collections
 
+import numpy as np
 import torch
 import torchaudio
 from hyperpyyaml import load_hyperpyyaml
@@ -33,15 +33,9 @@ from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeighte
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
 from tqdm import tqdm
-import opensmile
 
 logger = sb.utils.logger.get_logger("train.py")
 
-
-smile = opensmile.Smile(
-    feature_set=opensmile.FeatureSet.ComParE_2016,
-    feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
-)
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
@@ -54,21 +48,23 @@ class ParkinsonBrain(sb.core.Brain):
         """
 
         batch = batch.to(self.device)
-        wavs, lens = batch.sig
+        tokens, lens = batch.tokens
+        attn_mask, _ = batch.attn_mask
 
-        # Augmentations, if specified
-        if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
-            wavs, lens = self.hparams.wav_augment(wavs, lens)
-
-        # Compute features
-        feats = self.modules.compute_features(wavs, lens)
-        # feats = self.modules.mean_var_norm(feats, lens)
-
-        # Embeddings + speaker classifier
+        # Predict
+        feats = self.modules.compute_features(tokens, attn_mask)
         embeddings = self.modules.embedding_model(feats)
-        outputs = self.modules.classifier(embeddings)
+
+        # Add vocal embeddings
+        if self.hparams.concat_vocal:
+            wav, wavlens = batch.sig
+            vocal_feats = self.modules.vocal_features(wav)
+            vocal_embed = self.modules.vocal_embedding_model(vocal_feats)
+            embeddings = torch.cat((embeddings, vocal_embed), dim=-1)
 
         # Outputs
+        outputs = self.modules.classifier(embeddings)
+
         return outputs, lens
 
     def compute_objectives(self, outputs, batch, stage):
@@ -84,29 +80,7 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute loss
         if stage == sb.Stage.TRAIN:
-            if self.hparams.loss == "aam":
-                # Squeeze and ensure targets are one hot encoded (for AAM)
-                preds = outputs.squeeze(1)
-                targets = labels.squeeze(1)
-                targets = F.one_hot(targets.long(), preds.shape[1]).float()
-
-                # Compute loss with weights
-                preds = self.hparams.AAM_loss(preds, targets)
-
-                # Pass through log softmax
-                preds = F.log_softmax(preds, dim=1)
-
-                # Pass through KLDiv Loss, apply weight and average
-                # KLDLoss = torch.nn.KLDivLoss(reduction="none")
-                loss = KLDLoss(preds, targets) * weights
-                loss = loss.sum() / targets.sum()
-
-            elif self.hparams.loss == "focal":
-                loss = self.hparams.focal_loss(outputs, labels)
-            elif self.hparams.loss == "bce":
-                loss = self.hparams.bce_loss(outputs, labels, weight=batch.weight)
-            else:
-                raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'bce'")
+            loss = self.hparams.bce_loss(outputs, labels, weight=batch.weight)
 
         # Validation / Test
         else:
@@ -139,6 +113,7 @@ class ParkinsonBrain(sb.core.Brain):
 
             # Generate overall metrics, using stored threshold for test set
             avg_threshold = None if stage == sb.Stage.VALID else self.avg_threshold
+            #avg_threshold = 0.5
             metrics_comb_avg = self.metrics_by_category(
                 combined_avg, target_category=None, threshold=avg_threshold
             )
@@ -225,27 +200,25 @@ class ParkinsonBrain(sb.core.Brain):
         info_dicts = self.error_metrics.info_dicts
 
         combined_scores = {}
-        for i, score, label, info_dict in zip(ids, scores, labels, info_dicts):
-            utt_id, chunk = i.rsplit("_", 1)
-
+        for utt_id, score, label, info_dict in zip(ids, scores, labels, info_dicts):
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
-                    "scores": [round(score.item(), 3)],
+                    "scores": [round(score.item(), 4)],
                     "label": label.item(),
                     **info_dict,
                 }
             else:
-                combined_scores[utt_id]["scores"].append(round(score.item(), 3))
+                combined_scores[utt_id]["scores"].append(round(score.item(), 4))
 
         # For now just take the average or max. Perhaps do something fancier later
         for utt_id in combined_scores:
             scores = combined_scores[utt_id]["scores"]
             if how == "avg":
                 combined_scores[utt_id]["combined"] = round(
-                    sum(scores) / len(scores), 3
+                    sum(scores) / len(scores), 4
                 )
             elif how == "max":
-                combined_scores[utt_id]["combined"] = round(max(scores), 3)
+                combined_scores[utt_id]["combined"] = round(max(scores), 4)
             else:
                 raise ValueError("Expected 'avg' or 'max'")
 
@@ -298,33 +271,58 @@ def dataio_prep(hparams):
     label_encoder.enforce_label("PD", 1)
     label_encoder.enforce_label("HC", 0)
 
-    # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "start")
+    @sb.utils.data_pipeline.takes("wav")
     @sb.utils.data_pipeline.provides("sig")
-    def opensmile_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
-            wav,
-            num_frames=int(duration * hparams["sample_rate"]),
-            frame_offset=int(start * hparams["sample_rate"]),
-        )
+    def wav_pipeline(wav):
+        sig, fs = torchaudio.load(wav, num_frames=16000 * 120)
+        yield sig.squeeze(0)
 
-        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-            torchaudio.save(f.name, sig, fs)
-            feats = smile.process_file(f.name)
+    # Define transcript pipeline (without augmentations):
+    @sb.utils.data_pipeline.takes("transcript", "manual")
+    @sb.utils.data_pipeline.provides("tokens", "attn_mask")
+    def transcript_eval_pipeline(transcript, manual):
 
-        return torch.tensor(feats.to_numpy())
+        if manual != "":
+            transcript = manual
+        tokens = hparams["compute_features"].tokenizer(transcript, return_tensors="pt")
+        yield tokens["input_ids"][0]
+        yield tokens["attention_mask"][0]
 
-    # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "start")
-    @sb.utils.data_pipeline.provides("sig")
-    def audio_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
-            wav,
-            num_frames=int(duration * hparams["sample_rate"]),
-            frame_offset=int(start * hparams["sample_rate"]),
-        )
+    # Transcript train pipeline (with augmentations):
+    @sb.utils.data_pipeline.takes("transcript", "translation", "manual")
+    @sb.utils.data_pipeline.provides("tokens", "attn_mask")
+    def transcript_train_pipeline(transcript, translation, manual):
+        #print(transcript)
+        #print(translation)
 
-        return sig.squeeze(0)
+        if manual != "":
+            transcript = manual
+
+        s = np.random.binomial(1, hparams["input_translate_prob"])
+        words = translation.split(" ") if s else transcript.split(" ")
+
+        #print(words)
+
+        # Random word drop
+        drop_count = int(hparams["input_drop_frac"] * len(words))
+        drop_choices = np.random.choice(len(words), drop_count, replace=False)
+        words = [w for i, w in enumerate(words) if i not in drop_choices]
+
+        #print(words)
+
+        # Random word swap
+        swap_count = int(hparams["input_swap_frac"] * len(words)) // 2
+        swap_choices = np.random.choice(len(words), swap_count * 2, replace=False)
+        for i, j in zip(swap_choices[:swap_count], swap_choices[swap_count:]):
+            words[i], words[j] = words[j], words[i]
+
+        #print(words)
+
+        # Convert to tokens
+        transcript = " ".join(words)
+        tokens = hparams["compute_features"].tokenizer(transcript, return_tensors="pt")
+        yield tokens["input_ids"][0]
+        yield tokens["attention_mask"][0]
 
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("info_dict")
@@ -341,13 +339,15 @@ def dataio_prep(hparams):
         yield patient_type_encoded
 
         # Weight PD less since there's more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
+        #weight = 0.7 if patient_type_encoded else 1.5
+        #weight *= 0.7 if info_dict["sex"] == "M" else 1.5
         #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
+        weight = 1.0
         yield weight
 
-        # Balance on ptype and sex
-        balance = info_dict["ptype"] + "_" + info_dict["sex"]
+        # Balance on ptype
+        balance = info_dict["ptype"]
+        balance += "_" + info_dict["sex"]
         #balance += "_FR" if info_dict["lang"] == "fr" else "_EN/O"
         yield balance
 
@@ -360,19 +360,25 @@ def dataio_prep(hparams):
         "test": hparams["test_annotation"],
     }
 
-    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
-    for dataset in train_info:
+    out_keys = ["id", "tokens", "attn_mask", "patient_type_encoded", "info_dict", "weight", "to_balance", "sig"]
+    for dataset, json_path in train_info.items():
+        if dataset == "train":
+            dynamic_items = [wav_pipeline, transcript_train_pipeline, label_pipeline]
+        else:
+            dynamic_items = [wav_pipeline, transcript_eval_pipeline, label_pipeline]
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=train_info[dataset],
-            dynamic_items=[audio_pipeline, label_pipeline],
-            #dynamic_items=[opensmile_pipeline, label_pipeline],
-            output_keys=out_keys,
+            json_path=json_path, dynamic_items=dynamic_items, output_keys=out_keys,
         )
 
     # Remove keys from training data for e.g. training only on men
+    # Also remove very short utterances
     for key, values in hparams["train_keep_keys"].items():
         datasets["train"] = datasets["train"].filtered_sorted(
-            key_test={"info_dict": lambda x: x[key] in values},
+            key_test={
+                "info_dict": lambda x: x[key] in values,
+                #"tokens": lambda x: len(x) > 15, # Using tokens here causes some warning from the tokenizer.
+                "transcript": lambda x: len(x) > 50,
+            },
         )
     for key, values in hparams["test_keep_keys"].items():
         for dataset in ["valid", "test"]:
@@ -420,10 +426,9 @@ if __name__ == "__main__":
             "test_annotation": hparams["test_annotation"],
             "valid_annotation": hparams["valid_annotation"],
             "chunk_size": hparams["chunk_size"],
+            "transcript_folder": hparams["transcript_folder"],
         },
     )
-    sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
-    # sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
@@ -459,6 +464,7 @@ if __name__ == "__main__":
     parkinson_brain.evaluate(
         test_set=datasets["valid"],
         #max_key=hparams["error_metric"],
+        #min_key="loss",
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
@@ -467,5 +473,6 @@ if __name__ == "__main__":
     parkinson_brain.evaluate(
         test_set=datasets["test"],
         #max_key=hparams["error_metric"],
+        #min_key="loss",
         test_loader_kwargs=hparams["test_dataloader_options"],
     )

@@ -1,15 +1,15 @@
 # ################################
-# Model: Parkinson's identification with ECAPA
+# Model: Alzheimer's identification
 # Author: Briac Cordelle & Peter Plantinga
 # ################################
 
 # Basic parameters
-seed: 2028
+seed: 2032
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: wavlm_large_dnn
+experiment_name: whisper_large_dnn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -37,9 +37,9 @@ NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.z
 RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?rlkey=pg9cu8vrpn2u173vhiqyu743u&dl=1
 
 # Training parameters
-epochs: 20
+epochs: 30
 warmup_epochs: 2
-samples_per_epoch: 1024
+samples_per_epoch: 400
 total_batch_size: 32
 batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
@@ -50,27 +50,18 @@ step_size: 50
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 loss: bce
-
-# This is formatted as key => list of values to keep
-train_keep_keys:
-    task: [dpt]
-    #task: [vowel_repeat]
-    #lang: [en, other]
-test_keep_keys:
-    task: [dpt]
-    #task: [vowel_repeat]
+train_keep_keys: {}
+test_keep_keys: {}
 
 # Test parameters
 test_batch_size: 1
-metric_categories: [sex, lang]
-threshold: 0.5
 
 # Model parameters
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 1024
-embedding_size: 1280
+feature_size: 1280
+embedding_size: 768
 dropout: 0.2
 out_neurons: 1
 
@@ -80,6 +71,7 @@ num_workers: 4
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>
+    shuffle: True
 
 valid_dataloader_options:
     batch_size: !ref <test_batch_size>
@@ -132,6 +124,7 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
     drop_freq_width: 0.05
 
 # Time drop: randomly drops a number of temporal chunks.
+# LEFT OUT BECAUSE PAUSES CAN INDICATE PATHOLOGY
 #drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
 #    drop_length_low: 1000
 #    drop_length_high: 2000
@@ -148,29 +141,23 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+#    source: !ref <pretrained_source>
+#    output_norm: True
+#    freeze_feature_extractor: True
+#    freeze: !ref <freeze_pretrained>
+#    save_path: !ref <output_folder>/wavlm-large
+
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
     source: !ref <pretrained_source>
-    output_norm: True
-    freeze_feature_extractor: True
+    encoder_only: True
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/wavlm-large
-
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
-#    source: !ref <pretrained_source>
-#    encoder_only: True
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/whisper
-
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.hubert.HuBERT
-#    source: !ref <pretrained_source>
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/whisper
+    save_path: !ref <output_folder>/whisper
 
 #compute_features: !new:nemo_encoder.NeMoEncoder
-#    source: !ref <pretrained_source> / canary-1b.nemo
+#    source: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
-#    nemo_type: "MultiTask"
-#    source_dir: !ref <pretrained_source>
+#    nemo_type: "CTC"
 
 #compute_features: !new:xeus_encoder.XEUS_Encoder
 #    source: !ref <pretrained_source>
