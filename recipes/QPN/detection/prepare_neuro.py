@@ -97,11 +97,7 @@ def get_patient_traits(files, sheet, batch):
         sex = sheet.cell(row=row, column=3).value
         l1 = sheet.cell(row=row, column=4).value
         updrs = sheet.cell(row=row, column=5).value
-
-        if batch == "Batch1":
-            age = sheet.cell(row=row, column=6).value
-        else:
-            age = 0
+        age = sheet.cell(row=row, column=6).value
 
         # Check if the patient ID is in the recordings, if it is add to dict
         if pid is not None and pid.rstrip() in pids:
