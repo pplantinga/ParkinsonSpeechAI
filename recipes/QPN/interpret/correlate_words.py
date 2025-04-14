@@ -2,7 +2,8 @@
 
 Author: Peter Plantinga
 """
-import hyperpyyaml, torch, speechbrain, json, torchaudio, argparse, scipy, collections
+import hyperpyyaml, torch, speechbrain, json, torchaudio, argparse
+import scipy, collections, unicodedata
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
@@ -68,6 +69,7 @@ def collect_activations(models, test_data):
     searcher = S2SWhisperGreedySearcher(
         model=compute_features, min_decode_ratio=0.0, max_decode_ratio=1.0
     )
+    tokizer = compute_features.tokenizer
 
     # Iterate test data and compute+store network activations
     words = {}
@@ -77,6 +79,8 @@ def collect_activations(models, test_data):
     tokens = []
     for sample_id, sample in test_data.items():
         audio = audio_pipeline(sample["wav"], sample["duration"], sample["start"])
+
+        energy = audio.squeeze().square().unfold(dimension=0, size=640, step=320)
         print(sample_id)
 
         # Forward pass
@@ -95,34 +99,57 @@ def collect_activations(models, test_data):
             continue
 
         # Assembly and reshape
-        decoder_attn = sae_layer.attention_scores.squeeze(-1).clone()
+        detector_attn = sae_layer.attention_scores.squeeze(-1).clone()
         cross_attn = torch.stack([a.view(-1, 1500).sum(0) for a in attns])
 
         # Remove EOS tokens
         cross_attn = cross_attn[:-1]
         log_probs = log_probs.squeeze()[:-1]
 
-        #print("Decoder attn shape", decoder_attn.shape)
-        #print("Cross attn shape", cross_attn.shape)
+        #print("Decoder attn shape", detector_attn.shape)
+        print("Cross attn shape", cross_attn.shape)
         #print("log_probs shape", log_probs.shape)
 
 
         # Find the top k attention frames
-        values, indexes = decoder_attn.squeeze().topk(k=10)
+        values, indexes = detector_attn.squeeze().topk(k=10)
 
         # Find decoder token with highest score for these ten frames
-        print(compute_features.tokenizer.decode(hyps[0]))
+        #print(tokizer.decode(hyps[0]))
         for index in indexes:
             decoder_idx = cross_attn[1:, index].argmax() + 1
-            tok = compute_features.tokenizer.decode(hyps[0][decoder_idx])
+            tok = tokizer.decode(hyps[0][decoder_idx])
             tokens.append(tok)
-            print(tok)
+            #print(tok)
+        
+
+        # Add up all the decoder attention token scores for each frame (denominator)
+        #total_cross_attn_weight = cross_attn[1:].sum(dim=0)
+
+        # Compute the attention weight for all tokens considered punctuation
+        #all_tokens = [tokizer.decode(t) for t in hyps[0]]
+        #punct_indexes = [i for i, t in enumerate(all_tokens) if is_punctuation(t)]
+        #punct_cross_attn_weight = cross_attn[punct_indexes].sum(dim=0)
+        
+        #ratio = punct_cross_attn_weight / total_cross_attn_weight
+
+        # Frame rate is every 0.02 sec
+        xs = torch.arange(detector_attn.numel()) * 0.02
+        plt.rcParams["figure.figsize"] = (20,3)
+        plt.plot(xs, sma_norm(detector_attn).cpu())
+        plt.plot(xs[:-1], sma_norm(energy.sum(dim=1)).cpu())
+        plt.legend(["Detector attention", "Signal energy"])
+        plt.xlabel("Time (seconds)")
+        plt.ylabel("Normalized score")
+        plt.savefig("Attention-vs-Energy-Log.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
+        plt.clf()
+        break
 
         # Combine
-        #decoder_attn = F.avg_pool1d(decoder_attn, 5, 1, 2, count_include_pad=False)
-        #decoder_attn[decoder_attn < 0.1 * decoder_attn.amax()] = 0
+        #detector_attn = F.avg_pool1d(detector_attn, 5, 1, 2, count_include_pad=False)
+        #detector_attn[detector_attn < 0.1 * detector_attn.amax()] = 0
 
-        #token_attn = (cross_attn * decoder_attn).sum(dim=1)#, keepdim=True)
+        #token_attn = (cross_attn * detector_attn).sum(dim=1)#, keepdim=True)
         #decoder_token_idx = token_attn.argmax()
 
         #print("Token attn shape", token_attn.shape)
@@ -137,6 +164,24 @@ def collect_activations(models, test_data):
 
     return words, activations, predictions
 
+
+def sma_norm(signal, kernel=21, clamp_min=1e-3, log=False):
+    signal = signal.view(1, -1)
+    #signal = F.avg_pool1d(
+    #    signal, kernel, stride=1, padding=kernel // 2, count_include_pad=False
+    #)
+    weight = torch.hann_window(kernel, device=DEVICE).view(1, 1, -1)
+    signal = F.conv1d(signal, weight, padding=kernel // 2)
+    signal = signal / signal.amax()
+    signal = signal.squeeze(0).clamp(min=clamp_min)
+    if log:
+        return signal.log()
+    return signal
+
+
+def is_punctuation(token):
+    c = token.strip()[0]
+    return unicodedata.category(c).startswith("P")
 
 def correlation(vector_a, vector_b):
     cov = ((vector_a - vector_a.mean()) * (vector_b - vector_b.mean())).mean()

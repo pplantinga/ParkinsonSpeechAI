@@ -62,7 +62,6 @@ def collect_activations(models, test_data):
     sae_layer.enable_storage()
 
     # Iterate test data and compute+store network activations
-    preactivations = {}
     activations = {}
     attention_scores = {}
     predictions = {}
@@ -75,12 +74,11 @@ def collect_activations(models, test_data):
         prediction = classifier(embedding)
 
         # Store computed activations
-        preactivations[sample_id] = sae_layer.pre_activations.detach().clone()
         activations[sample_id] = sae_layer.get_activations().detach().clone()
         attention_scores[sample_id] = sae_layer.attention_scores.detach().clone()
         predictions[sample_id] = prediction.squeeze().detach().clone()
 
-    return preactivations, activations, attention_scores, predictions
+    return activations, attention_scores, predictions
 
 
 def collect_features(attention_scores, test_data):
@@ -91,8 +89,11 @@ def collect_features(attention_scores, test_data):
 
     features = {}
     feats_attn = {}
+    pause_len = {}
+    pause_n = {}
     for sample_id, sample in test_data.items():
         audio = audio_pipeline(sample["wav"], sample["duration"], sample["start"])
+        pause_len[sample_id], pause_n[sample_id] = compute_pause_features(audio)
 
         # Pad with one window to match whisper output, so we can use attention
         vocal_feat = vocal_feats(audio)
@@ -105,7 +106,30 @@ def collect_features(attention_scores, test_data):
         s = (vocal_feat * attention_scores[sample_id]).mean(dim=1).detach()
         feats_attn[sample_id] = s
 
-    return features, feats_attn
+    return features, feats_attn, pause_len, pause_n
+
+
+def compute_pause_features(audio, n=10):
+    energy = audio.squeeze().unfold(dimension=0, size=1600, step=800).sum(dim=0)
+
+    # Silence = Energy is lower than 1% of peak
+    pause_frames = energy < energy.amax() * 0.05
+
+    # Count silent frames
+    pause_length = pause_frames.count_nonzero() / 10
+
+    # Count 1-second unbroken silent intervals (Allow for 1 spurious frame)
+    pause_count = 0
+    cooldown = 0
+    for i in range(len(pause_frames) - n):
+        if cooldown > 0:
+            cooldown -= 1
+
+        if not cooldown and pause_frames[i:i+n].count_nonzero() == n:
+            pause_count += 1
+            cooldown = n
+
+    return pause_length, pause_count
 
 
 def collect_attributes(test_data):
@@ -127,22 +151,26 @@ def correlation(vector_a, vector_b):
     return cov / vector_a.std() / vector_b.std()
 
 
-def compute_correlations(features, preactivations, activations, predictions, attributes):
+def compute_correlations(features, activations, predictions, attributes):
     """Compute correlations between features and activations.
 
     NOTE: correlations with predictions is a baseline -- any correlations
     should be higher than the correlation with the final prediction.
     """
-    feature_matrix = torch.stack(tuple(features.values()), dim=-1).squeeze(0)
-    preactivation_matrix = torch.stack(tuple(preactivations.values()), dim=-1).squeeze(0)
+    features, feats_attn, pause_len, pause_n = features
+    feature_matrix = torch.stack(tuple(feats_attn.values()), dim=-1).squeeze(0)
     activation_matrix = torch.stack(tuple(activations.values()), dim=-1).squeeze(0)
-    prediction_matrix = torch.stack(tuple(predictions.values())).view(1, -1)
     attribute_matrix = torch.stack(tuple(attributes.values()), dim=-1)
+    prediction_matrix = torch.stack(tuple(predictions.values()))
+    pause_len_matrix = torch.tensor(tuple(pause_len.values()), device=DEVICE).float()
+    pause_n_matrix = torch.tensor(tuple(pause_n.values()), device=DEVICE).float()
 
     print(feature_matrix.shape)
     print(activation_matrix.shape)
     print(prediction_matrix.shape)
     print(attribute_matrix.shape)
+    print(pause_len_matrix.shape)
+    print(pause_n_matrix.shape)
 
 
     # Correlate predictions with activations as a baseline for each
@@ -158,21 +186,23 @@ def compute_correlations(features, preactivations, activations, predictions, att
 
         indexes = activation_matrix[i].nonzero().squeeze()
         activations = activation_matrix[i, indexes]
-        predictions = prediction_matrix[0, indexes]
+        predictions = prediction_matrix[indexes]
 
-        corr = correlation(activations, predictions).abs()
+        corr = correlation(activations, predictions)
         print(f"Correlation of active feats with prediction: {corr}")
         score.append(corr)
         corr, pvalue = scipy.stats.spearmanr(activations.cpu(), predictions.cpu())
         print(f"Rank Correlation of active with prediction: {corr}")
 
-        for j in range(5):
-            attributes = attribute_matrix[j, indexes]
-            attr_corr = correlation(activations, attributes)
-            print(f"Correlation of activations with attributes: {attr_corr}")
+        #for j in range(5):
+        #    attributes = attribute_matrix[j, indexes]
+        #    attr_corr = correlation(activations, attributes)
+        #    print(f"Correlation of activations with attributes: {attr_corr}")
 
-        #ovl_corr = correlation(preactivation_matrix[i], prediction_matrix[0]).abs()
-        #print(f"Preactivation correlation with prediction: {ovl_corr}")
+        pause_lengths_corr = correlation(activations, pause_len_matrix[indexes])
+        pause_counts_corr = correlation(activations, pause_n_matrix[indexes])
+        print(f"Correlation of active with pause length: {pause_lengths_corr}")
+        print(f"Correlation of active with pause count: {pause_counts_corr}")
 
         # Try different features
         max_feat = 0
@@ -182,7 +212,6 @@ def compute_correlations(features, preactivations, activations, predictions, att
         for j in range(feature_matrix.size(0)):
             feature = feature_matrix[j, indexes]
             feat_corr = correlation(activations, feature).abs()
-            feat_ovl_corr = correlation(preactivation_matrix[i], feature_matrix[j]).abs()
 
             if i == 15 and j == 10:
                 plot_correlations(activations, predictions, feature)
@@ -191,12 +220,7 @@ def compute_correlations(features, preactivations, activations, predictions, att
                 max_feat = feat_corr
                 max_feat_index = j
 
-            if feat_ovl_corr > max_ovl_feat:
-                max_ovl_feat = feat_ovl_corr
-                max_ovl_feat_index = j
-
         print(f"Max corr feat {max_feat_index} with score {max_feat}")
-        #print(f"Max ovl feat {max_ovl_feat_index} with score {max_ovl_feat}")
         score.append(max_feat_index)
         score.append(max_feat)
 
@@ -224,10 +248,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     models, test_data = load_models(args.hparams_file)
-    preactivations, activations, attn_scores, predictions = collect_activations(models, test_data)
-    features, feats_attn = collect_features(attn_scores, test_data)
+    activations, attn_scores, predictions = collect_activations(models, test_data)
+    feats = collect_features(attn_scores, test_data)
     attributes = collect_attributes(test_data)
 
-    correlations = compute_correlations(feats_attn, preactivations, activations, predictions, attributes)
+    correlations = compute_correlations(feats, activations, predictions, attributes)
 
     #plot_correlations(correlations)
