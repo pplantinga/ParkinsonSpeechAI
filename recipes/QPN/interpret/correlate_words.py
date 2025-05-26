@@ -1,9 +1,7 @@
 """Correlate the activations with various features
-
-Author: Peter Plantinga
 """
 import hyperpyyaml, torch, speechbrain, json, torchaudio, argparse
-import scipy, collections, unicodedata
+import scipy, collections, unicodedata, nltk
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
@@ -16,9 +14,9 @@ DEVICE = "cuda"
 def load_models(hparams_file):
     """Load hparams and models and data"""
     overrides = {
-        "data_folder": "/home/competerscience/Documents/data/Neuro_split",
+        "data_folder": "path/to/qpn",
         "storage_folder": "results",
-        "pretrained_source": "/home/competerscience/Documents/data/ssl-models/whisper-small",
+        "pretrained_source": "openai/whisper-small",
         "compute_features": {"encoder_only": False, "output_attentions": True},
     }
     with open(hparams_file) as f:
@@ -77,6 +75,7 @@ def collect_activations(models, test_data):
     attention_scores = {}
     predictions = {}
     tokens = []
+    count = 0
     for sample_id, sample in test_data.items():
         audio = audio_pipeline(sample["wav"], sample["duration"], sample["start"])
 
@@ -90,7 +89,7 @@ def collect_activations(models, test_data):
         prediction = classifier(embedding)
 
         # Pass relative length to searcher
-        length = torch.tensor([sample["duration"] / 30.0])
+        length = torch.tensor([sample["duration"] / 30.0], device=DEVICE)
         # Set the language token
         lang_token = compute_features.to_language_token(sample["info_dict"]["lang"])
         searcher.set_lang_tokens(lang_token)
@@ -98,56 +97,46 @@ def collect_activations(models, test_data):
         if len(hyps[0]) < 3:
             continue
 
+        # Count sentences, words, average lengths
+        tok_count = len(hyps[0])
+        utterance = tokizer.decode(hyps[0])
+        word_count = len(utterance.split())
+        word_count_per_second = word_count / sample["duration"]
+        sentences = nltk.sent_tokenize(utterance)
+        sent_count = len(sentences)
+        sent_count_per_second = sent_count / sample["duration"]
+        avg_sent_len = word_count / sent_count
+        avg_word_len = sum(len(w) for w in utterance.split()) / word_count
+
+        word_vector = [tok_count, word_count, word_count_per_second, sent_count]
+        word_vector += [sent_count_per_second, avg_sent_len, avg_word_len]
+
         # Assembly and reshape
         detector_attn = sae_layer.attention_scores.squeeze(-1).clone()
-        cross_attn = torch.stack([a.view(-1, 1500).sum(0) for a in attns])
+        #cross_attn = torch.stack([a.view(-1, 1500).sum(0) for a in attns])
 
         # Remove EOS tokens
-        cross_attn = cross_attn[:-1]
-        log_probs = log_probs.squeeze()[:-1]
+        #cross_attn = cross_attn[:-1]
+        #log_probs = log_probs.squeeze()[:-1]
 
         #print("Decoder attn shape", detector_attn.shape)
-        print("Cross attn shape", cross_attn.shape)
+        #print("Cross attn shape", cross_attn.shape)
         #print("log_probs shape", log_probs.shape)
 
+        if count == 0 or count == 20:
+            plot_energy_vs_attn(f"Attention_{count}.png", detector_attn, energy)
 
         # Find the top k attention frames
-        values, indexes = detector_attn.squeeze().topk(k=10)
+        #values, indexes = detector_attn.squeeze().topk(k=10)
 
         # Find decoder token with highest score for these ten frames
         #print(tokizer.decode(hyps[0]))
-        for index in indexes:
-            decoder_idx = cross_attn[1:, index].argmax() + 1
-            tok = tokizer.decode(hyps[0][decoder_idx])
-            tokens.append(tok)
+        #for index in indexes:
+        #    decoder_idx = cross_attn[1:, index].argmax() + 1
+        #    tok = tokizer.decode(hyps[0][decoder_idx])
+        #    tokens.append(tok)
             #print(tok)
         
-
-        # Add up all the decoder attention token scores for each frame (denominator)
-        #total_cross_attn_weight = cross_attn[1:].sum(dim=0)
-
-        # Compute the attention weight for all tokens considered punctuation
-        #all_tokens = [tokizer.decode(t) for t in hyps[0]]
-        #punct_indexes = [i for i, t in enumerate(all_tokens) if is_punctuation(t)]
-        #punct_cross_attn_weight = cross_attn[punct_indexes].sum(dim=0)
-        
-        #ratio = punct_cross_attn_weight / total_cross_attn_weight
-
-        # Frame rate is every 0.02 sec
-        xs = torch.arange(detector_attn.numel()) * 0.02
-        plt.rcParams["figure.figsize"] = (20,3)
-        plt.plot(xs, sma_norm(detector_attn).cpu())
-        plt.plot(xs[:-1], sma_norm(energy.sum(dim=1)).cpu())
-        plt.legend(["Detector attention", "Signal energy"])
-        plt.xlabel("Time (seconds)")
-        plt.ylabel("Normalized score")
-        plt.savefig("Attention-vs-Energy-Log.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
-        plt.clf()
-        break
-
-        # Combine
-        #detector_attn = F.avg_pool1d(detector_attn, 5, 1, 2, count_include_pad=False)
-        #detector_attn[detector_attn < 0.1 * detector_attn.amax()] = 0
 
         #token_attn = (cross_attn * detector_attn).sum(dim=1)#, keepdim=True)
         #decoder_token_idx = token_attn.argmax()
@@ -157,12 +146,29 @@ def collect_activations(models, test_data):
         # Store computed activations
         #words[sample_id] = (log_probs * token_attn).sum(dim=0)
         #words[sample_id] = log_probs[decoder_token_idx].clone()
+        words[sample_id] = torch.tensor(word_vector, device=DEVICE)
         activations[sample_id] = sae_layer.get_activations().clone()
         predictions[sample_id] = prediction.squeeze().clone()
 
-    print(collections.Counter(tokens).most_common(10))
+    #print(collections.Counter(tokens).most_common(10))
 
     return words, activations, predictions
+
+
+def plot_energy_vs_attn(fig_name, detector_attn, energy):
+    # Frame rate is every 0.02 sec
+    xs = torch.arange(detector_attn.size(1)) * 0.02
+    plt.rcParams["figure.figsize"] = (5,1)
+    plt.plot(xs, sma_norm(detector_attn).cpu())
+    #plt.plot(xs, detector_attn.squeeze(0).cpu() / detector_attn.amax().cpu())
+    plt.plot(xs[:-1], sma_norm(energy.sum(dim=1)).cpu())
+    #plt.legend(["Attention 1", "Attentin 2", "Attention 3", "Attention 4", "Signal energy"])
+    plt.legend(["Attn", "Energy"])
+    plt.xlabel("Time (seconds)")
+    plt.ylabel("Norm. score")
+    #plt.savefig("Attention-vs-Energy-multiattn.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
+    plt.savefig(fig_name, dpi=300, bbox_inches="tight", pad_inches=0.1)
+    plt.clf()
 
 
 def sma_norm(signal, kernel=21, clamp_min=1e-3, log=False):
@@ -222,15 +228,17 @@ def compute_correlations(words, activations, predictions, tokenizer):
         max_word_vec = None
         for j in range(word_matrix.size(0)):
             word_vec = word_matrix[j, indexes]
-            corr = correlation(activations, word_vec).abs()
-            if abs(corr) > max_word_corr:
-                max_word_corr = abs(corr)
+            #corr = correlation(activations, word_vec).abs()
+            corr, _ = scipy.stats.spearmanr(activations.cpu(), word_vec.cpu())
+            if abs(corr) > abs(max_word_corr):
+                max_word_corr = corr
                 max_word_idx = j
                 max_word_vec = word_vec
 
         print(max_word_idx)
-        word = tokenizer.decode([max_word_idx])
-        print(f"Max correlated word '{word}' with corr: {max_word_corr}")
+        print(max_word_corr)
+        #word = tokenizer.decode([max_word_idx])
+        #print(f"Max correlated word '{word}' with corr: {max_word_corr}")
 
 
 def plot_correlations(activations, predictions, feature):

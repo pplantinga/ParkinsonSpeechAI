@@ -6,7 +6,7 @@ lr_factor: 1
 
 # Save folders and paths
 experiment_name: whisper_small_sae_jump
-storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
+storage_folder: !PLACEHOLDER # where you want to save results
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -206,12 +206,12 @@ embedding_model: !new:torch.nn.Sequential
 sae_layer: 4.w
 embedding_sae: !new:speechbrain.nnet.adapters.AdaptedModel
     model_to_adapt: !ref <embedding_model>
-    adapter_class: !name:speechbrain.nnet.adapters.SparseAutoEncoder
+    adapter_class: !name:sparse_autoencoder.SparseAutoEncoder
     target_layers: [!ref <sae_layer>]
     manual_adapter_insertion: True
     adapter_kwargs:
         dict_size: !ref <dictionary_size>
-        activation_fn: !new:speechbrain.nnet.activations.JumpReLU
+        activation_fn: !new:jumprelu.JumpReLU
             input_size: !ref <dictionary_size>
             #fixed_threshold: 0.01
         storing_activations: True

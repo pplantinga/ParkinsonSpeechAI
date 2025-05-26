@@ -2,10 +2,7 @@
 """Recipe for interpretability on the Quebec Parkinson's Network Speech Dataset
 
 To run this recipe, use the following command:
-> python train.py train.yaml
-
-Author
-    * Peter Plantinga 2024
+> python train.py hparams/train.yaml
 """
 
 import sys
@@ -41,16 +38,16 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features and sparsity loss (tied to 
         feats = self.modules.compute_features(wavs, lens)
-        target_embeddings = self.modules.embedding_model(feats)
+        #target_embeddings = self.modules.embedding_model(feats)
         predict_embeddings = self.modules.embedding_sae(feats)
 
-        return predict_embeddings, target_embeddings
+        return predict_embeddings#, target_embeddings
 
     def compute_objectives(self, outputs, batch, stage):
         """Computes the loss using patient-type as label."""
 
         # Get predictions and labels
-        predict_embeddings, target_embeddings = outputs
+        #predict_embeddings, target_embeddings = outputs
 
         # Reconstruction loss improves fidelity, ensuring we get
         # an accurate representation of the model decision
@@ -65,9 +62,15 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Diversity loss encourages different features to activate by
         # maximizing the entropy of the mask probabilities.
-        diversity_loss = self.sae_layer.diversity_loss.mean()
+        if hasattr(self.sae_layer, "diversity_loss"):
+            diversity_loss = self.sae_layer.diversity_loss.mean()
+        else:
+            diversity_loss = torch.zeros(1, device=self.device)
         self.diversity_losses.append(diversity_loss.detach().clone())
         diversity_loss *= self.hparams.diversity_weight * self.diversity_warmup
+
+        if stage != sb.Stage.TRAIN:
+            self.activation_counts.append(self.sae_layer.sparse_activations.count_nonzero())
 
         return reconstruction_loss + sparsity_loss + diversity_loss
 
@@ -76,6 +79,7 @@ class ParkinsonBrain(sb.core.Brain):
         self.fidelity_losses = []
         self.sparsity_losses = []
         self.diversity_losses = []
+        self.activation_counts = []
         if epoch == 1:
             self.sparsity_warmup = 0.0
             self.diversity_warmup = 0.0
@@ -90,7 +94,8 @@ class ParkinsonBrain(sb.core.Brain):
             "fidelity": torch.stack(self.fidelity_losses).mean().detach(),
             "sparsity": torch.stack(self.sparsity_losses).mean().detach(),
             "temperature": self.sae_layer.mask_temperature.temperature,
-            "diversity": torch.stack(self.diversity_losses).mean().detach()
+            "diversity": torch.stack(self.diversity_losses).mean().detach(),
+            "active_count": torch.tensor(self.activation_counts).sum().detach()
         }
         if stage == sb.Stage.TRAIN:
             self.train_stats = stage_stats

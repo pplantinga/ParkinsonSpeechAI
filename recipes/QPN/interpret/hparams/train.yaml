@@ -1,12 +1,12 @@
 
 # Basic parameters
-seed: 2058
+seed: 2059
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
 experiment_name: whisper_small_sae_mask_postpool
-storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
+storage_folder: !PLACEHOLDER # where you want to save results
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -43,9 +43,9 @@ lr: 0.003
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 sparsity_warmup: 100
-sparsity_weight: 0.001
+sparsity_weight: 0.01
 diversity_warmup: 100
-diversity_weight: 1.0
+diversity_weight: 0.0
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
@@ -211,7 +211,7 @@ embedding_model: !new:torch.nn.Sequential
 sae_layer: "3"
 embedding_sae: !new:speechbrain.nnet.adapters.AdaptedModel
     model_to_adapt: !ref <embedding_model>
-    adapter_class: !name:speechbrain.nnet.adapters.SparseAutoEncoder
+    adapter_class: !name:sparse_autoencoder.SparseAutoEncoder
     target_layers: [!ref <sae_layer>]
     manual_adapter_insertion: True
     adapter_kwargs:
@@ -220,7 +220,7 @@ embedding_sae: !new:speechbrain.nnet.adapters.AdaptedModel
         activation_fn: mask
         storing_activations: True
         sparse_loss_fn: L1
-        mask_temperature: !new:speechbrain.nnet.adapters.MaskTemp
+        mask_temperature: !new:sparse_autoencoder.MaskTemp
             start_temp: 1.0
             stop_temp: 0.2
             steps: 200
