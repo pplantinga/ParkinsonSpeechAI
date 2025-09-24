@@ -11,8 +11,6 @@ def prepare_adresso(
     data_folder, train_annotation, test_annotation, valid_annotation, chunk_size, transcript_folder=None
 ):
     assert os.path.exists(data_folder), "Data folder not found"
-    #if os.path.exists(train_annotation):
-    #    return
 
     # Read csv from file
     data_folder = pathlib.Path(data_folder)
