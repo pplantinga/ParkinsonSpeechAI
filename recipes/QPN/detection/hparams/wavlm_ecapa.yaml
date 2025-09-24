@@ -4,12 +4,12 @@
 # ################################
 
 # Basic parameters
-seed: 2028
+seed: 2055
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: wavlm_large_dnn
+experiment_name: whisper_small_all
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -23,7 +23,8 @@ noise_folder: !ref <data_folder>/noise
 rir_folder: !ref <data_folder>/rir
 train_annotation: !ref <storage_folder>/train.json
 valid_annotation: !ref <storage_folder>/valid.json
-test_annotation: !ref <storage_folder>/test.json
+#test_annotation: !ref <storage_folder>/test.json
+test_annotation: !ref <storage_folder>/human_samples.json
 noise_annotation: !ref <save_folder>/noise.csv
 rir_annotation: !ref <save_folder>/rir.csv
 valid_metrics_json: !ref <output_folder>/valid_metrics.json
@@ -41,7 +42,7 @@ epochs: 20
 warmup_epochs: 2
 samples_per_epoch: 1024
 total_batch_size: 32
-batch_size: 4
+batch_size: 2
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
 lr: 0.0001
 base_lr: 0.000001
@@ -50,27 +51,28 @@ step_size: 50
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 loss: bce
+#mask_regions: highpower
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
-    task: [dpt]
+    task: [vowel_repeat, repeat, read, recall, dpt]
     #task: [vowel_repeat]
     #lang: [en, other]
 test_keep_keys:
-    task: [dpt]
+    task: [vowel_repeat, repeat, read, recall, dpt]
     #task: [vowel_repeat]
 
 # Test parameters
 test_batch_size: 1
-metric_categories: [sex, lang]
+metric_categories: [sex, lang, task, first_lang, severity, age_range, reason]
 threshold: 0.5
 
 # Model parameters
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 1024
-embedding_size: 1280
+feature_size: 768
+embedding_size: 768
 dropout: 0.2
 out_neurons: 1
 
@@ -132,11 +134,11 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
     drop_freq_width: 0.05
 
 # Time drop: randomly drops a number of temporal chunks.
-#drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
-#    drop_length_low: 1000
-#    drop_length_high: 2000
-#    drop_count_low: 1
-#    drop_count_high: 5
+drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
+    drop_length_low: 16000
+    drop_length_high: 32000
+    drop_count_low: 1
+    drop_count_high: 5
 
 # Augmenter: Combines previously defined augmentations to perform data augmentation
 wav_augment: !new:speechbrain.augment.augmenter.Augmenter
@@ -144,22 +146,22 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     concat_original: False
     min_augmentations: 2
     max_augmentations: 2
-    augment_prob: 0.9
-    augmentations: [!ref <add_noise>, !ref <drop_freq>]
+    augment_prob: 1.0
+    augmentations: [!ref <add_noise>, !ref <drop_freq>, !ref <drop_chunk>]
 
 # Models
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-    source: !ref <pretrained_source>
-    output_norm: True
-    freeze_feature_extractor: True
-    freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/wavlm-large
-
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
 #    source: !ref <pretrained_source>
-#    encoder_only: True
+#    output_norm: True
+#    freeze_feature_extractor: True
 #    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/whisper
+#    save_path: !ref <output_folder>/wavlm-large
+
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
+    source: !ref <pretrained_source>
+    encoder_only: True
+    freeze: !ref <freeze_pretrained>
+    save_path: !ref <output_folder>/whisper
 
 #compute_features: !new:speechbrain.lobes.models.huggingface_transformers.hubert.HuBERT
 #    source: !ref <pretrained_source>
@@ -167,15 +169,20 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.W
 #    save_path: !ref <output_folder>/whisper
 
 #compute_features: !new:nemo_encoder.NeMoEncoder
-#    source: !ref <pretrained_source> / canary-1b.nemo
+#    source: !ref <pretrained_source>
+    #source: !ref <pretrained_source> / canary-1b.nemo
+    #nemo_type: "MultiTask"
+    #source_dir: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
-#    nemo_type: "MultiTask"
-#    source_dir: !ref <pretrained_source>
 
 #compute_features: !new:xeus_encoder.XEUS_Encoder
 #    source: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/xeus
+
+#compute_features: !new:eat.EAT_AS2M
+#    source: !ref <pretrained_source>
+#    freeze: !ref <freeze_pretrained>
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>
@@ -249,7 +256,7 @@ bce_loss: !name:speechbrain.nnet.losses.bce_loss
 #    weight_decay: 0.0001
 opt_class: !name:bitsandbytes.optim.Adam8bit
     lr: !ref <lr>
-    weight_decay: 0.0001
+    weight_decay: 0.00001
 
 #lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
 #    base_lr: !ref <base_lr>

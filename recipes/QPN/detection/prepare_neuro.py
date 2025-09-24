@@ -53,9 +53,10 @@ def get_path_type_dicts(data_folder):
     :return: dicts
     """
 
-    datasets = os.listdir(data_folder)
+    datasets = ["train", "valid", "test"]
     batch1_excel_path = os.path.join(data_folder, "QPN_Batch1.xlsx")
     batch2_excel_path = os.path.join(data_folder, "QPN_Batch2.xlsx")
+    batch3_excel_path = os.path.join(data_folder, "QPN_Batch3.xlsx")
     path_type_dict = {}
 
     # Load the Excel files
@@ -63,6 +64,8 @@ def get_path_type_dicts(data_folder):
     batch1_sheet = batch1_workbook.active
     batch2_workbook = openpyxl.load_workbook(batch2_excel_path)
     batch2_sheet = batch2_workbook["Demographic"]
+    batch3_workbook = openpyxl.load_workbook(batch3_excel_path)
+    batch3_sheet = batch3_workbook["demographic"]
 
     for dataset in datasets:
         dataset_path = os.path.join(data_folder, dataset)
@@ -75,14 +78,17 @@ def get_path_type_dicts(data_folder):
 
         batch1_data_path = os.path.join(dataset_path, "Batch1")
         batch2_data_path = os.path.join(dataset_path, "Batch2")
+        batch3_data_path = os.path.join(dataset_path, "Batch3")
 
         batch1_files = glob.glob(batch1_data_path + "/*.wav")
         batch2_files = glob.glob(batch2_data_path + "/*.wav")
+        batch3_files = glob.glob(batch3_data_path + "/*.wav")
 
         batch1_patients = get_patient_traits(batch1_files, batch1_sheet, "Batch1")
         batch2_patients = get_patient_traits(batch2_files, batch2_sheet, "Batch2")
+        batch3_patients = get_patient_traits(batch3_files, batch3_sheet, "Batch3")
 
-        path_type_dict[dataset] = batch1_patients | batch2_patients
+        path_type_dict[dataset] = batch1_patients | batch2_patients | batch3_patients
 
     return path_type_dict
 
@@ -160,6 +166,10 @@ def create_json(json_file, path_type_dict, chunk_size, transcripts=None, manual=
 
         # Remove 'l1' files as they are duplicates
         if "l1" in audiofile:
+            continue
+
+        # Remove "un-combined" repeat files
+        if "repeat" in audiofile and "combined" not in audiofile:
             continue
 
         # Get utterance info from the file name

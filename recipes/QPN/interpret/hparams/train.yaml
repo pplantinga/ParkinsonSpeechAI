@@ -1,11 +1,11 @@
 
 # Basic parameters
-seed: 2059
+seed: 2050
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_small_sae_mask_postpool
+experiment_name: whisper_small_all_sae
 storage_folder: !PLACEHOLDER # where you want to save results
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -19,7 +19,8 @@ noise_folder: !ref <data_folder>/noise
 rir_folder: !ref <data_folder>/rir
 train_annotation: !ref <storage_folder>/train.json
 valid_annotation: !ref <storage_folder>/valid.json
-test_annotation: !ref <storage_folder>/test.json
+#test_annotation: !ref <storage_folder>/test.json
+test_annotation: !ref <storage_folder>/human_samples.json
 noise_annotation: !ref <save_folder>/noise.csv
 rir_annotation: !ref <save_folder>/rir.csv
 valid_metrics_json: !ref <output_folder>/valid_metrics.json
@@ -45,15 +46,15 @@ chunk_size: 30.0 # seconds
 sparsity_warmup: 100
 sparsity_weight: 0.01
 diversity_warmup: 100
-diversity_weight: 0.0
+diversity_weight: 0.1
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
-    task: [dpt]
+    task: [vowel_repeat, repeat, recall, read, dpt]
     #task: [vowel_repeat]
     #lang: [en, other]
 test_keep_keys:
-    task: [dpt]
+    task: [vowel_repeat, repeat, recall, read, dpt]
     #task: [vowel_repeat]
 
 # Test parameters
@@ -64,6 +65,7 @@ threshold: 0.5
 # Model parameters
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
+finetuned_source: pretrained/whisper_small_all
 freeze_pretrained: True
 feature_size: 768
 embedding_size: 768
@@ -267,5 +269,5 @@ pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
         embedding_model: !ref <embedding_model>
         classifier: !ref <classifier>
     paths:
-        embedding_model: pretrained/whisper_small/embedding_model.ckpt
-        classifier: pretrained/whisper_small/classifier.ckpt
+        embedding_model: !ref <finetuned_source>/embedding_model.ckpt
+        classifier: !ref <finetuned_source>/classifier.ckpt

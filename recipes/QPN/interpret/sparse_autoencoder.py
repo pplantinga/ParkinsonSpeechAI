@@ -1,3 +1,5 @@
+import torch
+from speechbrain.nnet.losses import mse_loss
 
 class MaskTemp:
     """Keeps track of temperature for masking
@@ -31,7 +33,7 @@ class MaskTemp:
         return self.temperature
 
 
-class SparseAutoEncoder(nn.Module):
+class SparseAutoEncoder(torch.nn.Module):
     """Adds a sparse auto-encoder (SAE) layer after a pretrained module.
 
     Majority of initialization code comes from a reference implementation.
@@ -114,25 +116,25 @@ class SparseAutoEncoder(nn.Module):
 
         # Initialize the parameters according to reference
         self.dict_size = dict_size
-        self.W_enc = nn.Parameter(
+        self.W_enc = torch.nn.Parameter(
             torch.empty(module_out_size, dict_size, device=device)
         )
-        self.b_enc = nn.Parameter(torch.zeros(dict_size, device=device))
+        self.b_enc = torch.nn.Parameter(torch.zeros(dict_size, device=device))
 
         if self.activation_fn == "mask":
-            self.W_mask = nn.Parameter(
+            self.W_mask = torch.nn.Parameter(
                 torch.nn.init.kaiming_uniform_(
                     torch.empty(module_out_size, dict_size, device=device)
                 )
             )
-            self.b_mask = nn.Parameter(torch.zeros(dict_size, device=device))
+            self.b_mask = torch.nn.Parameter(torch.zeros(dict_size, device=device))
 
-        self.W_dec = nn.Parameter(
+        self.W_dec = torch.nn.Parameter(
             torch.nn.init.kaiming_uniform_(
                 torch.empty(dict_size, module_out_size, device=device)
             )
         )
-        self.b_dec = nn.Parameter(torch.zeros(module_out_size, device=device))
+        self.b_dec = torch.nn.Parameter(torch.zeros(module_out_size, device=device))
         self.W_dec.data = self.W_dec / self.W_dec.norm(dim=1, keepdim=True)
         self.W_enc.data = self.W_dec.data.clone().T
 

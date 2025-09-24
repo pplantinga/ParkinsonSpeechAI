@@ -154,12 +154,14 @@ class ParkinsonBrain(sb.core.Brain):
 
             # Log metrics split by given categories
             for category in self.hparams.metric_categories:
+                if category == "reason" and stage != sb.Stage.TEST:
+                    continue
                 threshold = metrics_comb_avg["overall"]["threshold"]
                 cat_metrics = self.metrics_by_category(
                     combined_scores=combined_avg, target_category=category, threshold=threshold
                 )
                 logger.info(f"Comb avg breakdown by {category}")
-                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
+                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=300))
 
             # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
@@ -228,6 +230,41 @@ class ParkinsonBrain(sb.core.Brain):
         for i, score, label, info_dict in zip(ids, scores, labels, info_dicts):
             utt_id, chunk = i.rsplit("_", 1)
 
+            # Add a computed category to the info_dict, first/non-first language
+            if (
+                info_dict["l1"] == "French" and info_dict["lang"] == "fr"
+                or info_dict["l1"] == "English" and info_dict["lang"] == "en"
+            ):
+                info_dict["first_lang"] = "First Language"
+            elif info_dict["task"] == "vowel_repeat":
+                info_dict["first_lang"] = "No Language"
+            else:
+                info_dict["first_lang"] = "Non-first language"
+
+
+            # Add a computed category to the info_dict, disease severity
+            if info_dict["updrs"] is None:
+                info_dict["severity"] = "No Info"
+            elif info_dict["updrs"] > 58:
+                info_dict["severity"] = "Severe"
+            elif info_dict["updrs"] > 32:
+                info_dict["severity"] = "Moderate"
+            elif info_dict["updrs"] > 0:
+                info_dict["severity"] = "Mild"
+            else:
+                info_dict["severity"] = "No Info"
+
+            # Add a computed category to the info_dict, age category
+            if 53 <= info_dict["age"] < 63:
+                info_dict["age_range"] = "53-62"
+            elif 63 <= info_dict["age"] < 73:
+                info_dict["age_range"] = "63-72"
+            elif 73 <= info_dict["age"] < 83:
+                info_dict["age_range"] = "73-82"
+            else:
+                info_dict["age_range"] = "unknown"
+
+
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
                     "scores": [round(score.item(), 3)],
@@ -285,6 +322,7 @@ class ParkinsonBrain(sb.core.Brain):
         summary["threshold"] = round(all_metrics["threshold"], 3)
         cross_ent = binary_cross_entropy(metrics.scores, metrics.labels.float())
         summary["bce"] = round(cross_ent.item(), 3)
+        summary["count"] = len(metrics.ids)
         return summary
 
 
@@ -341,13 +379,15 @@ def dataio_prep(hparams):
         yield patient_type_encoded
 
         # Weight PD less since there's more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
+        weight = 1
+        #weight *= 0.7 if patient_type_encoded else 1.5
+        #weight *= 0.7 if info_dict["sex"] == "M" else 1.5
         #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
         yield weight
 
         # Balance on ptype and sex
-        balance = info_dict["ptype"] + "_" + info_dict["sex"]
+        #balance = info_dict["ptype"] + "_" + info_dict["sex"]
+        balance = info_dict["ptype"] + "_" + info_dict["task"]
         #balance += "_FR" if info_dict["lang"] == "fr" else "_EN/O"
         yield balance
 
@@ -454,13 +494,13 @@ if __name__ == "__main__":
     )
 
     # Run validation and test set to get the predictions
-    logger.info("Final validation result:")
-    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=datasets["valid"],
-        #max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["test_dataloader_options"],
-    )
+    #logger.info("Final validation result:")
+    #parkinson_brain.metrics_json = hparams["valid_metrics_json"]
+    #parkinson_brain.evaluate(
+    #    test_set=datasets["valid"],
+    #    #max_key=hparams["error_metric"],
+    #    test_loader_kwargs=hparams["test_dataloader_options"],
+    #)
 
     logger.info("Final test result:")
     parkinson_brain.metrics_json = hparams["test_metrics_json"]
