@@ -13,3 +13,5 @@ __pycache__
 
 # Run scripts
 **/run_scripts/
+
+manifest.json
