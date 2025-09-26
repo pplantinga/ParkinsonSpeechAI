@@ -264,8 +264,8 @@ def dataio_prep(hparams):
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("PD", 1)
-    label_encoder.enforce_label("HC", 0)
+    label_encoder.enforce_label("Disease", 1)
+    label_encoder.enforce_label("Control", 0)
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -310,7 +310,7 @@ def dataio_prep(hparams):
     train_info = {
         "train": hparams["train_annotation"],
         "valid": hparams["valid_annotation"],
-        "qpn_test": hparams["qpn_test_annotation"],
+        "pd_test": hparams["pd_test_annotation"],
     }
 
     out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
@@ -327,7 +327,7 @@ def dataio_prep(hparams):
             key_test={"info_dict": lambda x: x[key] in values},
         )
     for key, values in hparams["test_keep_keys"].items():
-        for dataset in ["valid", "qpn_test"]:
+        for dataset in ["valid", "pd_test"]:
             datasets[dataset] = datasets[dataset].filtered_sorted(
                 key_test={"info_dict": lambda x: x[key] in values},
             )
@@ -341,14 +341,14 @@ def dataio_prep(hparams):
 
     return datasets
 
-def dataio_prep_adresso(hparams): 
+def dataio_prep_adresso(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("ProbableAD", 1)
+    label_encoder.enforce_label("Disease", 1)
     label_encoder.enforce_label("Control", 0)
 
     # Define audio pipeline
@@ -364,22 +364,22 @@ def dataio_prep_adresso(hparams):
         return sig.squeeze(0)
 
     # Define label pipeline:
-    @sb.utils.data_pipeline.takes("dx")
-    @sb.utils.data_pipeline.provides("dx_encoded")
-    def label_pipeline(dx):
+    @sb.utils.data_pipeline.takes("ptype")
+    @sb.utils.data_pipeline.provides("patient_type_encoded")
+    def label_pipeline(ptype):
         """Defines the pipeline to process the diagnosis labels.
         Note that we have to assign a different integer to each class
         through the label encoder.
         """
-        l = label_encoder.encode_label_torch(dx)
-        return l
+        patient_type_encoded = label_encoder.encode_label_torch(ptype)
+        return patient_type_encoded
 
     # Define test dataset. We also connect the dataset with the data processing
     # functions defined above.
     test_set = sb.dataio.dataset.DynamicItemDataset.from_json(
-        json_path=hparams["adresso_test_annotation"],
+        json_path=hparams["ad_test_annotation"],
         dynamic_items=[audio_pipeline, label_pipeline],
-        output_keys=["id", "sig", "dx_encoded"],
+        output_keys=["id", "sig", "patient_type_encoded"],
     )
 
     return test_set
@@ -415,7 +415,6 @@ if __name__ == "__main__":
         prepare_adresso,
         kwargs={
             "data_folder": hparams["ad_data_folder"],
-            "train_annotation": hparams["ad_train_annotation"],
             "test_annotation": hparams["ad_test_annotation"],
             "chunk_size": hparams["chunk_size"],
         }
@@ -453,7 +452,7 @@ if __name__ == "__main__":
 
     # Run validation and test set to get the predictions
     logger.info("Final validation result PD:")
-    parkinson_brain.metrics_json = hparams["qpn_valid_metrics_json"]
+    parkinson_brain.metrics_json = hparams["pd_valid_metrics_json"]
     parkinson_brain.evaluate(
         test_set=datasets["valid"],
         #max_key=hparams["error_metric"],
@@ -461,9 +460,9 @@ if __name__ == "__main__":
     )
 
     logger.info("Final test result PD:")
-    parkinson_brain.metrics_json = hparams["qpn_test_metrics_json"]
+    parkinson_brain.metrics_json = hparams["pd_test_metrics_json"]
     parkinson_brain.evaluate(
-        test_set=datasets["qpn_test"],
+        test_set=datasets["pd_test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )

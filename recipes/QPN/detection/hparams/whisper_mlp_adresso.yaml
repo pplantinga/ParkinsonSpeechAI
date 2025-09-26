@@ -10,7 +10,7 @@ lr_factor: 1
 
 # Save folders and paths
 experiment_name: whisper_mlp
-storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
+storage_folder: ~/scratch/ # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -20,15 +20,15 @@ encoded_labels: !ref <save_folder>/label_encoder.txt
 # Data files
 pd_data_folder: !PLACEHOLDER
 ad_data_folder: !PLACEHOLDER
-noise_folder: !ref <data_folder>/noise
+noise_folder: !ref <pd_data_folder>/noise
 train_annotation: !ref <storage_folder>/train.json
 valid_annotation: !ref <storage_folder>/valid.json
 pd_test_annotation: !ref <storage_folder>/pd_test.json
 ad_train_annotation: !ref <storage_folder>/ad_train.json
 ad_test_annotation: !ref <storage_folder>/ad_test.json
 noise_annotation: !ref <save_folder>/noise.csv
-qpn_valid_metrics_json: !ref <output_folder>/valid_metrics.json
-qpn_test_metrics_json: !ref <output_folder>/test_metrics.json
+pd_valid_metrics_json: !ref <output_folder>/valid_metrics.json
+pd_test_metrics_json: !ref <output_folder>/test_metrics.json
 ad_test_metrics_json: !ref <output_folder>/ad_test_metrics.json
 
 skip_prep: False
@@ -68,8 +68,8 @@ threshold: 0.5
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 1024
-embedding_size: 1280
+feature_size: 1280
+embedding_size: 768
 dropout: 0.2
 out_neurons: 1
 

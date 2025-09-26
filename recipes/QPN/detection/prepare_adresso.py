@@ -13,7 +13,7 @@ def prepare_adresso(data_folder, test_annotation, chunk_size):
     data_folder = pathlib.Path(data_folder)
     train_gt = read_csv(data_folder, "train")
     test_gt = read_csv(data_folder, "test-dist")
-    test_gt = pandas.concat(train_gt, test_gt)
+    test_gt = pandas.concat([train_gt, test_gt], ignore_index=True)
 
     # Create json manifest
     create_json(test_annotation, test_gt, chunk_size)
@@ -40,7 +40,7 @@ def create_json(json_file, ground_truth, chunk_size, overlap=None):
                 "wav": str(row["path"]),
                 "start": start,
                 "duration": chunk_duration,
-                "dx": row["Dx"],
+                "ptype": row["Dx"],
             }
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:
