@@ -81,7 +81,7 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             probs = torch.sigmoid(outputs.view(-1))
             self.error_metrics.append(batch.id, probs, labels.view(-1))
-            #self.error_metrics.info_dicts.extend(batch.info_dict)
+            self.error_metrics.info_dicts.extend(batch.info_dict)
 
             # Use unweighted, unsmoothed score for comparable results across hparams
             loss = binary_cross_entropy(probs, labels.view(-1).float())
@@ -94,7 +94,7 @@ class ParkinsonBrain(sb.core.Brain):
             self.error_metrics = self.hparams.error_stats()
 
             # Add this list so we can store the info dict
-            #self.error_metrics.info_dicts = []
+            self.error_metrics.info_dicts = []
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -122,13 +122,13 @@ class ParkinsonBrain(sb.core.Brain):
             )
 
             # Log metrics split by given categories
-            #for category in self.hparams.metric_categories:
-            #    threshold = metrics_comb_avg["overall"]["threshold"]
-            #    cat_metrics = self.metrics_by_category(
-            #        combined_scores=combined_avg, target_category=category, threshold=threshold
-            #    )
-            #    logger.info(f"Comb avg breakdown by {category}")
-            #    logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
+            for category in self.hparams.metric_categories:
+                threshold = metrics_comb_avg["overall"]["threshold"]
+                cat_metrics = self.metrics_by_category(
+                    combined_scores=combined_avg, target_category=category, threshold=threshold
+                )
+                logger.info(f"Comb avg breakdown by {category}")
+                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
 
             # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
@@ -191,16 +191,17 @@ class ParkinsonBrain(sb.core.Brain):
         ids = self.error_metrics.ids
         scores = self.error_metrics.scores
         labels = self.error_metrics.labels
-        #info_dicts = self.error_metrics.info_dicts
+        info_dicts = self.error_metrics.info_dicts
 
         combined_scores = {}
-        for i, score, label in zip(ids, scores, labels):
+        for i, score, label, info_dict in zip(ids, scores, labels, info_dicts):
             utt_id, chunk = i.rsplit("_", 1)
 
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
                     "scores": [round(score.item(), 3)],
                     "label": label.item(),
+                    **info_dict,
                 }
             else:
                 combined_scores[utt_id]["scores"].append(round(score.item(), 3))
