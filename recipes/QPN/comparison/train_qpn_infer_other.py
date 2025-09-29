@@ -93,9 +93,6 @@ class ParkinsonBrain(sb.core.Brain):
         if stage != sb.Stage.TRAIN:
             self.error_metrics = self.hparams.error_stats()
 
-            # Add this list so we can store the info dict
-            self.error_metrics.info_dicts = []
-
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
@@ -113,22 +110,11 @@ class ParkinsonBrain(sb.core.Brain):
             )
 
             # Log overall metrics
-            chunk_stats = self.summarize_metrics(
-                self.error_metrics, self.hparams.threshold
-            )
+            chunk_stats = self.summarize_metrics(self.error_metrics, threshold=None)
             stage_stats.update({f"chunk_{k}": v for k, v in chunk_stats.items()})
             stage_stats.update(
                 {f"comb_avg_{k}": v for k, v in metrics_comb_avg["overall"].items()}
             )
-
-            # Log metrics split by given categories
-            for category in self.hparams.metric_categories:
-                threshold = metrics_comb_avg["overall"]["threshold"]
-                cat_metrics = self.metrics_by_category(
-                    combined_scores=combined_avg, target_category=category, threshold=threshold
-                )
-                logger.info(f"Comb avg breakdown by {category}")
-                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
 
             # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
@@ -191,17 +177,15 @@ class ParkinsonBrain(sb.core.Brain):
         ids = self.error_metrics.ids
         scores = self.error_metrics.scores
         labels = self.error_metrics.labels
-        info_dicts = self.error_metrics.info_dicts
 
         combined_scores = {}
-        for i, score, label, info_dict in zip(ids, scores, labels, info_dicts):
+        for i, score, label, info_dict in zip(ids, scores, labels):
             utt_id, chunk = i.rsplit("_", 1)
 
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
                     "scores": [round(score.item(), 3)],
                     "label": label.item(),
-                    **info_dict,
                 }
             else:
                 combined_scores[utt_id]["scores"].append(round(score.item(), 3))
