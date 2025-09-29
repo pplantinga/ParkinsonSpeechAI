@@ -81,7 +81,7 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             probs = torch.sigmoid(outputs.view(-1))
             self.error_metrics.append(batch.id, probs, labels.view(-1))
-            self.error_metrics.info_dicts.extend(batch.info_dict)
+            #self.error_metrics.info_dicts.extend(batch.info_dict)
 
             # Use unweighted, unsmoothed score for comparable results across hparams
             loss = binary_cross_entropy(probs, labels.view(-1).float())
