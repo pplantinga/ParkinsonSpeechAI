@@ -148,12 +148,12 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-#    source: !ref <pretrained_source>
-#    output_norm: True
-#    freeze_feature_extractor: True
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/wavlm-large
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+    source: !ref <pretrained_source>
+    output_norm: True
+    freeze_feature_extractor: True
+    freeze: !ref <freeze_pretrained>
+    save_path: !ref <output_folder>/wavlm-large
 
 #compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
 #    source: !ref <pretrained_source>
@@ -176,10 +176,6 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
 #    source: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/xeus
-
-compute_features: !new:owsm_encoder.OWSM_Encoder
-    source: !ref <pretrained_source>
-    freeze: !ref <freeze_pretrained>
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>
