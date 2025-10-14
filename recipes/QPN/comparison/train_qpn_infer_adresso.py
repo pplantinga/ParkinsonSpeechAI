@@ -120,6 +120,10 @@ class ParkinsonBrain(sb.core.Brain):
             if stage == sb.Stage.TEST:
                 with open(self.metrics_json, "w") as f:
                     json.dump(combined_avg, f)
+                    f.write("\nChunk stats: ")
+                    json.dump(chunk_stats, f)
+                    f.write("\nCombined stats: ")
+                    json.dump(metrics_comb_avg, f)
                 logger.info(f"Results stored {self.metrics_json}")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
@@ -179,7 +183,7 @@ class ParkinsonBrain(sb.core.Brain):
         labels = self.error_metrics.labels
 
         combined_scores = {}
-        for i, score, label, info_dict in zip(ids, scores, labels):
+        for i, score, label in zip(ids, scores, labels):
             utt_id, chunk = i.rsplit("_", 1)
 
             if utt_id not in combined_scores:

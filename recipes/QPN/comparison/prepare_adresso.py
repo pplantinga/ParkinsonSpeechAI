@@ -11,9 +11,9 @@ def prepare_adresso(data_folder, test_annotation, chunk_size):
 
     # Read csv from file
     data_folder = pathlib.Path(data_folder)
-    train_gt = read_csv(data_folder, "train")
+#    train_gt = read_csv(data_folder, "train")
     test_gt = read_csv(data_folder, "test-dist")
-    test_gt = pandas.concat([train_gt, test_gt], ignore_index=True)
+#    test_gt = pandas.concat([train_gt, test_gt], ignore_index=True)
 
     # Create json manifest
     create_json(test_annotation, test_gt, chunk_size)
@@ -34,13 +34,18 @@ def create_json(json_file, ground_truth, chunk_size, overlap=None):
         duration = audioinfo.num_frames / audioinfo.sample_rate
         # Write chunks to dict
         max_start = max(duration - hop_size, 1)
+        # Get ptype
+        if row["Dx"] == "ProbableAD":
+            ptype = "Disease"
+        else:
+            ptype = "Control"
         for i, start in enumerate(np.arange(0, max_start, hop_size)):
             chunk_duration = min(chunk_size, duration - i * hop_size)
             json_dict[f"{row['ID']}_{i}"] = {
                 "wav": str(row["path"]),
                 "start": start,
                 "duration": chunk_duration,
-                "ptype": row["Dx"],
+                "ptype": ptype,
             }
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:

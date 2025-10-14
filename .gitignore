@@ -13,3 +13,9 @@ __pycache__
 
 # Run scripts
 **/run_scripts/
+
+# Ignore mac files
+*.DS_Store
+
+# Ignore bash scripts
+*.sh
