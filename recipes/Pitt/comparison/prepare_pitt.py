@@ -14,17 +14,9 @@ def prepare_pitt(data_folder, train_annotation, test_annotation, valid_annotatio
     data_folder = pathlib.Path(data_folder)
     data_csv = read_csv(data_folder, "pitt_corpus")
     
-    # Debug prints
-    print("Available columns:", data_csv.columns)
-    print("First few rows of data_csv:")
-    print(data_csv.head())
-    print("Unique IDs in dataset:", data_csv["id"].unique())
-    
     # Separate out validation/test sets
-    valid_ids = [1, 2, 6, 7, 10, 12, 13, 14]
-    print("Looking for valid_ids:", valid_ids)
+    valid_ids = ["001", "002", "006", "007", "010", "012", "013", "014"]
     valid_gt = data_csv[data_csv["id"].isin(valid_ids)]
-    print("Number of rows in valid_gt:", len(valid_gt))
     train_gt = data_csv[~data_csv["id"].isin(valid_ids)]
 
     test_gt = data_csv[data_csv["test"] == 1]
@@ -52,7 +44,9 @@ def read_csv(data_folder, subset):
 
         # Check for all recordings of this patient
         base_path = data_folder / subfolder
-        pattern = f"{row['id']}-*.mp3"
+        # Format ID to be 3 digits with leading zeros
+        id_str = str(row['id']).zfill(3)
+        pattern = f"{id_str}-*.mp3"
         recording_files = sorted(glob.glob(str(base_path / pattern)))
         
         # If patient is in test set, only keep the first recording (-0)
