@@ -15,11 +15,16 @@ def prepare_pitt(data_folder, train_annotation, test_annotation, valid_annotatio
     data_csv = read_csv(data_folder, "pitt_corpus")
 
     # Separate out validation/test sets
-    valid_gt = data_csv[data_csv["valid"] == 1]
-    train_gt = data_csv[data_csv["valid"] == 0]
+    valid_ids = [1, 2, 6, 7, 10, 12, 13, 14]
+    valid_gt = data_csv[data_csv["id"].isin(valid_ids)]
+    train_gt = data_csv[~data_csv["id"].isin(valid_ids)]
 
     test_gt = data_csv[data_csv["test"] == 1]
     train_gt = data_csv[data_csv["test"] == 0]
+
+    print(train_gt)
+    print(valid_gt)
+    print(test_gt)
 
     # Create json manifests
     create_json(train_annotation, train_gt, chunk_size, overlap=0)
@@ -36,10 +41,10 @@ def read_csv(data_folder, subset):
     for _, row in df.iterrows():
         # Determine subfolder based on diagnosis
         subfolder = "control" if row["dx"] == "Control" else "dementia"
-        
+
         # Check for all recordings of this patient
         base_path = data_folder / subfolder
-        pattern = f"{row['ID']}-*.mp3"
+        pattern = f"{row['id']}-*.mp3"
         recording_files = sorted(glob.glob(str(base_path / pattern)))
         
         # If patient is in test set, only keep the first recording (-0)
@@ -69,11 +74,11 @@ def create_json(json_file, ground_truth, chunk_size, transcripts=None, overlap=N
         max_start = max(duration - hop_size, 1)
         for i, start in enumerate(np.arange(0, max_start, hop_size)):
             chunk_duration = min(chunk_size, duration - i * hop_size)
-            json_dict[f"{row['ID']}_{i}"] = {
+            json_dict[f"{row['id']}_{i}"] = {
                 "wav": str(row["path"]),
                 "start": start,
                 "duration": chunk_duration,
-                "dx": row["Dx"],
+                "dx": row["dx"],
             }
 
     # Writing the dictionary to the json file

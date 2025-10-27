@@ -9,7 +9,7 @@ __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_mlp
+experiment_name: whisper_mlp_pitt_qpn
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -21,10 +21,11 @@ encoded_labels: !ref <save_folder>/label_encoder.txt
 pd_data_folder: !PLACEHOLDER
 ad_data_folder: !PLACEHOLDER
 noise_folder: !ref <storage_folder>/noise
-train_annotation: !ref <save_folder>/train.json
-valid_annotation: !ref <save_folder>/valid.json
+pd_train_annotation: !ref <save_folder>/pd_train.json
+pd_valid_annotation: !ref <save_folder>/pd_valid.json
 pd_test_annotation: !ref <save_folder>/pd_test.json
 ad_train_annotation: !ref <save_folder>/ad_train.json
+ad_valid_annotation: !ref <save_folder>/ad_valid.json
 ad_test_annotation: !ref <save_folder>/ad_test.json
 noise_annotation: !ref <save_folder>/noise.csv
 pd_valid_metrics_json: !ref <output_folder>/valid_metrics.json
