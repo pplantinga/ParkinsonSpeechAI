@@ -276,7 +276,7 @@ def dataio_prep_neuro(hparams):
         Note that we have to assign a different integer to each class
         through the label encoder.
         """
-        yield info_dict["ptype"]
+        #yield info_dict["ptype"]
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
 

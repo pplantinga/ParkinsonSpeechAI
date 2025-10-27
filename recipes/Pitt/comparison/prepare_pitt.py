@@ -15,7 +15,7 @@ def prepare_pitt(data_folder, train_annotation, test_annotation, valid_annotatio
     data_csv = read_csv(data_folder, "pitt_corpus")
     
     # Separate out validation/test sets
-    valid_ids = ["001", "002", "006", "007", "010", "012", "013", "014"]
+    valid_ids = [1, 2, 6, 7, 10, 12, 13, 14]
     valid_gt = data_csv[data_csv["id"].isin(valid_ids)]
     train_gt = data_csv[~data_csv["id"].isin(valid_ids)]
 
