@@ -9,8 +9,7 @@ Using your own hyperparameter file or one of the following:
     hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
 
 Author
-    * Briac Cordelle 2024, 2025
-    * Peter Plantinga 2024
+    * Briac Cordelle 2025
 """
 
 import os
@@ -36,7 +35,7 @@ from tqdm import tqdm
 
 logger = sb.utils.logger.get_logger("train.py")
 
-class ParkinsonBrain(sb.core.Brain):
+class AlzheimerBrain(sb.core.Brain):
     """Class for speaker embedding training"""
 
     def compute_forward(self, batch, stage):
@@ -245,7 +244,7 @@ class ParkinsonBrain(sb.core.Brain):
         return summary
 
 
-def dataio_prep(hparams):
+def dataio_prep_neuro(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
@@ -296,8 +295,8 @@ def dataio_prep(hparams):
     # functions defined above.
     datasets = {}
     train_info = {
-        "train": hparams["train_annotation"],
-        "valid": hparams["valid_annotation"],
+        "train": hparams["pd_train_annotation"],
+        "valid": hparams["pd_valid_annotation"],
         "pd_test": hparams["pd_test_annotation"],
     }
 
@@ -329,7 +328,7 @@ def dataio_prep(hparams):
 
     return datasets
 
-def dataio_prep_adresso(hparams, cross_validation_annotations):
+def dataio_prep_pitt(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
@@ -362,17 +361,23 @@ def dataio_prep_adresso(hparams, cross_validation_annotations):
         patient_type_encoded = label_encoder.encode_label_torch(ptype)
         return patient_type_encoded
 
-    # Define test dataset. We also connect the dataset with the data processing
+    # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
-    test_sets = {}
-    for cross_validation_annotation in cross_validation_annotations: 
-        test_sets[cross_validation_annotation] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=cross_validation_annotation,
+    datasets = {}
+    train_info = {
+        "train": hparams["ad_train_annotation"],
+        "valid": hparams["ad_valid_annotation"],
+        "test": hparams["ad_test_annotation"],
+    }
+
+    for dataset in train_info:
+        datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
+            json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
             output_keys=["id", "sig", "patient_type_encoded"],
         )
 
-    return test_sets
+    return datasets
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
@@ -389,22 +394,24 @@ if __name__ == "__main__":
 
     # Dataset prep
     from prepare_neuro import prepare_neuro
-    from prepare_adresso import prepare_adresso
+    from prepare_pitt import prepare_pitt
 
     sb.utils.distributed.run_on_main(
         prepare_neuro,
         kwargs={
             "data_folder": hparams["pd_data_folder"],
-            "train_annotation": hparams["train_annotation"],
+            "train_annotation": hparams["pd_train_annotation"],
             "test_annotation": hparams["pd_test_annotation"],
-            "valid_annotation": hparams["valid_annotation"],
+            "valid_annotation": hparams["pd_valid_annotation"],
             "chunk_size": hparams["chunk_size"],
         }
     )
     sb.utils.distributed.run_on_main(
-        prepare_adresso,
+        prepare_pitt,
         kwargs={
             "data_folder": hparams["ad_data_folder"],
+            "train_annotation": hparams["ad_train_annotation"],
+            "valid_annotation": hparams["ad_valid_annotation"],
             "test_annotation": hparams["ad_test_annotation"],
             "chunk_size": hparams["chunk_size"],
         }
@@ -412,8 +419,8 @@ if __name__ == "__main__":
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
-    datasets = dataio_prep(hparams)
-    ad_test_sets = dataio_prep_adresso(hparams, cross_validation_annotations)
+    pd_test_sets = dataio_prep_neuro(hparams)
+    ad_datasets = dataio_prep_pitt(hparams)
 
     # Create experiment directory
     sb.core.create_experiment_directory(
@@ -423,7 +430,7 @@ if __name__ == "__main__":
     )
 
     # Brain class initialization
-    parkinson_brain = ParkinsonBrain(
+    alzheimer_brain = AlzheimerBrain(
         modules=hparams["modules"],
         opt_class=hparams["opt_class"],
         hparams=hparams,
@@ -432,35 +439,35 @@ if __name__ == "__main__":
     )
 
     # Training
-    parkinson_brain.fit(
-        parkinson_brain.hparams.epoch_counter,
-        train_set=datasets["train"],
-        valid_set=datasets["valid"],
+    alzheimer_brain.fit(
+        alzheimer_brain.hparams.epoch_counter,
+        train_set=ad_datasets["train"],
+        valid_set=ad_datasets["valid"],
         train_loader_kwargs=hparams["train_dataloader_options"],
         valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
     # Run validation and test set to get the predictions
-    logger.info("Final validation result PD:")
-    parkinson_brain.metrics_json = hparams["pd_valid_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=datasets["valid"],
+    logger.info("Final validation result AD:")
+    alzheimer_brain.metrics_json = hparams["ad_valid_metrics_json"]
+    alzheimer_brain.evaluate(
+        test_set=ad_datasets["valid"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
     logger.info("Final test result PD:")
-    parkinson_brain.metrics_json = hparams["pd_test_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=datasets["pd_test"],
+    alzheimer_brain.metrics_json = hparams["ad_test_metrics_json"]
+    alzheimer_brain.evaluate(
+        test_set=ad_datasets["test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
-    logger.info("Final test result AD:")
-    parkinson_brain.metrics_json = hparams["ad_test_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=ad_test_set,
+    logger.info("Final test result PD:")
+    alzheimer_brain.metrics_json = hparams["pd_test_metrics_json"]
+    alzheimer_brain.evaluate(
+        test_set=pd_test_sets["pd_test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
