@@ -48,6 +48,8 @@ class AlzheimerBrain(sb.core.Brain):
         batch = batch.to(self.device)
         wavs, lens = batch.sig
 
+        print(f"wav shape: {wavs.shape}")
+
         # Augmentations, if specified
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
@@ -295,8 +297,8 @@ def dataio_prep_neuro(hparams):
     # functions defined above.
     datasets = {}
     train_info = {
-        "train": hparams["pd_train_annotation"],
-        "valid": hparams["pd_valid_annotation"],
+        "pd_train": hparams["pd_train_annotation"],
+        "pd_valid": hparams["pd_valid_annotation"],
         "pd_test": hparams["pd_test_annotation"],
     }
 
@@ -310,17 +312,17 @@ def dataio_prep_neuro(hparams):
 
     # Remove keys from training data for e.g. training only on men
     for key, values in hparams["train_keep_keys"].items():
-        datasets["train"] = datasets["train"].filtered_sorted(
+        datasets["pd_train"] = datasets["pd_train"].filtered_sorted(
             key_test={"info_dict": lambda x: x[key] in values},
         )
     for key, values in hparams["test_keep_keys"].items():
-        for dataset in ["valid", "pd_test"]:
+        for dataset in ["pd_valid", "pd_test"]:
             datasets[dataset] = datasets[dataset].filtered_sorted(
                 key_test={"info_dict": lambda x: x[key] in values},
             )
 
     hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
-        dataset=datasets["train"],
+        dataset=datasets["pd_train"],
         key="to_balance",
         num_samples=hparams["samples_per_epoch"],
         replacement=True,
@@ -365,9 +367,9 @@ def dataio_prep_pitt(hparams):
     # functions defined above.
     datasets = {}
     train_info = {
-        "train": hparams["ad_train_annotation"],
-        "valid": hparams["ad_valid_annotation"],
-        "test": hparams["ad_test_annotation"],
+        "ad_train": hparams["ad_train_annotation"],
+        "ad_valid": hparams["ad_valid_annotation"],
+        "ad_test": hparams["ad_test_annotation"],
     }
 
     for dataset in train_info:
@@ -419,7 +421,7 @@ if __name__ == "__main__":
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
-    pd_test_sets = dataio_prep_neuro(hparams)
+    pd_datasets = dataio_prep_neuro(hparams)
     ad_datasets = dataio_prep_pitt(hparams)
 
     # Create experiment directory
@@ -441,8 +443,8 @@ if __name__ == "__main__":
     # Training
     alzheimer_brain.fit(
         alzheimer_brain.hparams.epoch_counter,
-        train_set=ad_datasets["train"],
-        valid_set=ad_datasets["valid"],
+        train_set=ad_datasets["ad_train"],
+        valid_set=ad_datasets["ad_valid"],
         train_loader_kwargs=hparams["train_dataloader_options"],
         valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
@@ -451,15 +453,15 @@ if __name__ == "__main__":
     logger.info("Final validation result AD:")
     alzheimer_brain.metrics_json = hparams["ad_valid_metrics_json"]
     alzheimer_brain.evaluate(
-        test_set=ad_datasets["valid"],
+        test_set=ad_datasets["ad_valid"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
-    logger.info("Final test result PD:")
+    logger.info("Final test result AD:")
     alzheimer_brain.metrics_json = hparams["ad_test_metrics_json"]
     alzheimer_brain.evaluate(
-        test_set=ad_datasets["test"],
+        test_set=ad_datasets["ad_test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
@@ -467,7 +469,7 @@ if __name__ == "__main__":
     logger.info("Final test result PD:")
     alzheimer_brain.metrics_json = hparams["pd_test_metrics_json"]
     alzheimer_brain.evaluate(
-        test_set=pd_test_sets["pd_test"],
+        test_set=pd_datasets["pd_test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
