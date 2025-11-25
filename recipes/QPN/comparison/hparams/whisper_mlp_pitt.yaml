@@ -28,7 +28,7 @@ ad_train_annotation: !ref <save_folder>/ad_train.json
 ad_valid_annotation: !ref <save_folder>/ad_valid.json
 ad_test_annotation: !ref <save_folder>/ad_test.json
 noise_annotation: !ref <save_folder>/noise.csv
-ad_valid_metrics_json: !ref <output_folder>/ad_valid_metrics.json
+pd_valid_metrics_json: !ref <output_folder>/pd_valid_metrics.json
 pd_test_metrics_json: !ref <output_folder>/pd_test_metrics.json
 ad_test_metrics_json: !ref <output_folder>/ad_test_metrics.json
 

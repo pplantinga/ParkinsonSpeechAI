@@ -13,10 +13,9 @@ def prepare_pitt(data_folder, train_annotation, test_annotation, valid_annotatio
 
     data_folder = pathlib.Path(data_folder)
     data_csv = read_csv(data_folder, "pitt_corpus")
-
+    
     # Separate out validation/test sets
-    valid_ids = [59, 167, 211, 124, 182, 52, 208, 304, 122, 173, 238, 687, 10, 508, 213, 244]
-
+    valid_ids = [1, 2, 6, 7, 10, 12, 13, 14]
     valid_gt = data_csv[data_csv["id"].isin(valid_ids)]
     train_gt = data_csv[~data_csv["id"].isin(valid_ids)]
 
@@ -31,10 +30,10 @@ def prepare_pitt(data_folder, train_annotation, test_annotation, valid_annotatio
 
 def read_csv(data_folder, subset):
     df = pandas.read_csv(data_folder / (subset + ".csv"))
-
+    
     # Create a list to store expanded entries
     expanded_rows = []
-
+    
     for _, row in df.iterrows():
         # Determine subfolder based on diagnosis
         subfolder = "control" if row["dx"] == "Control" else "dementia"
@@ -45,7 +44,7 @@ def read_csv(data_folder, subset):
         id_str = str(row['id']).zfill(3)
         pattern = f"{id_str}-*.mp3"
         recording_files = sorted(glob.glob(str(base_path / pattern)))
-
+        
         # If patient is in test set, only keep the first recording (-0)
         if row["test"] == 1:
             recording_files = [f for f in recording_files if f.endswith("-0.mp3")]

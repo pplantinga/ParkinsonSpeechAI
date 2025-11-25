@@ -9,8 +9,7 @@ Using your own hyperparameter file or one of the following:
     hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
 
 Author
-    * Briac Cordelle 2024, 2025
-    * Peter Plantinga 2024
+    * Briac Cordelle 2025
 """
 
 import os
@@ -245,7 +244,7 @@ class ParkinsonBrain(sb.core.Brain):
         return summary
 
 
-def dataio_prep(hparams):
+def dataio_prep_neuro(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
@@ -296,8 +295,8 @@ def dataio_prep(hparams):
     # functions defined above.
     datasets = {}
     train_info = {
-        "train": hparams["train_annotation"],
-        "valid": hparams["valid_annotation"],
+        "pd_train": hparams["pd_train_annotation"],
+        "pd_valid": hparams["pd_valid_annotation"],
         "pd_test": hparams["pd_test_annotation"],
     }
 
@@ -309,19 +308,8 @@ def dataio_prep(hparams):
             output_keys=out_keys,
         )
 
-    # Remove keys from training data for e.g. training only on men
-    for key, values in hparams["train_keep_keys"].items():
-        datasets["train"] = datasets["train"].filtered_sorted(
-            key_test={"info_dict": lambda x: x[key] in values},
-        )
-    for key, values in hparams["test_keep_keys"].items():
-        for dataset in ["valid", "pd_test"]:
-            datasets[dataset] = datasets[dataset].filtered_sorted(
-                key_test={"info_dict": lambda x: x[key] in values},
-            )
-
     hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
-        dataset=datasets["train"],
+        dataset=datasets["pd_train"],
         key="to_balance",
         num_samples=hparams["samples_per_epoch"],
         replacement=True,
@@ -329,7 +317,7 @@ def dataio_prep(hparams):
 
     return datasets
 
-def dataio_prep_adresso(hparams, cross_validation_annotations):
+def dataio_prep_pitt(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
@@ -364,15 +352,20 @@ def dataio_prep_adresso(hparams, cross_validation_annotations):
 
     # Define test dataset. We also connect the dataset with the data processing
     # functions defined above.
-    test_sets = {}
-    for cross_validation_annotation in cross_validation_annotations: 
-        test_sets[cross_validation_annotation] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=cross_validation_annotation,
+    datasets = {}
+    train_info = {
+        "ad_train": hparams["ad_train_annotation"],
+        "ad_valid": hparams["ad_valid_annotation"],
+        "ad_test": hparams["ad_test_annotation"],
+    }
+    for dataset in train_info:
+        datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
+            json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
             output_keys=["id", "sig", "patient_type_encoded"],
         )
 
-    return test_sets
+    return datasets
 
 if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
@@ -389,22 +382,24 @@ if __name__ == "__main__":
 
     # Dataset prep
     from prepare_neuro import prepare_neuro
-    from prepare_adresso import prepare_adresso
+    from prepare_pitt import prepare_pitt
 
     sb.utils.distributed.run_on_main(
         prepare_neuro,
         kwargs={
             "data_folder": hparams["pd_data_folder"],
-            "train_annotation": hparams["train_annotation"],
+            "train_annotation": hparams["pd_train_annotation"],
             "test_annotation": hparams["pd_test_annotation"],
-            "valid_annotation": hparams["valid_annotation"],
+            "valid_annotation": hparams["pd_valid_annotation"],
             "chunk_size": hparams["chunk_size"],
         }
     )
     sb.utils.distributed.run_on_main(
-        prepare_adresso,
+        prepare_pitt,
         kwargs={
             "data_folder": hparams["ad_data_folder"],
+            "train_annotation": hparams["ad_train_annotation"],
+            "valid_annotation": hparams["ad_valid_annotation"],
             "test_annotation": hparams["ad_test_annotation"],
             "chunk_size": hparams["chunk_size"],
         }
@@ -412,8 +407,8 @@ if __name__ == "__main__":
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
-    datasets = dataio_prep(hparams)
-    ad_test_sets = dataio_prep_adresso(hparams, cross_validation_annotations)
+    pd_datasets = dataio_prep_neuro(hparams)
+    ad_datasets = dataio_prep_pitt(hparams)
 
     # Create experiment directory
     sb.core.create_experiment_directory(
@@ -434,8 +429,8 @@ if __name__ == "__main__":
     # Training
     parkinson_brain.fit(
         parkinson_brain.hparams.epoch_counter,
-        train_set=datasets["train"],
-        valid_set=datasets["valid"],
+        train_set=pd_datasets["pd_train"],
+        valid_set=pd_datasets["pd_valid"],
         train_loader_kwargs=hparams["train_dataloader_options"],
         valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
@@ -444,7 +439,7 @@ if __name__ == "__main__":
     logger.info("Final validation result PD:")
     parkinson_brain.metrics_json = hparams["pd_valid_metrics_json"]
     parkinson_brain.evaluate(
-        test_set=datasets["valid"],
+        test_set=pd_datasets["pd_valid"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
@@ -452,7 +447,7 @@ if __name__ == "__main__":
     logger.info("Final test result PD:")
     parkinson_brain.metrics_json = hparams["pd_test_metrics_json"]
     parkinson_brain.evaluate(
-        test_set=datasets["pd_test"],
+        test_set=pd_datasets["pd_test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
@@ -460,7 +455,7 @@ if __name__ == "__main__":
     logger.info("Final test result AD:")
     parkinson_brain.metrics_json = hparams["ad_test_metrics_json"]
     parkinson_brain.evaluate(
-        test_set=ad_test_set,
+        test_set=ad_datasets["ad_test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )

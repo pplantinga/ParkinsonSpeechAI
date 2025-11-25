@@ -48,8 +48,6 @@ class AlzheimerBrain(sb.core.Brain):
         batch = batch.to(self.device)
         wavs, lens = batch.sig
 
-        print(f"wav shape: {wavs.shape}")
-
         # Augmentations, if specified
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
@@ -77,7 +75,7 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Compute loss
         if stage == sb.Stage.TRAIN:
-            loss = self.hparams.bce_loss(outputs, labels, weight=batch.weight)
+            loss = self.hparams.bce_loss(outputs, labels) #, weight=batch.weight)
         # Validation / Test
         else:
             probs = torch.sigmoid(outputs.view(-1))
@@ -278,7 +276,7 @@ def dataio_prep_neuro(hparams):
         Note that we have to assign a different integer to each class
         through the label encoder.
         """
-        #yield info_dict["ptype"]
+        yield info_dict["ptype"]
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
 
@@ -310,23 +308,12 @@ def dataio_prep_neuro(hparams):
             output_keys=out_keys,
         )
 
-    # Remove keys from training data for e.g. training only on men
-    for key, values in hparams["train_keep_keys"].items():
-        datasets["pd_train"] = datasets["pd_train"].filtered_sorted(
-            key_test={"info_dict": lambda x: x[key] in values},
-        )
-    for key, values in hparams["test_keep_keys"].items():
-        for dataset in ["pd_valid", "pd_test"]:
-            datasets[dataset] = datasets[dataset].filtered_sorted(
-                key_test={"info_dict": lambda x: x[key] in values},
-            )
-
-    hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
-        dataset=datasets["pd_train"],
-        key="to_balance",
-        num_samples=hparams["samples_per_epoch"],
-        replacement=True,
-    )
+    #hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
+    #    dataset=datasets["pd_train"],
+    #    key="to_balance",
+    #    num_samples=hparams["samples_per_epoch"],
+    #    replacement=True,
+    #)
 
     return datasets
 
