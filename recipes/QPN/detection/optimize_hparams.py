@@ -62,7 +62,6 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
-        # feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -176,11 +175,14 @@ class ParkinsonBrain(sb.core.Brain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
+
             self.checkpointer.save_and_keep_only(
                 meta=stage_stats,
                 max_keys=[self.hparams.error_metric],
                 min_keys=["loss"],
             )
+            
+            hp.report_result(stage_stats) # show optimization progress
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -341,8 +343,8 @@ def dataio_prep(hparams):
         yield patient_type_encoded
 
         # Weight PD less since there's more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
+        weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
+        weight *= hparams["weight_male"] if info_dict["sex"] == "M" else hparams["weight_female"]
         #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
         yield weight
 
@@ -397,9 +399,7 @@ def dataio_prep(hparams):
 
 
 if __name__ == "__main__":
-    torch.backends.cudnn.benchmark = True
-
-    with hp.hyperparameter_optimization(objective_key="error") as hp_ctx:
+    with hp.hyperparameter_optimization(objective_key="chunk_F-score") as hp_ctx:
         hparams_file, run_opts, overrides = hp_ctx.parse_arguments(sys.argv[1:])
         sb.utils.distributed.ddp_init_group(run_opts)
 
@@ -424,47 +424,51 @@ if __name__ == "__main__":
 
         sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
 
-    # Dataset IO prep: creating Dataset objects and proper encodings for phones
-    datasets = dataio_prep(hparams)
+        # Dataset IO prep: creating Dataset objects and proper encodings for phones
+        datasets = dataio_prep(hparams)
 
-    # Create experiment directory
-    sb.core.create_experiment_directory(
-        experiment_directory=hparams["output_folder"],
-        hyperparams_to_save=hparams_file,
-        overrides=overrides,
-    )
+        # Create experiment directory
+        sb.core.create_experiment_directory(
+            experiment_directory=hparams["output_folder"],
+            hyperparams_to_save=hparams_file,
+            overrides=overrides,
+        )
 
-    # Brain class initialization
-    parkinson_brain = ParkinsonBrain(
-        modules=hparams["modules"],
-        opt_class=hparams["opt_class"],
-        hparams=hparams,
-        run_opts=run_opts,
-        checkpointer=hparams["checkpointer"],
-    )
+        # Brain class initialization
+        parkinson_brain = ParkinsonBrain(
+            modules=hparams["modules"],
+            opt_class=hparams["opt_class"],
+            hparams=hparams,
+            run_opts=run_opts,
+            checkpointer=hparams["checkpointer"],
+        )
 
-    # Training
-    parkinson_brain.fit(
-        parkinson_brain.hparams.epoch_counter,
-        train_set=datasets["train"],
-        valid_set=datasets["valid"],
-        train_loader_kwargs=hparams["train_dataloader_options"],
-        valid_loader_kwargs=hparams["valid_dataloader_options"],
-    )
+        # Training
+        parkinson_brain.fit(
+            parkinson_brain.hparams.epoch_counter,
+            train_set=datasets["train"],
+            valid_set=datasets["valid"],
+            train_loader_kwargs=hparams["train_dataloader_options"],
+            valid_loader_kwargs=hparams["valid_dataloader_options"],
+        )
 
-    # Run validation and test set to get the predictions
-    logger.info("Final validation result:")
-    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=datasets["valid"],
-        #max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["test_dataloader_options"],
-    )
+        # Run validation and test set to get the predictions
+        logger.info("Final validation result:")
 
-    logger.info("Final test result:")
-    parkinson_brain.metrics_json = hparams["test_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=datasets["test"],
-        #max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["test_dataloader_options"],
-    )
+        if not hp_ctx.enabled:
+            parkinson_brain.metrics_json = hparams["valid_metrics_json"]
+            parkinson_brain.evaluate(
+                test_set=datasets["valid"],
+                #max_key=hparams["error_metric"],
+                test_loader_kwargs=hparams["test_dataloader_options"],
+            )
+
+        logger.info("Final test result:")
+
+        if not hp_ctx.enabled:
+            parkinson_brain.metrics_json = hparams["test_metrics_json"]
+            parkinson_brain.evaluate(
+                test_set=datasets["test"],
+                #max_key=hparams["error_metric"],
+                test_loader_kwargs=hparams["test_dataloader_options"],
+            )

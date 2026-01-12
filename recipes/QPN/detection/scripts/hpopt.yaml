@@ -1,0 +1,4 @@
+number_of_epochs: 10
+#ckpt_enabled: False
+trial_id: hpopt
+output_folder: !ref <storage_folder>/<experiment_name>/<trial_id>
