@@ -1,0 +1,4 @@
+epochs: 10
+#ckpt_enabled: False
+trial_id: hpopt
+output_folder: !ref ~/scratch/hparam_optim/<trial_id>

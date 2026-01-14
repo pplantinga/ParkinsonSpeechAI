@@ -181,7 +181,7 @@ class ParkinsonBrain(sb.core.Brain):
                 max_keys=[self.hparams.error_metric],
                 min_keys=["loss"],
             )
-            
+
             hp.report_result(stage_stats) # show optimization progress
 
         if stage == sb.Stage.TEST:
