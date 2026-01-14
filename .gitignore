@@ -19,6 +19,13 @@ __pycache__
 
 # Ignore bash scripts
 *.sh
+!**/scripts/*.sh
 
 # ignore txt
 *.txt
+
+# Ignore virtual environments
+.venv/
+
+# Ignore csv
+*.csv
