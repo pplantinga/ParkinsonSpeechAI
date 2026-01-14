@@ -17,6 +17,9 @@ store_all=False
 compress_exp=False
 seed=2028
 additional_flags=""
+data_folder=""
+pretrained_source=""
+additional_hparams=""
 
 print_usage() {
     cat <<-USAGE
@@ -44,6 +47,8 @@ while [[ $# -gt 0 ]]; do
     --exp_name) exp_name="$2"; shift 2;;
     --output_folder) output_folder="$2"; shift 2;;
     --hparams) hparams="$2"; shift 2;;
+        --data_folder) data_folder="$2"; shift 2;;
+        --pretrained_source) pretrained_source="$2"; shift 2;;
     --config_file) config_file="$2"; shift 2;;
     --hpopt_file) hpopt_file="$2"; shift 2;;
     --exp_max_trials) exp_max_trials="$2"; shift 2;;
@@ -55,6 +60,22 @@ while [[ $# -gt 0 ]]; do
     *) POSITIONAL+=("$1"); shift;;
   esac
 done
+
+# Build additional_hparams to pass to optimize_hparams.py (e.g. --data_folder, --pretrained_source)
+if [ -n "$data_folder" ]; then
+    additional_hparams+="--data_folder '$data_folder' "
+fi
+if [ -n "$pretrained_source" ]; then
+    additional_hparams+="--pretrained_source '$pretrained_source' "
+fi
+
+if [ -n "$storage_folder" ]; then
+    additional_hparams+="--storage_folder '$storage_folder' "
+fi
+
+if [ -n "$feature_size" ]; then
+    additional_hparams+="--feature_size '$feature_size' "
+fi
 
 if [ -z "$output_folder" ] || [ -z "$hparams" ]; then
     echo "ERROR: --output_folder and --hparams are required"
@@ -136,7 +157,7 @@ while true; do
     echo "=============================================="
 
     # Build orion command (calls the project's optimize_hparams.py)
-    orion_cmd=(orion hunt -n "$exp_name_step" -c "$config_file" --exp-max-trials "$exp_max_trials" python ../optimize_hparams.py "$hparams_step" --hpopt "$hpopt_file" --hpopt_mode orion)
+    orion_cmd=(orion hunt -n "$exp_name_step" -c "$config_file" --exp-max-trials "$exp_max_trials" python ../optimize_hparams.py "$hparams_step" "$additional_hparams" --hpopt "$hpopt_file" --hpopt_mode orion)
 
     # Append extracted optimization flags and any additional flags
     eval "orion_cmd+=( $opt_flags $additional_flags )"
