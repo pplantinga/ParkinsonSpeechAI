@@ -49,6 +49,8 @@ while [[ $# -gt 0 ]]; do
     --hparams) hparams="$2"; shift 2;;
         --data_folder) data_folder="$2"; shift 2;;
         --pretrained_source) pretrained_source="$2"; shift 2;;
+        --storage_folder) storage_folder="$2"; shift 2;;
+        --feature_size) feature_size="$2" shift 2;;
     --config_file) config_file="$2"; shift 2;;
     --hpopt_file) hpopt_file="$2"; shift 2;;
     --exp_max_trials) exp_max_trials="$2"; shift 2;;
