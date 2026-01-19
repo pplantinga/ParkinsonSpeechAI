@@ -461,12 +461,28 @@ def dataio_prep(hparams):
 
 
 if __name__ == "__main__":
-    print("Starting hyperparameter optimization with Optuna (from optimize_hparams.py)...")
+    if len(sys.argv) < 2:
+        print("Usage: python optimize_hparams.py <hparams_file> [--key=value ...]")
+        sys.exit(1)
+
+    hparams_file = sys.argv[1]
+    overrides = {}
+    for arg in sys.argv[2:]:
+        if '=' in arg:
+            key, value = arg.split('=', 1)
+            if key.startswith('--'):
+                key = key[2:]
+            overrides[key] = value
+
+    print("Starting hyperparameter optimization with Optuna...")
 
     def objective(trial):
-        hparams_file = sys.argv[1]
         with open(hparams_file) as fin:
-            hparams = load_hyperpyyaml(fin, {})
+            hparams = load_hyperpyyaml(fin, overrides)
+
+        # Set experiment name to compose with passed name and trial number
+        exp_name = hparams.get('experiment_name')
+        hparams['experiment_name'] = f'{exp_name}_optuna_trial_{trial.number}'
 
         # Suggest hyperparameters
         hparams['lr'] = trial.suggest_loguniform('lr', 1e-5, 1e-3)
