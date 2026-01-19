@@ -399,10 +399,11 @@ def dataio_prep(hparams):
 
 
 if __name__ == "__main__":
+    print("Starting hyperparameter optimization (from optimize_hparams.py)...")
+
     with hp.hyperparameter_optimization(objective_key="chunk_F-score") as hp_ctx:
         hparams_file, run_opts, overrides = hp_ctx.parse_arguments(sys.argv[1:])
         sb.utils.distributed.ddp_init_group(run_opts)
-
 
         # Load hyperparameters file with command-line overrides
         with open(hparams_file) as fin:
