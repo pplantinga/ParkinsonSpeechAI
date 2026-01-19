@@ -27,8 +27,8 @@ import torchaudio
 from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
+import optuna
 from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeightedRandomSampler
-from speechbrain.utils import hpopt as hp
 
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
@@ -45,6 +45,10 @@ smile = opensmile.Smile(
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
+
+    def __init__(self, modules, opt_class, hparams, run_opts, checkpointer):
+        super().__init__(modules, opt_class, hparams, run_opts, checkpointer)
+        self.last_valid_stats = None
 
     def compute_forward(self, batch, stage):
         """
@@ -182,7 +186,7 @@ class ParkinsonBrain(sb.core.Brain):
                 min_keys=["loss"],
             )
 
-            hp.report_result(stage_stats) # show optimization progress
+            self.last_valid_stats = stage_stats
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -288,6 +292,64 @@ class ParkinsonBrain(sb.core.Brain):
         cross_ent = binary_cross_entropy(metrics.scores, metrics.labels.float())
         summary["bce"] = round(cross_ent.item(), 3)
         return summary
+
+
+def train_and_evaluate(hparams, run_opts, hparams_file):
+    """Train the model and evaluate on validation set, return F-score"""
+    # Dataset prep
+    from prepare_neuro import prepare_neuro
+
+    sb.utils.distributed.run_on_main(
+        prepare_neuro,
+        kwargs={
+            "data_folder": hparams["data_folder"],
+            "train_annotation": hparams["train_annotation"],
+            "test_annotation": hparams["test_annotation"],
+            "valid_annotation": hparams["valid_annotation"],
+            "chunk_size": hparams["chunk_size"],
+        },
+    )
+
+    sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
+
+    # Dataset IO prep: creating Dataset objects and proper encodings for phones
+    datasets = dataio_prep(hparams)
+
+    # Create experiment directory
+    sb.core.create_experiment_directory(
+        experiment_directory=hparams["output_folder"],
+        hyperparams_to_save=hparams_file,
+        overrides={},
+    )
+
+    # Brain class initialization
+    parkinson_brain = ParkinsonBrain(
+        modules=hparams["modules"],
+        opt_class=hparams["opt_class"],
+        hparams=hparams,
+        run_opts=run_opts,
+        checkpointer=hparams["checkpointer"],
+    )
+
+    # Training
+    parkinson_brain.fit(
+        parkinson_brain.hparams.epoch_counter,
+        train_set=datasets["train"],
+        valid_set=datasets["valid"],
+        train_loader_kwargs=hparams["train_dataloader_options"],
+        valid_loader_kwargs=hparams["valid_dataloader_options"],
+    )
+
+    # Run validation and test set to get the predictions
+    logger.info("Final validation result:")
+
+    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
+    parkinson_brain.evaluate(
+        test_set=datasets["valid"],
+        test_loader_kwargs=hparams["test_dataloader_options"],
+    )
+
+    return parkinson_brain.last_valid_stats["chunk_F-score"]
 
 
 def dataio_prep(hparams):
@@ -399,77 +461,46 @@ def dataio_prep(hparams):
 
 
 if __name__ == "__main__":
-    print("Starting hyperparameter optimization (from optimize_hparams.py)...")
+    print("Starting hyperparameter optimization with Optuna (from optimize_hparams.py)...")
 
-    with hp.hyperparameter_optimization(objective_key="chunk_F-score") as hp_ctx:
-        hparams_file, run_opts, overrides = hp_ctx.parse_arguments(sys.argv[1:])
+    def objective(trial):
+        hparams_file = sys.argv[1]
+        with open(hparams_file) as fin:
+            hparams = load_hyperpyyaml(fin, {})
+
+        # Suggest hyperparameters
+        hparams['lr'] = trial.suggest_loguniform('lr', 1e-5, 1e-3)
+        hparams['base_lr'] = trial.suggest_loguniform('base_lr', 1e-7, 1e-4)
+        hparams['chunk_size'] = trial.suggest_int('chunk_size', 15, 60)
+        hparams['weight_pd'] = trial.suggest_uniform('weight_pd', 0.1, 2.0)
+        hparams['weight_hc'] = trial.suggest_uniform('weight_hc', 0.1, 2.0)
+        hparams['weight_male'] = trial.suggest_uniform('weight_male', 0.1, 2.0)
+        hparams['weight_female'] = trial.suggest_uniform('weight_female', 0.1, 2.0)
+        hparams['embedding_size'] = trial.suggest_categorical('embedding_size', [1280, 780, 512])
+        hparams['dropout'] = trial.suggest_uniform('dropout', 0.1, 0.5)
+        hparams['snr_low'] = trial.suggest_uniform('snr_low', 0.0, 15.0)
+        hparams['snr_delta'] = trial.suggest_uniform('snr_delta', 5.0, 20.0)
+        hparams['drop_freq_low'] = trial.suggest_uniform('drop_freq_low', 0.0, 0.3)
+        hparams['drop_freq_high'] = trial.suggest_uniform('drop_freq_high', 0.7, 1.0)
+        hparams['drop_freq_count_low'] = trial.suggest_categorical('drop_freq_count_low', [1, 2, 3])
+        hparams['drop_freq_count_delta'] = trial.suggest_categorical('drop_freq_count_delta', [0, 1, 2, 3, 4, 5, 6])
+        hparams['drop_freq_width'] = trial.suggest_uniform('drop_freq_width', 0.01, 0.15)
+        hparams['min_augmentations'] = trial.suggest_categorical('min_augmentations', [0, 1, 2])
+        hparams['augment_prob'] = trial.suggest_uniform('augment_prob', 0.5, 1.0)
+        hparams['weight_decay'] = trial.suggest_loguniform('weight_decay', 1e-6, 1e-2)
+
+        run_opts = {}
         sb.utils.distributed.ddp_init_group(run_opts)
 
-        # Load hyperparameters file with command-line overrides
-        with open(hparams_file) as fin:
-            hparams = load_hyperpyyaml(fin, overrides)
+        score = train_and_evaluate(hparams, run_opts, hparams_file)
+        return score
 
-        # Dataset prep
-        from prepare_neuro import prepare_neuro
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objective, n_trials=100)
 
-        sb.utils.distributed.run_on_main(
-            prepare_neuro,
-            kwargs={
-                "data_folder": hparams["data_folder"],
-                "train_annotation": hparams["train_annotation"],
-                "test_annotation": hparams["test_annotation"],
-                "valid_annotation": hparams["valid_annotation"],
-                "chunk_size": hparams["chunk_size"],
-            },
-        )
-
-        sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
-
-        # Dataset IO prep: creating Dataset objects and proper encodings for phones
-        datasets = dataio_prep(hparams)
-
-        # Create experiment directory
-        sb.core.create_experiment_directory(
-            experiment_directory=hparams["output_folder"],
-            hyperparams_to_save=hparams_file,
-            overrides=overrides,
-        )
-
-        # Brain class initialization
-        parkinson_brain = ParkinsonBrain(
-            modules=hparams["modules"],
-            opt_class=hparams["opt_class"],
-            hparams=hparams,
-            run_opts=run_opts,
-            checkpointer=hparams["checkpointer"],
-        )
-
-        # Training
-        parkinson_brain.fit(
-            parkinson_brain.hparams.epoch_counter,
-            train_set=datasets["train"],
-            valid_set=datasets["valid"],
-            train_loader_kwargs=hparams["train_dataloader_options"],
-            valid_loader_kwargs=hparams["valid_dataloader_options"],
-        )
-
-        # Run validation and test set to get the predictions
-        logger.info("Final validation result:")
-
-        if not hp_ctx.enabled:
-            parkinson_brain.metrics_json = hparams["valid_metrics_json"]
-            parkinson_brain.evaluate(
-                test_set=datasets["valid"],
-                #max_key=hparams["error_metric"],
-                test_loader_kwargs=hparams["test_dataloader_options"],
-            )
-
-        logger.info("Final test result:")
-
-        if not hp_ctx.enabled:
-            parkinson_brain.metrics_json = hparams["test_metrics_json"]
-            parkinson_brain.evaluate(
-                test_set=datasets["test"],
-                #max_key=hparams["error_metric"],
-                test_loader_kwargs=hparams["test_dataloader_options"],
-            )
+    print('Best trial:')
+    trial = study.best_trial
+    print(f'  Value: {trial.value}')
+    print('  Params: ')
+    for key, value in trial.params.items():
+        print(f'    {key}: {value}')

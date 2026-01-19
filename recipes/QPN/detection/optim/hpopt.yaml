@@ -1,6 +1,0 @@
-epochs: 10
-#ckpt_enabled: False
-trial_id: hpopt
-storage_folder: !PLACEHOLDER
-experiment_name: hparam_optim_whisper_small
-output_folder: !ref <storage_folder>/<experiment_name>/<trial_id>
