@@ -124,9 +124,9 @@ def get_patient_traits(files, sheet, batch):
 
             # Refactor patient type
             if ptype == "CTRL" or ptype == "control":
-                ptype = "Control"
+                ptype = "HC"
             elif ptype == "PD" or ptype == "patient":
-                ptype = "Disease"
+                ptype = "PD"
             else:
                 print(f"Unknown key found: {ptype}")
                 continue

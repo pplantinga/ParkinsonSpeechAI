@@ -461,18 +461,8 @@ def dataio_prep(hparams):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python optimize_hparams.py <hparams_file> [--key=value ...]")
-        sys.exit(1)
 
-    hparams_file = sys.argv[1]
-    overrides = {}
-    for arg in sys.argv[2:]:
-        if '=' in arg:
-            key, value = arg.split('=', 1)
-            if key.startswith('--'):
-                key = key[2:]
-            overrides[key] = value
+    hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
     print("Starting hyperparameter optimization with Optuna...")
 
@@ -505,7 +495,6 @@ if __name__ == "__main__":
         hparams['augment_prob'] = trial.suggest_float('augment_prob', 0.5, 1.0)
         hparams['weight_decay'] = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
 
-        run_opts = {}
         sb.utils.distributed.ddp_init_group(run_opts)
 
         score = train_and_evaluate(hparams, run_opts, hparams_file)
