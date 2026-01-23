@@ -1,7 +1,0 @@
-experiment:
-    max_trials: 1000
-    max_broken: 1000
-    algorithms:
-        tpe:
-            seed: 42
-            n_initial_points: 5

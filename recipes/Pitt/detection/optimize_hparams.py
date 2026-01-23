@@ -37,17 +37,11 @@ import opensmile
 
 logger = sb.utils.logger.get_logger("train.py")
 
-
-smile = opensmile.Smile(
-    feature_set=opensmile.FeatureSet.ComParE_2016,
-    feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
-)
-
-class ParkinsonBrain(sb.core.Brain):
+class AlzheimerBrain(sb.core.Brain):
     """Class for speaker embedding training"""
     def compute_forward(self, batch, stage):
         """
-        Computation pipeline based on a encoder + speaker classifier for parkinson's detection.
+        Computation pipeline based on a encoder + speaker classifier for Alzheimer's detection.
         Data augmentation and environmental corruption are applied to the
         input speech if present.
         """
@@ -102,7 +96,7 @@ class ParkinsonBrain(sb.core.Brain):
             elif self.hparams.loss == "focal":
                 loss = self.hparams.focal_loss(outputs, labels)
             elif self.hparams.loss == "bce":
-                loss = self.hparams.bce_loss(outputs, labels, weight=batch.weight)
+                loss = self.hparams.bce_loss(outputs, labels)
             else:
                 raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'bce'")
 
@@ -110,7 +104,6 @@ class ParkinsonBrain(sb.core.Brain):
         else:
             probs = torch.sigmoid(outputs.view(-1))
             self.error_metrics.append(batch.id, probs, labels.view(-1))
-            self.error_metrics.info_dicts.extend(batch.info_dict)
 
             # Use unweighted, unsmoothed score for comparable results across hparams
             loss = binary_cross_entropy(probs, labels.view(-1).float())
@@ -121,9 +114,6 @@ class ParkinsonBrain(sb.core.Brain):
         """Gets called at the beginning of an epoch."""
         if stage != sb.Stage.TRAIN:
             self.error_metrics = self.hparams.error_stats()
-
-            # Add this list so we can store the info dict
-            self.error_metrics.info_dicts = []
 
     def on_stage_end(self, stage, stage_loss, epoch=None):
         """Gets called at the end of an epoch."""
@@ -149,19 +139,14 @@ class ParkinsonBrain(sb.core.Brain):
                 {f"comb_avg_{k}": v for k, v in metrics_comb_avg["overall"].items()}
             )
 
-            # Log metrics split by given categories
-            for category in self.hparams.metric_categories:
-                threshold = metrics_comb_avg["overall"]["threshold"]
-                cat_metrics = self.metrics_by_category(
-                    combined_scores=combined_avg, target_category=category, threshold=threshold
-                )
-                logger.info(f"Comb avg breakdown by {category}")
-                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=100))
-
             # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
                 with open(self.metrics_json, "w") as f:
                     json.dump(combined_avg, f)
+                    f.write("\nChunk stats: ")
+                    json.dump(chunk_stats, f)
+                    f.write("\nCombined stats: ")
+                    json.dump(metrics_comb_avg, f)
                 logger.info(f"Results stored {self.metrics_json}")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
@@ -216,17 +201,15 @@ class ParkinsonBrain(sb.core.Brain):
         ids = self.error_metrics.ids
         scores = self.error_metrics.scores
         labels = self.error_metrics.labels
-        info_dicts = self.error_metrics.info_dicts
 
         combined_scores = {}
-        for i, score, label, info_dict in zip(ids, scores, labels, info_dicts):
+        for i, score, label in zip(ids, scores, labels):
             utt_id, chunk = i.rsplit("_", 1)
 
             if utt_id not in combined_scores:
                 combined_scores[utt_id] = {
                     "scores": [round(score.item(), 3)],
                     "label": label.item(),
-                    **info_dict,
                 }
             else:
                 combined_scores[utt_id]["scores"].append(round(score.item(), 3))
@@ -285,10 +268,10 @@ class ParkinsonBrain(sb.core.Brain):
 def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     """Train the model and evaluate on validation set, return F-score"""
     # Dataset prep
-    from prepare_neuro import prepare_neuro
+    from prepare_pitt import prepare_pitt
 
     sb.utils.distributed.run_on_main(
-        prepare_neuro,
+        prepare_pitt,
         kwargs={
             "data_folder": hparams["data_folder"],
             "train_annotation": hparams["train_annotation"],
@@ -311,26 +294,25 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     )
 
     # Brain class initialization
-    parkinson_brain = ParkinsonBrain(
+    alzheimer_brain = AlzheimerBrain(
         modules=hparams["modules"],
         opt_class=hparams["opt_class"],
         hparams=hparams,
         run_opts=run_opts,
     )
 
-    parkinson_brain.last_valid_stats = None
+    alzheimer_brain.last_valid_stats = None
 
     # Training
-    parkinson_brain.fit(
-        parkinson_brain.hparams.epoch_counter,
+    alzheimer_brain.fit(
+        alzheimer_brain.hparams.epoch_counter,
         train_set=datasets["train"],
         valid_set=datasets["valid"],
         train_loader_kwargs=hparams["train_dataloader_options"],
         valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
-    return parkinson_brain.last_valid_stats["chunk_F-score"]
-
+    return alzheimer_brain.last_valid_stats["chunk_F-score"]
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -339,24 +321,8 @@ def dataio_prep(hparams):
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("PD", 1)
+    label_encoder.enforce_label("AD", 1)
     label_encoder.enforce_label("HC", 0)
-
-    # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "start")
-    @sb.utils.data_pipeline.provides("sig")
-    def opensmile_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
-            wav,
-            num_frames=int(duration * hparams["sample_rate"]),
-            frame_offset=int(start * hparams["sample_rate"]),
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-            torchaudio.save(f.name, sig, fs)
-            feats = smile.process_file(f.name)
-
-        return torch.tensor(feats.to_numpy())
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -371,29 +337,15 @@ def dataio_prep(hparams):
         return sig.squeeze(0)
 
     # Define label pipeline:
-    @sb.utils.data_pipeline.takes("info_dict")
-    @sb.utils.data_pipeline.provides(
-        "patient_type", "patient_type_encoded", "weight", "to_balance"
-    )
-    def label_pipeline(info_dict):
-        """Defines the pipeline to process the patient type labels.
+    @sb.utils.data_pipeline.takes("ptype")
+    @sb.utils.data_pipeline.provides("patient_type_encoded")
+    def label_pipeline(ptype):
+        """Defines the pipeline to process the diagnosis labels.
         Note that we have to assign a different integer to each class
         through the label encoder.
         """
-        yield info_dict["ptype"]
-        patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
-        yield patient_type_encoded
-
-        # Weight PD less since there's more in the data
-        weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
-        weight *= hparams["weight_male"] if info_dict["sex"] == "M" else hparams["weight_female"]
-        #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
-        yield weight
-
-        # Balance on ptype and sex
-        balance = info_dict["ptype"] + "_" + info_dict["sex"]
-        #balance += "_FR" if info_dict["lang"] == "fr" else "_EN/O"
-        yield balance
+        patient_type_encoded = label_encoder.encode_label_torch(ptype)
+        return patient_type_encoded
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
@@ -404,41 +356,14 @@ def dataio_prep(hparams):
         "test": hparams["test_annotation"],
     }
 
-    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
-            #dynamic_items=[opensmile_pipeline, label_pipeline],
-            output_keys=out_keys,
+            output_keys=["id", "sig", "patient_type_encoded"],
         )
-
-    # Remove keys from training data for e.g. training only on men
-    for key, values in hparams["train_keep_keys"].items():
-        datasets["train"] = datasets["train"].filtered_sorted(
-            key_test={"info_dict": lambda x: x[key] in values},
-        )
-    for key, values in hparams["test_keep_keys"].items():
-        for dataset in ["valid", "test"]:
-            datasets[dataset] = datasets[dataset].filtered_sorted(
-                key_test={"info_dict": lambda x: x[key] in values},
-            )
-
-    hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
-        dataset=datasets["train"],
-        key="to_balance",
-        num_samples=hparams["samples_per_epoch"],
-        replacement=True,
-    )
-    #hparams["train_dataloader_options"]["sampler"] = ReproducibleWeightedRandomSampler(
-    #    weights=[d["weight"] for d in datasets["train"]],
-    #    num_samples=hparams["samples_per_epoch"],
-    #    replacement=True,
-    #    seed=hparams["seed"],
-    #)
 
     return datasets
-
 
 if __name__ == "__main__":
 
@@ -454,10 +379,6 @@ if __name__ == "__main__":
         hparams['lr'] = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
         hparams['base_lr'] = trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)
         hparams['chunk_size'] = trial.suggest_int('chunk_size', 15, 60)
-        hparams['weight_pd'] = trial.suggest_float('weight_pd', 0.1, 2.0)
-        hparams['weight_hc'] = trial.suggest_float('weight_hc', 0.1, 2.0)
-        hparams['weight_male'] = trial.suggest_float('weight_male', 0.1, 2.0)
-        hparams['weight_female'] = trial.suggest_float('weight_female', 0.1, 2.0)
         hparams['embedding_size'] = trial.suggest_categorical('embedding_size', [1280, 780, 512])
         hparams['dropout'] = trial.suggest_float('dropout', 0.1, 0.5)
         hparams['snr_low'] = trial.suggest_float('snr_low', 0.0, 15.0)
@@ -478,11 +399,11 @@ if __name__ == "__main__":
 
     study = optuna.create_study(
         storage="sqlite:///optuna_study.db",
-        study_name="qpn_tuning",
+        study_name="pitt_tuning",
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=500)
+    study.optimize(objective, n_trials=200)
 
     print('Best trial:')
     trial = study.best_trial
