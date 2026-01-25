@@ -1,14 +1,12 @@
 # ################################
-# Model: Hyperparameter config for Whisper + DNN
-# Author: Briac Cordelle
+# Model: Hyperparameters for Whisper-based model for Parkinson's detection
+# Author: Briac Cordelle, 2026
 # ################################
 
 # Basic parameters
 seed: 2028
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
-hpopt_mode: null
-hpopt: null
 
 # Save folders and paths
 experiment_name: !PLACEHOLDER
@@ -44,18 +42,18 @@ samples_per_epoch: 1024
 total_batch_size: 32
 batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.00008271321912171501 # @orion_step1: --lr~"loguniform(1e-5, 1e-3, precision=6)"
-base_lr: 0.0000001250715960995437 # @orion_step1: --base_lr~"loguniform(1e-7, 1e-4, precision=7)"
+lr: 0.00008271321912171501
+base_lr: 0.0000001250715960995437
 max_lr: !ref <lr>
 step_size: 50
 sample_rate: 16000
-chunk_size: 19.0 # @orion_step1: --chunk_size~"uniform(15, 60, discrete=True)"
+chunk_size: 19.0
 loss: bce
 threshold: 0.5
-weight_pd: 0.4682858748117499 # @orion_step1: --weight_pd~"uniform(0.1, 2.0, precision=2)"
-weight_hc: 1.9673078100673893 # @orion_step1: --weight_hc~"uniform(0.1, 2.0, precision=2)"
-weight_male: 1.231259106237911 # @orion_step1: --weight_male~"uniform(0.1, 2.0, precision=2)"
-weight_female: 1.549523915742016 # @orion_step1: --weight_female~"uniform(0.1, 2.0, precision=2)"
+weight_pd: 0.4682858748117499
+weight_hc: 1.9673078100673893
+weight_male: 1.231259106237911
+weight_female: 1.549523915742016
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
@@ -75,8 +73,8 @@ metric_categories: [sex, lang]
 pretrained_source: openai/whisper-small
 freeze_pretrained: True
 feature_size: 768 # for small: 768, for medium: 1024, 
-embedding_size: 512 # @orion_step1: --embedding_size~"choices([1280, 780, 512])"
-dropout: 0.1574 # @orion_step1: --dropout~"uniform(0.1, 0.5, precision=2)"
+embedding_size: 512
+dropout: 0.1574
 out_neurons: 1
 
 # Dataloader options
@@ -103,8 +101,8 @@ prepare_noise_data: !name:speechbrain.augment.preparation.prepare_dataset_from_U
     csv_file: !ref <noise_annotation>
     max_length: !ref <chunk_size>
 
-snr_low: 2.5270 # @orion_step2: --snr_low~"uniform(0.0, 15.0, precision=2)"
-snr_delta: 17.6465 # @orion_step2: --snr_delta~"uniform(5.0, 20.0, precision=2)"
+snr_low: 2.5270
+snr_delta: 17.6465
 snr_high: !ref <snr_low> + <snr_delta>
 
 # Add noise to input signal
@@ -116,12 +114,12 @@ add_noise: !new:speechbrain.augment.time_domain.AddNoise
     clean_sample_rate: !ref <sample_rate>
     num_workers: !ref <num_workers>
 
-drop_freq_low: 0.1998 # @orion_step2: --drop_freq_low~"uniform(0.0, 0.3, precision=2)"
-drop_freq_high: 0.7860 # @orion_step2: --drop_freq_high~"uniform(0.7, 1.0, precision=2)"
-drop_freq_count_low: 1 # @orion_step2: --drop_freq_count_low~"choices([1, 2, 3])"
-drop_freq_count_delta: 4 # @orion_step2: --drop_freq_count_high~"choices([0, 1, 2, 3, 4, 5, 6])"
+drop_freq_low: 0.1998
+drop_freq_high: 0.7860
+drop_freq_count_low: 1
+drop_freq_count_delta: 4
 drop_freq_count_high: !ref <drop_freq_count_low> + <drop_freq_count_delta>
-drop_freq_width: 0.06234 # @orion_step2: --drop_freq_width~"uniform(0.01, 0.15, precision=2)"
+drop_freq_width: 0.06234
 
 # Frequency drop: randomly drops a number of frequency bands to zero.
 drop_freq: !new:speechbrain.augment.time_domain.DropFreq
@@ -131,16 +129,9 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
     drop_freq_count_high: !ref <drop_freq_count_high>
     drop_freq_width: !ref <drop_freq_width>
 
-# Time drop: randomly drops a number of temporal chunks.
-#drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
-#    drop_length_low: 1000
-#    drop_length_high: 2000
-#    drop_count_low: 1
-#    drop_count_high: 5
-
 # Augmenter: Combines previously defined augmentations to perform data augmentation
-min_augmentations: 2 # @orion_step2: --min_augmentations~"choices([0, 1, 2])"
-augment_prob: 0.8233 # @orion_step2: --augment_prob~"uniform(0.5, 1.0, precision=2)"
+min_augmentations: 2
+augment_prob: 0.8233
 
 wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     parallel_augment: False
@@ -200,10 +191,6 @@ softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-#focal_loss: !new:focal_loss.FocalLoss
-#    gamma: 2.0
-#    alpha: [!ref <weight_hc>, !ref <weight_pd>]
-
 kld_loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum
 
@@ -215,20 +202,11 @@ bce_loss: !name:speechbrain.nnet.losses.bce_loss
     allowed_len_diff: 0
     label_smoothing: 0.01
 
-#opt_class: !name:torch.optim.Adam
-#    lr: !ref <lr>
-#    weight_decay: 0.0001
-
-weight_decay: 0.0002925 # @orion_step2: --weight_decay~"loguniform(1e-6, 1e-2, precision=6)"
+weight_decay: 0.0002925
 
 opt_class: !name:bitsandbytes.optim.Adam8bit
     lr: !ref <lr>
     weight_decay: !ref <weight_decay>
-
-#lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
-#    base_lr: !ref <base_lr>
-#    max_lr: !ref <max_lr>
-#    step_size: !ref <step_size>
 
 lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
     num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
@@ -246,9 +224,6 @@ error_metric: chunk_F-score
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>
     recoverables:
-        #compute_features: !ref <compute_features>
         embedding_model: !ref <embedding_model>
         classifier: !ref <classifier>
-        #normalizer: !ref <mean_var_norm>
         counter: !ref <epoch_counter>
-        #lr_annealing: !ref <lr_annealing>
