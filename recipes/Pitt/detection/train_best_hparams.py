@@ -1,6 +1,30 @@
 import sys
 import sqlite3
 import subprocess
+import json
+
+def decode_param(param_value, distribution_json):
+    """
+    Decode Optuna param_value using distribution_json.
+    """
+    dist = json.loads(distribution_json)
+    name = dist["name"]
+    attrs = dist.get("attributes", {})
+
+    if name == "CategoricalDistribution":
+        choices = attrs["choices"]
+        return choices[int(float(param_value))]
+
+    elif name == "IntDistribution":
+        return int(float(param_value))
+
+    elif name == "FloatDistribution":
+        return float(param_value)
+
+    else:
+        # Fallback: return raw value
+        return param_value
+
 
 def main():
     if len(sys.argv) != 6:
@@ -12,16 +36,9 @@ def main():
     data_folder = sys.argv[3]
     storage_folder = sys.argv[4]
     experiment_name = sys.argv[5]
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-
-    INT_PARAMS = {
-        "embedding_size",
-        "chunk_size",
-        "min_augmentations",
-        "drop_freq_count_delta",
-        "drop_freq_count_low",
-    }
 
     # Get top 5 trials based on value
     cursor.execute("""
@@ -36,35 +53,41 @@ def main():
         print("No trials found.")
         return
 
-    # For each trial, get parameters and run scripts
     for trial_id in trial_ids:
         print(f"\n=== Running trial_id {trial_id} ===")
 
         cursor.execute("""
-            SELECT param_name, param_value
+            SELECT param_name, param_value, distribution_json
             FROM trial_params
             WHERE trial_id = ?
         """, (trial_id,))
 
         params = cursor.fetchall()
 
+        decoded_params = {}
+        for name, value, dist_json in params:
+            decoded_params[name] = decode_param(value, dist_json)
+
         for seed in range(5):
-            train_cmd = ["python", "train.py", hparams_path, f"--data_folder={data_folder}", f"--storage_folder={storage_folder}",
-                     f"--experiment_name={experiment_name}_trial_{trial_id}", f"--seed={seed}"]
-            
-            for name, value in params:
-                if name in INT_PARAMS:
-                    value = int(float(value))
-                train_cmd.extend([f"--{name}={value}"])
+            train_cmd = [
+                "python",
+                "train.py",
+                hparams_path,
+                f"--data_folder={data_folder}",
+                f"--storage_folder={storage_folder}",
+                f"--experiment_name={experiment_name}_trial_{trial_id}",
+                f"--seed={seed}",
+            ]
+
+            for name, value in decoded_params.items():
+                train_cmd.append(f"--{name}={value}")
 
             print("Running:", " ".join(train_cmd))
             subprocess.run(train_cmd, check=True)
 
-            #print("Running permutation_test.py")
-            #subprocess.run(["python", "permutation_test.py", f"{storage_folder}/{experiment_name}_trial_{trial_id}/seed_{seed}", f"{storage_folder}/{experiment_name}_trial_{trial_id}/seed_{seed}"], check=True)
-
     conn.close()
     print("\nAll trials completed successfully.")
+
 
 if __name__ == "__main__":
     main()

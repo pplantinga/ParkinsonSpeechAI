@@ -1,26 +1,18 @@
 # !/usr/bin/python3
-"""Recipe for training a detector on the McGill Neuro Parkinson's dataset.
+"""Recipe for optimizing a detector on DementiaBank's Pitt Corpus, an Alzheimers dataset.
 We employ an encoder followed by a classifier.
 
 To run this recipe, use the following command:
-> python train_ecapa_tdnn.py {hyperparameter_file}
+> python optimize_hparams.py {hyperparameter_file} {overrides}
 
-Using your own hyperparameter file or one of the following:
-    hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
+Hyperparameters that are being tuned are defined in the objective function.
 
 Author
-    * Briac Cordelle 2025
+    * Briac Cordelle 2026
 """
 
-import os
-import random
 import sys
-import csv
 import json
-import logging
-import pprint
-import tempfile
-import collections
 
 import torch
 import torchaudio
@@ -28,12 +20,8 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 import optuna
-from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeightedRandomSampler
 
-from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
-from tqdm import tqdm
-import opensmile
 
 logger = sb.utils.logger.get_logger("train.py")
 
@@ -76,31 +64,7 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Compute loss
         if stage == sb.Stage.TRAIN:
-            if self.hparams.loss == "aam":
-                # Squeeze and ensure targets are one hot encoded (for AAM)
-                preds = outputs.squeeze(1)
-                targets = labels.squeeze(1)
-                targets = F.one_hot(targets.long(), preds.shape[1]).float()
-
-                # Compute loss with weights
-                preds = self.hparams.AAM_loss(preds, targets)
-
-                # Pass through log softmax
-                preds = F.log_softmax(preds, dim=1)
-
-                # Pass through KLDiv Loss, apply weight and average
-                # KLDLoss = torch.nn.KLDivLoss(reduction="none")
-                loss = KLDLoss(preds, targets) * weights
-                loss = loss.sum() / targets.sum()
-
-            elif self.hparams.loss == "focal":
-                loss = self.hparams.focal_loss(outputs, labels)
-            elif self.hparams.loss == "bce":
-                loss = self.hparams.bce_loss(outputs, labels)
-            else:
-                raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'bce'")
-
-        # Validation / Test
+            loss = self.hparams.bce_loss(outputs, labels)            
         else:
             probs = torch.sigmoid(outputs.view(-1))
             self.error_metrics.append(batch.id, probs, labels.view(-1))
@@ -318,7 +282,7 @@ def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
-    # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
+    # of the observed label a unique index (e.g, 'hc': 0, 'ad': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
     label_encoder.enforce_label("AD", 1)
