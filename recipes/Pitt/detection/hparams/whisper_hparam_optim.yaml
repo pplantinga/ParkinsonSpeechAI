@@ -66,9 +66,9 @@ metric_categories: [sex, lang]
 
 # Model parameters
 # For the pretrained_source, use the path to the model dir
-pretrained_source: openai/whisper-medium
+pretrained_source: openai/whisper-small
 freeze_pretrained: True
-feature_size: 1024 # for small: 768, for medium: 1024, 
+feature_size: 768 # for small: 768, for medium: 1024, 
 embedding_size: 1280 # @orion_step1: --embedding_size~"choices([1280, 780, 512])"
 dropout: 0.2 # @orion_step1: --dropout~"uniform(0.1, 0.5, precision=2)"
 out_neurons: 1
@@ -236,3 +236,10 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
     positive_label: 1
 error_metric: chunk_F-score
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <save_folder>
+    recoverables:
+        embedding_model: !ref <embedding_model>
+        classifier: !ref <classifier>
+        counter: !ref <epoch_counter>

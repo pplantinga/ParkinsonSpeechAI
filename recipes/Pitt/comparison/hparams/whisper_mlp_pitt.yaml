@@ -45,12 +45,12 @@ samples_per_epoch: 1024
 total_batch_size: 32
 batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.0001
-base_lr: 0.000001
+lr: 0.0000217087706389717
+base_lr: 0.000000490308763517136
 max_lr: !ref <lr>
 step_size: 50
 sample_rate: 16000
-chunk_size: 30.0 # seconds
+chunk_size: 56.0 # seconds
 loss: bce
 
 # Test parameters
@@ -63,8 +63,8 @@ threshold: 0.5
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
 feature_size: 768
-embedding_size: 768
-dropout: 0.2
+embedding_size: 512
+dropout: 0.147014385872339
 out_neurons: 1
 
 # Dataloader options
