@@ -446,11 +446,13 @@ if __name__ == "__main__":
 
     print("Starting hyperparameter optimization with Optuna...")
 
+    with open(hparams_file) as fin:
+        hparams = load_hyperpyyaml(fin, overrides)
+
     def objective(trial):
-        with open(hparams_file) as fin:
-            hparams = load_hyperpyyaml(fin, overrides)
 
         # Suggest hyperparameters
+        hparams['epochs'] = trial.suggest_int('epochs', 15, 50, step=2)
         hparams['lr'] = trial.suggest_float('lr', 1e-5, 1e-3, log=True, step=1e-6)
         hparams['base_lr'] = trial.suggest_float('base_lr', 1e-7, 1e-4, log=True, step=1e-7)
         hparams['chunk_size'] = trial.suggest_int('chunk_size', 15, 60)
@@ -458,7 +460,7 @@ if __name__ == "__main__":
         hparams['weight_hc'] = trial.suggest_float('weight_hc', 0.1, 2.0, step=0.1)
         hparams['weight_male'] = trial.suggest_float('weight_male', 0.1, 2.0, step=0.1)
         hparams['weight_female'] = trial.suggest_float('weight_female', 0.1, 2.0, step=0.1)
-        hparams['embedding_size'] = trial.suggest_categorical('embedding_size', [1280, 780, 512])
+        hparams['embedding_size'] = trial.suggest_int('embedding_size', 512, 1280, step=32)
         hparams['dropout'] = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
         hparams['snr_low'] = trial.suggest_float('snr_low', 0.0, 15.0, step=1.0)
         hparams['snr_delta'] = trial.suggest_float('snr_delta', 5.0, 20.0, step=1.0)
@@ -482,7 +484,7 @@ if __name__ == "__main__":
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=500)
+    study.optimize(objective, n_trials=hparams['num_trials'])
 
     print('Best trial:')
     trial = study.best_trial

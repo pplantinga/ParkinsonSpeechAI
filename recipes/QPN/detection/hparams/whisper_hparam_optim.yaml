@@ -7,6 +7,7 @@
 seed: 2028
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
+num_trials: 1000
 
 # Save folders and paths
 experiment_name: !PLACEHOLDER

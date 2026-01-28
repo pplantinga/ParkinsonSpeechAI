@@ -340,10 +340,11 @@ if __name__ == "__main__":
             hparams = load_hyperpyyaml(fin, overrides)
 
         # Suggest hyperparameters
+        hparams['epochs'] = trial.suggest_int('epochs', 15, 50, step=1)
         hparams['lr'] = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
         hparams['base_lr'] = trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)
         hparams['chunk_size'] = trial.suggest_int('chunk_size', 15, 60)
-        hparams['embedding_size'] = trial.suggest_categorical('embedding_size', [1280, 780, 512])
+        hparams['embedding_size'] = trial.suggest_int('embedding_size', 512, 1280, step=32)
         hparams['dropout'] = trial.suggest_float('dropout', 0.1, 0.5)
         hparams['snr_low'] = trial.suggest_float('snr_low', 0.0, 15.0)
         hparams['snr_delta'] = trial.suggest_float('snr_delta', 5.0, 20.0)
@@ -367,7 +368,7 @@ if __name__ == "__main__":
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=200)
+    study.optimize(objective, n_trials=1000)
 
     print('Best trial:')
     trial = study.best_trial
