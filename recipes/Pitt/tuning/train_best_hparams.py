@@ -1,3 +1,12 @@
+"""Script for training the best hyperparameters found during optimization.
+
+To run this recipe, use the following command:
+> python train_best_hparams.py path/to/database.db path/to/hparams path/to/data path/to/storage experiment_name
+
+Author
+    * Briac Cordelle 2026
+"""
+
 import sys
 import sqlite3
 import subprocess

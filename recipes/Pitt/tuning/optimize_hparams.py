@@ -232,7 +232,7 @@ class AlzheimerBrain(sb.core.Brain):
 def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     """Train the model and evaluate on validation set, return F-score"""
     # Dataset prep
-    from prepare_pitt import prepare_pitt
+    from ..prepare_pitt import prepare_pitt
 
     sb.utils.distributed.run_on_main(
         prepare_pitt,
@@ -335,27 +335,26 @@ if __name__ == "__main__":
 
     print("Starting hyperparameter optimization with Optuna...")
 
-    def objective(trial):
-        with open(hparams_file) as fin:
-            hparams = load_hyperpyyaml(fin, overrides)
+    with open(hparams_file) as fin:
+        hparams = load_hyperpyyaml(fin, overrides)
 
-        # Suggest hyperparameters
-        hparams['epochs'] = trial.suggest_int('epochs', 15, 50, step=1)
-        hparams['lr'] = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
-        hparams['base_lr'] = trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)
-        hparams['chunk_size'] = trial.suggest_int('chunk_size', 15, 60)
+    def objective(trial):
+        hparams['epochs'] = trial.suggest_int('epochs', 15, 50, step=2)
+        hparams['lr'] = trial.suggest_float('lr', 1e-5, 1e-3, log=True, step=1e-5)
+        hparams['base_lr'] = trial.suggest_float('base_lr', 1e-7, 1e-4, log=True, step=1e-7)
+        hparams['chunk_size'] = trial.suggest_int('chunk_size', 15, 60, step=1)
         hparams['embedding_size'] = trial.suggest_int('embedding_size', 512, 1280, step=32)
-        hparams['dropout'] = trial.suggest_float('dropout', 0.1, 0.5)
-        hparams['snr_low'] = trial.suggest_float('snr_low', 0.0, 15.0)
-        hparams['snr_delta'] = trial.suggest_float('snr_delta', 5.0, 20.0)
-        hparams['drop_freq_low'] = trial.suggest_float('drop_freq_low', 0.0, 0.3)
-        hparams['drop_freq_high'] = trial.suggest_float('drop_freq_high', 0.7, 1.0)
+        hparams['dropout'] = trial.suggest_float('dropout', 0.1, 0.5, step=0.1)
+        hparams['snr_low'] = trial.suggest_float('snr_low', 0.0, 15.0, step=1.0)
+        hparams['snr_delta'] = trial.suggest_float('snr_delta', 5.0, 20.0, step=1.0)
+        hparams['drop_freq_low'] = trial.suggest_float('drop_freq_low', 0.0, 0.3, step=0.01)
+        hparams['drop_freq_high'] = trial.suggest_float('drop_freq_high', 0.7, 1.0, step=0.01)
         hparams['drop_freq_count_low'] = trial.suggest_categorical('drop_freq_count_low', [1, 2, 3])
         hparams['drop_freq_count_delta'] = trial.suggest_categorical('drop_freq_count_delta', [0, 1, 2, 3, 4, 5, 6])
-        hparams['drop_freq_width'] = trial.suggest_float('drop_freq_width', 0.01, 0.15)
+        hparams['drop_freq_width'] = trial.suggest_float('drop_freq_width', 0.01, 0.15, step=0.01)
         hparams['min_augmentations'] = trial.suggest_categorical('min_augmentations', [0, 1, 2])
-        hparams['augment_prob'] = trial.suggest_float('augment_prob', 0.5, 1.0)
-        hparams['weight_decay'] = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)
+        hparams['augment_prob'] = trial.suggest_float('augment_prob', 0.5, 1.0, step=0.1)
+        hparams['weight_decay'] = trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True, step=1e-6)
 
         sb.utils.distributed.ddp_init_group(run_opts)
 
@@ -368,7 +367,7 @@ if __name__ == "__main__":
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=1000)
+    study.optimize(objective, n_trials=hparams['num_trials'])
 
     print('Best trial:')
     trial = study.best_trial

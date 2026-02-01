@@ -1,37 +1,26 @@
 # !/usr/bin/python3
-"""Recipe for training a detector on the McGill Neuro Parkinson's dataset.
+"""Recipe for training a detector on the Pitt Corpus, an Alzheimers dataset.
 We employ an encoder followed by a classifier. This recipe then infers on a separate dataset.
 
 To run this recipe, use the following command:
-> python train_ecapa_tdnn.py {hyperparameter_file}
+> python train.py {hyperparameter_file}
 
 Using your own hyperparameter file or one of the following:
-    hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
+    hparams/whisper_dnn.yaml (for whisper + dnn)
 
 Author
-    * Briac Cordelle 2025
+    * Briac Cordelle 2026
 """
 
-import os
-import random
 import sys
-import csv
 import json
-import logging
-import pprint
-import tempfile
-import collections
 
 import torch
 import torchaudio
 from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
-from speechbrain.dataio.sampler import BalancingDataSampler
-
-from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
-from tqdm import tqdm
 
 logger = sb.utils.logger.get_logger("train.py")
 
@@ -40,7 +29,7 @@ class AlzheimerBrain(sb.core.Brain):
 
     def compute_forward(self, batch, stage):
         """
-        Computation pipeline based on a encoder + speaker classifier for parkinson's detection.
+        Computation pipeline based on a encoder + speaker classifier for alzheimer's detection.
         Data augmentation and environmental corruption are applied to the
         input speech if present.
         """
@@ -308,7 +297,7 @@ if __name__ == "__main__":
         hparams = load_hyperpyyaml(fin, overrides)
 
     # Dataset prep
-    from prepare_pitt import prepare_pitt
+    from recipes.Pitt.prepare_pitt import prepare_pitt
     sb.utils.distributed.run_on_main(
         prepare_pitt,
         kwargs={
