@@ -39,10 +39,6 @@ smile = opensmile.Smile(
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
-    def __init__(self, modules, opt_class, hparams, run_opts, checkpointer=None):
-        super().__init__(modules, opt_class, hparams, run_opts, checkpointer)
-        self.last_valid_stats = None
-
     def compute_forward(self, batch, stage):
         """
         Computation pipeline based on a encoder + speaker classifier for parkinson's detection.
@@ -165,7 +161,6 @@ class ParkinsonBrain(sb.core.Brain):
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
             lr = self.lr_scheduler.get_last_lr()
-
             self.hparams.train_logger.log_stats(
                 stats_meta={"epoch": epoch, "lr": lr},
                 train_stats=self.train_stats,
@@ -287,7 +282,7 @@ class ParkinsonBrain(sb.core.Brain):
         return summary
 
 
-def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
+def train_and_evaluate(hparams, run_opts):
     """Train the model and evaluate on validation set, return F-score"""
     # Dataset prep
     from prepare_neuro import prepare_neuro
@@ -311,8 +306,6 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     # Create experiment directory
     sb.core.create_experiment_directory(
         experiment_directory=hparams["output_folder"],
-        hyperparams_to_save=hparams_file,
-        overrides=overrides,
     )
 
     # Brain class initialization
@@ -322,6 +315,8 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
         hparams=hparams,
         run_opts=run_opts,
     )
+
+    parkinson_brain.last_valid_stats = None
 
     # Training
     parkinson_brain.fit(
@@ -447,12 +442,10 @@ if __name__ == "__main__":
 
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
-    print("Starting hyperparameter optimization with Optuna...")
-
-    with open(hparams_file) as fin:
-        hparams = load_hyperpyyaml(fin, overrides)
-
     def objective(trial):
+        with open(hparams_file) as fin:
+            hparams = load_hyperpyyaml(fin, overrides)
+
         hparams['epochs'] = trial.suggest_int('epochs', 15, 50, step=1)
         hparams['lr'] = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
         hparams['base_lr'] = trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)
@@ -476,16 +469,16 @@ if __name__ == "__main__":
 
         sb.utils.distributed.ddp_init_group(run_opts)
 
-        score = train_and_evaluate(hparams, run_opts, hparams_file, overrides)
+        score = train_and_evaluate(hparams, run_opts)
         return score
 
     study = optuna.create_study(
-        storage="sqlite:///optuna_study.db",
+        storage="sqlite:///qpn_optuna_study.db",
         study_name="qpn_tuning",
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=hparams['num_trials'])
+    study.optimize(objective, n_trials=1000)
 
     print('Best trial:')
     trial = study.best_trial

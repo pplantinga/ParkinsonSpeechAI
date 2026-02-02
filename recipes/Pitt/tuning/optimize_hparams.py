@@ -27,10 +27,6 @@ logger = sb.utils.logger.get_logger("train.py")
 
 class AlzheimerBrain(sb.core.Brain):
     """Class for speaker embedding training"""
-    def __init__(self, modules, opt_class, hparams, run_opts, checkpointer=None):
-        super().__init__(modules, opt_class, hparams, run_opts, checkpointer)
-        self.last_valid_stats = None
-
     def compute_forward(self, batch, stage):
         """
         Computation pipeline based on a encoder + speaker classifier for Alzheimer's detection.
@@ -134,6 +130,7 @@ class AlzheimerBrain(sb.core.Brain):
                     min_keys=["loss"],
                 )
 
+            print(stage_stats)
             self.last_valid_stats = stage_stats
 
         if stage == sb.Stage.TEST:
@@ -269,12 +266,16 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     )
 
     # Brain class initialization
+    checkpointer = hparams.get("checkpointer", None)
     alzheimer_brain = AlzheimerBrain(
         modules=hparams["modules"],
         opt_class=hparams["opt_class"],
         hparams=hparams,
         run_opts=run_opts,
+        checkpointer=checkpointer,
     )
+
+    alzheimer_brain.last_valid_stats = None
 
     # Training
     alzheimer_brain.fit(
@@ -342,12 +343,10 @@ if __name__ == "__main__":
 
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
-    print("Starting hyperparameter optimization with Optuna...")
-
-    with open(hparams_file) as fin:
-        hparams = load_hyperpyyaml(fin, overrides)
-
     def objective(trial):
+        with open(hparams_file) as fin:
+            hparams = load_hyperpyyaml(fin, overrides)
+
         hparams['epochs'] = trial.suggest_int('epochs', 15, 50, step=1)
         hparams['lr'] = trial.suggest_float('lr', 1e-5, 1e-3, log=True)
         hparams['base_lr'] = trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)
@@ -371,12 +370,12 @@ if __name__ == "__main__":
         return score
 
     study = optuna.create_study(
-        storage="sqlite:///optuna_study.db",
+        storage="sqlite:///pitt_optuna_study.db",
         study_name="pitt_tuning",
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=hparams['num_trials'])
+    study.optimize(objective, n_trials=1000)
 
     print('Best trial:')
     trial = study.best_trial
