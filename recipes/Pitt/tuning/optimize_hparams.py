@@ -27,6 +27,10 @@ logger = sb.utils.logger.get_logger("train.py")
 
 class AlzheimerBrain(sb.core.Brain):
     """Class for speaker embedding training"""
+    def __init__(self, modules, opt_class, hparams, run_opts, checkpointer=None):
+        super().__init__(modules, opt_class, hparams, run_opts, checkpointer)
+        self.last_valid_stats = None
+
     def compute_forward(self, batch, stage):
         """
         Computation pipeline based on a encoder + speaker classifier for Alzheimer's detection.
@@ -122,6 +126,13 @@ class AlzheimerBrain(sb.core.Brain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
+
+            if self.checkpointer is not None:
+                self.checkpointer.save_and_keep_only(
+                    meta=stage_stats,
+                    max_keys=["chunk_F-score"],
+                    min_keys=["loss"],
+                )
 
             self.last_valid_stats = stage_stats
 
@@ -264,8 +275,6 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
         hparams=hparams,
         run_opts=run_opts,
     )
-
-    alzheimer_brain.last_valid_stats = None
 
     # Training
     alzheimer_brain.fit(
