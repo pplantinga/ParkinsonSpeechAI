@@ -1,6 +1,6 @@
 # ################################
-# Model: Hyperparameters for Whisper-based model for Parkinson's detection
-# Author: Briac Cordelle, 2026
+# Model: Hyperparameter config for Whisper + DNN
+# Author: Briac Cordelle
 # ################################
 
 # Basic parameters
@@ -43,18 +43,14 @@ samples_per_epoch: 1024
 total_batch_size: 32
 batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.00008271321912171501
-base_lr: 0.0000001250715960995437
+lr: 0.0001
+base_lr: 0.000001
 max_lr: !ref <lr>
 step_size: 50
 sample_rate: 16000
-chunk_size: 19.0
+chunk_size: 30.0
 loss: bce
 threshold: 0.5
-weight_pd: 0.4682858748117499
-weight_hc: 1.9673078100673893
-weight_male: 1.231259106237911
-weight_female: 1.549523915742016
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
@@ -74,8 +70,8 @@ metric_categories: [sex, lang]
 pretrained_source: openai/whisper-small
 freeze_pretrained: True
 feature_size: 768 # for small: 768, for medium: 1024, 
-embedding_size: 512
-dropout: 0.1574
+embedding_size: 1280
+dropout: 0.2
 out_neurons: 1
 
 # Dataloader options
@@ -102,8 +98,8 @@ prepare_noise_data: !name:speechbrain.augment.preparation.prepare_dataset_from_U
     csv_file: !ref <noise_annotation>
     max_length: !ref <chunk_size>
 
-snr_low: 2.5270
-snr_delta: 17.6465
+snr_low: 5.0
+snr_delta: 5.0
 snr_high: !ref <snr_low> + <snr_delta>
 
 # Add noise to input signal
@@ -115,12 +111,12 @@ add_noise: !new:speechbrain.augment.time_domain.AddNoise
     clean_sample_rate: !ref <sample_rate>
     num_workers: !ref <num_workers>
 
-drop_freq_low: 0.1998
-drop_freq_high: 0.7860
+drop_freq_low: 0
+drop_freq_high: 1.0
 drop_freq_count_low: 1
-drop_freq_count_delta: 4
+drop_freq_count_delta: 3
 drop_freq_count_high: !ref <drop_freq_count_low> + <drop_freq_count_delta>
-drop_freq_width: 0.06234
+drop_freq_width: 0.05
 
 # Frequency drop: randomly drops a number of frequency bands to zero.
 drop_freq: !new:speechbrain.augment.time_domain.DropFreq
@@ -130,9 +126,16 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
     drop_freq_count_high: !ref <drop_freq_count_high>
     drop_freq_width: !ref <drop_freq_width>
 
+# Time drop: randomly drops a number of temporal chunks.
+#drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
+#    drop_length_low: 1000
+#    drop_length_high: 2000
+#    drop_count_low: 1
+#    drop_count_high: 5
+
 # Augmenter: Combines previously defined augmentations to perform data augmentation
-min_augmentations: 2
-augment_prob: 0.8233
+min_augmentations: 1
+augment_prob: 0.9
 
 wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     parallel_augment: False
@@ -192,6 +195,10 @@ softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
+#focal_loss: !new:focal_loss.FocalLoss
+#    gamma: 2.0
+#    alpha: [!ref <weight_hc>, !ref <weight_pd>]
+
 kld_loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum
 
@@ -203,17 +210,26 @@ bce_loss: !name:speechbrain.nnet.losses.bce_loss
     allowed_len_diff: 0
     label_smoothing: 0.01
 
-weight_decay: 0.0002925
+#opt_class: !name:torch.optim.Adam
+#    lr: !ref <lr>
+#    weight_decay: 0.0001
+
+weight_decay: 0.0001
 
 opt_class: !name:bitsandbytes.optim.Adam8bit
     lr: !ref <lr>
     weight_decay: !ref <weight_decay>
 
+#lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
+#    base_lr: !ref <base_lr>
+#    max_lr: !ref <max_lr>
+#    step_size: !ref <step_size>
+
 lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
     num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
     num_training_steps: !ref <epochs> * <samples_per_epoch> // <total_batch_size>
 
-# Logging + checkpoints
+# Logging 
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
 

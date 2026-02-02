@@ -29,3 +29,6 @@ __pycache__
 
 # Ignore csv
 *.csv
+
+# Ignore optuna db
+*.db
