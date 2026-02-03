@@ -64,7 +64,7 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Compute loss
         if stage == sb.Stage.TRAIN:
-            loss = self.hparams.bce_loss(outputs, labels)            
+            loss = self.hparams.bce_loss(outputs, labels)
         else:
             probs = torch.sigmoid(outputs.view(-1))
             self.error_metrics.append(batch.id, probs, labels.view(-1))
@@ -239,6 +239,13 @@ class AlzheimerBrain(sb.core.Brain):
 
 def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     """Train the model and evaluate on validation set, return F-score"""
+    # Create experiment directory
+    sb.core.create_experiment_directory(
+        experiment_directory=hparams["output_folder"],
+        hyperparams_to_save=hparams_file,
+        overrides=overrides,
+    )
+
     # Dataset prep
     from prepare_pitt import prepare_pitt
 
@@ -257,13 +264,6 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
-
-    # Create experiment directory
-    sb.core.create_experiment_directory(
-        experiment_directory=hparams["output_folder"],
-        hyperparams_to_save=hparams_file,
-        overrides=overrides,
-    )
 
     # Brain class initialization
     checkpointer = hparams.get("checkpointer", None)
@@ -344,27 +344,25 @@ if __name__ == "__main__":
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
     def objective(trial):
-        # Suggest hyperparameters first, then pass as overrides to YAML loading
-        trial_overrides = overrides + [
-            f"epochs={trial.suggest_int('epochs', 15, 50, step=1)}",
-            f"lr={trial.suggest_float('lr', 1e-5, 1e-3, log=True)}",
-            f"base_lr={trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)}",
-            f"chunk_size={trial.suggest_int('chunk_size', 15, 60, step=1)}",
-            f"embedding_size={trial.suggest_int('embedding_size', 512, 1280, step=32)}",
-            f"dropout={trial.suggest_float('dropout', 0.1, 0.5, step=0.1)}",
-            f"snr_low={trial.suggest_float('snr_low', 0.0, 15.0, step=1.0)}",
-            f"snr_delta={trial.suggest_float('snr_delta', 5.0, 20.0, step=1.0)}",
-            f"drop_freq_low={trial.suggest_float('drop_freq_low', 0.0, 0.3, step=0.01)}",
-            f"drop_freq_high={trial.suggest_float('drop_freq_high', 0.7, 1.0, step=0.01)}",
-            f"drop_freq_count_low={trial.suggest_categorical('drop_freq_count_low', [1, 2, 3])}",
-            f"drop_freq_count_delta={trial.suggest_categorical('drop_freq_count_delta', [0, 1, 2, 3, 4, 5, 6])}",
-            f"drop_freq_width={trial.suggest_float('drop_freq_width', 0.01, 0.15, step=0.01)}",
-            f"min_augmentations={trial.suggest_categorical('min_augmentations', [0, 1, 2])}",
-            f"augment_prob={trial.suggest_float('augment_prob', 0.5, 1.0, step=0.1)}",
-            f"weight_decay={trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}",
-        ]
+        trial_overrides = overrides + (
+            f"\ntrial: {trial.number}"
+            f"\nepochs: {trial.suggest_float('epochs', 15, 50, step=1)}"
+            f"\nlr: {trial.suggest_float('lr', 1e-5, 1e-3, log=True)}"
+            f"\nbase_lr: {trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)}"
+            f"\nchunk_size: {trial.suggest_int('chunk_size', 15, 60, step=1)}"
+            f"\nembedding_size: {trial.suggest_int('embedding_size', 512, 1280, step=32)}"
+            f"\ndropout: {trial.suggest_float('dropout', 0.1, 0.5, step=0.1)}"
+            f"\nsnr_low: {trial.suggest_float('snr_low', 0.0, 15.0, step=1.0)}"
+            f"\nsnr_delta: {trial.suggest_float('snr_delta', 5.0, 20.0, step=1.0)}"
+            f"\ndrop_freq_low: {trial.suggest_float('drop_freq_low', 0.0, 0.3, step=0.01)}"
+            f"\ndrop_freq_high: {trial.suggest_float('drop_freq_high', 0.7, 1.0, step=0.01)}"
+            f"\ndrop_freq_count_low: {trial.suggest_categorical('drop_freq_count_low', [1, 2, 3])}"
+            f"\ndrop_freq_count_delta: {trial.suggest_categorical('drop_freq_count_delta', [0, 1, 2, 3, 4, 5, 6])}"
+            f"\ndrop_freq_width: {trial.suggest_float('drop_freq_width', 0.01, 0.15, step=0.01)}"
+            f"\nmin_augmentations: {trial.suggest_categorical('min_augmentations', [0, 1, 2])}"
+            f"\naugment_prob: {trial.suggest_float('augment_prob', 0.5, 1.0, step=0.1)}"
+            f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}")
 
-        # Load YAML with trial overrides so model objects are created with correct hyperparameters
         with open(hparams_file) as fin:
             hparams = load_hyperpyyaml(fin, trial_overrides)
 
@@ -373,17 +371,13 @@ if __name__ == "__main__":
         score = train_and_evaluate(hparams, run_opts, hparams_file, trial_overrides)
         return score
 
-    # Load hparams once to get num_trials
-    with open(hparams_file) as fin:
-        hparams = load_hyperpyyaml(fin, overrides)
-
     study = optuna.create_study(
         storage="sqlite:///pitt_optuna_study.db",
         study_name="pitt_tuning",
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=hparams['num_trials'])
+    study.optimize(objective, n_trials=1000)
 
     print('Best trial:')
     trial = study.best_trial

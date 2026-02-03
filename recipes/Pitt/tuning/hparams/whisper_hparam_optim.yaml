@@ -7,13 +7,14 @@
 seed: 2028
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
+trial: 1
 num_trials: 1000
 
 # Save folders and paths
 experiment_name: !PLACEHOLDER
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
-output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
-save_folder: !ref <output_folder>/save
+output_folder: !ref <storage_folder>/<experiment_name>/trial_<trial>_seed_<seed>
+save_folder: !ref <storage_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
 encoded_labels: !ref <save_folder>/label_encoder.txt
@@ -150,7 +151,7 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper
     source: !ref <pretrained_source>
     encoder_only: True
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/whisper
+    save_path: !ref <save_folder>/whisper
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>

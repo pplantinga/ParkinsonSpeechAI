@@ -39,10 +39,6 @@ smile = opensmile.Smile(
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
-    def __init__(self, modules, opt_class, hparams, run_opts, checkpointer=None):
-        super().__init__(modules, opt_class, hparams, run_opts, checkpointer)
-        self.last_valid_stats = None
-
     def compute_forward(self, batch, stage):
         """
         Computation pipeline based on a encoder + speaker classifier for parkinson's detection.
@@ -289,6 +285,13 @@ class ParkinsonBrain(sb.core.Brain):
 
 def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     """Train the model and evaluate on validation set, return F-score"""
+    # Create experiment directory
+    sb.core.create_experiment_directory(
+        experiment_directory=hparams["output_folder"],
+        hyperparams_to_save=hparams_file,
+        overrides=overrides,
+    )
+
     # Dataset prep
     from prepare_neuro import prepare_neuro
 
@@ -308,13 +311,6 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
 
-    # Create experiment directory
-    sb.core.create_experiment_directory(
-        experiment_directory=hparams["output_folder"],
-        hyperparams_to_save=hparams_file,
-        overrides=overrides,
-    )
-
     # Brain class initialization
     parkinson_brain = ParkinsonBrain(
         modules=hparams["modules"],
@@ -322,6 +318,8 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
         hparams=hparams,
         run_opts=run_opts,
     )
+
+    parkinson_brain.last_valid_stats = None
 
     # Training
     parkinson_brain.fit(
@@ -448,28 +446,28 @@ if __name__ == "__main__":
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
     def objective(trial):
-        trial_overrides = overrides + [
-            f"epochs={trial.suggest_int('epochs', 15, 50, step=1)}",
-            f"lr={trial.suggest_float('lr', 1e-5, 1e-3, log=True)}",
-            f"base_lr={trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)}",
-            f"chunk_size={trial.suggest_int('chunk_size', 15, 60, step=1)}",
-            f"weight_pd={trial.suggest_float('weight_pd', 0.1, 2.0, step=0.1)}",
-            f"weight_hc={trial.suggest_float('weight_hc', 0.1, 2.0, step=0.1)}",
-            f"weight_male={trial.suggest_float('weight_male', 0.1, 2.0, step=0.1)}",
-            f"weight_female={trial.suggest_float('weight_female', 0.1, 2.0, step=0.1)}",
-            f"embedding_size={trial.suggest_int('embedding_size', 512, 1280, step=32)}",
-            f"dropout={trial.suggest_float('dropout', 0.1, 0.5, step=0.1)}",
-            f"snr_low={trial.suggest_float('snr_low', 0.0, 15.0, step=1.0)}",
-            f"snr_delta={trial.suggest_float('snr_delta', 5.0, 20.0, step=1.0)}",
-            f"drop_freq_low={trial.suggest_float('drop_freq_low', 0.0, 0.3, step=0.01)}",
-            f"drop_freq_high={trial.suggest_float('drop_freq_high', 0.7, 1.0, step=0.01)}",
-            f"drop_freq_count_low={trial.suggest_categorical('drop_freq_count_low', [1, 2, 3])}",
-            f"drop_freq_count_delta={trial.suggest_categorical('drop_freq_count_delta', [0, 1, 2, 3, 4, 5, 6])}",
-            f"drop_freq_width={trial.suggest_float('drop_freq_width', 0.01, 0.15, step=0.01)}",
-            f"min_augmentations={trial.suggest_categorical('min_augmentations', [0, 1, 2])}",
-            f"augment_prob={trial.suggest_float('augment_prob', 0.5, 1.0, step=0.1)}",
-            f"weight_decay={trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}",
-        ]
+        trial_overrides = overrides + (
+            f"\ntrial: {trial.number}"
+            f"\nepochs: {trial.suggest_float('epochs', 15, 50, step=1)}"
+            f"\nlr: {trial.suggest_float('lr', 1e-5, 1e-3, log=True)}"
+            f"\nbase_lr: {trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)}"
+            f"\nchunk_size: {trial.suggest_int('chunk_size', 15, 60, step=1)}"
+            f"\nweight_pd: {trial.suggest_float('weight_pd', 0.1, 2.0, step=0.1)}"
+            f"\nweight_hc: {trial.suggest_float('weight_hc', 0.1, 2.0, step=0.1)}"
+            f"\nweight_male: {trial.suggest_float('weight_male', 0.1, 2.0, step=0.1)}"
+            f"\nweight_female: {trial.suggest_float('weight_female', 0.1, 2.0, step=0.1)}"
+            f"\nembedding_size: {trial.suggest_int('embedding_size', 512, 1280, step=32)}"
+            f"\ndropout: {trial.suggest_float('dropout', 0.1, 0.5, step=0.1)}"
+            f"\nsnr_low: {trial.suggest_float('snr_low', 0.0, 15.0, step=1.0)}"
+            f"\nsnr_delta: {trial.suggest_float('snr_delta', 5.0, 20.0, step=1.0)}"
+            f"\ndrop_freq_low: {trial.suggest_float('drop_freq_low', 0.0, 0.3, step=0.01)}"
+            f"\ndrop_freq_high: {trial.suggest_float('drop_freq_high', 0.7, 1.0, step=0.01)}"
+            f"\ndrop_freq_count_low: {trial.suggest_categorical('drop_freq_count_low', [1, 2, 3])}"
+            f"\ndrop_freq_count_delta: {trial.suggest_categorical('drop_freq_count_delta', [0, 1, 2, 3, 4, 5, 6])}"
+            f"\ndrop_freq_width: {trial.suggest_float('drop_freq_width', 0.01, 0.15, step=0.01)}"
+            f"\nmin_augmentations: {trial.suggest_categorical('min_augmentations', [0, 1, 2])}"
+            f"\naugment_prob: {trial.suggest_float('augment_prob', 0.5, 1.0, step=0.1)}"
+            f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}")
 
         with open(hparams_file) as fin:
             hparams = load_hyperpyyaml(fin, trial_overrides)
@@ -479,17 +477,13 @@ if __name__ == "__main__":
         score = train_and_evaluate(hparams, run_opts, hparams_file, trial_overrides)
         return score
 
-    # Load hparams once to get num_trials
-    with open(hparams_file) as fin:
-        hparams = load_hyperpyyaml(fin, overrides)
-
     study = optuna.create_study(
-        storage="sqlite:///optuna_study.db",
+        storage="sqlite:///qpn_optuna_study.db",
         study_name="qpn_tuning",
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=hparams['num_trials'])
+    study.optimize(objective, n_trials=1000)
 
     print('Best trial:')
     trial = study.best_trial

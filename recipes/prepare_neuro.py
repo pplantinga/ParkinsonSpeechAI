@@ -29,7 +29,7 @@ def prepare_neuro(
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=0)
+    create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=None)
     create_json(test_annotation, path_type_dict["pd_test"], chunk_size)
     create_json(valid_annotation, path_type_dict["valid"], chunk_size)
 
