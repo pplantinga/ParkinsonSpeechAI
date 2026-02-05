@@ -1,11 +1,11 @@
 
 # Basic parameters
-seed: 2050
+seed: 2074
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_small_all_sae
+experiment_name: whisper_small_sae_mask_postpool
 storage_folder: !PLACEHOLDER # where you want to save results
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -44,18 +44,18 @@ lr: 0.003
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 sparsity_warmup: 100
-sparsity_weight: 0.01
+sparsity_weight: 0.001
 diversity_warmup: 100
-diversity_weight: 0.1
+diversity_weight: 0.0
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
-    task: [vowel_repeat, repeat, recall, read, dpt]
-    #task: [vowel_repeat]
+    #task: [vowel_repeat, repeat, recall, read, dpt]
+    task: [dpt]
     #lang: [en, other]
 test_keep_keys:
-    task: [vowel_repeat, repeat, recall, read, dpt]
-    #task: [vowel_repeat]
+    #task: [vowel_repeat, repeat, recall, read, dpt]
+    task: [dpt]
 
 # Test parameters
 test_batch_size: 1
@@ -65,7 +65,7 @@ threshold: 0.5
 # Model parameters
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
-finetuned_source: pretrained/whisper_small_all
+finetuned_source: pretrained/whisper_small
 freeze_pretrained: True
 feature_size: 768
 embedding_size: 768

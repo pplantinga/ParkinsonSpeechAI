@@ -34,6 +34,7 @@ from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
 from tqdm import tqdm
 import opensmile
+import pandas as pd
 
 logger = sb.utils.logger.get_logger("train.py")
 
@@ -81,32 +82,11 @@ class ParkinsonBrain(sb.core.Brain):
         # Concatenate labels in case of wav_augment
         if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
             labels = self.hparams.wav_augment.replicate_labels(labels)
+            weight = self.hparams.wav_augment.replicate_labels(batch.weight)
 
         # Compute loss
         if stage == sb.Stage.TRAIN:
-            if self.hparams.loss == "aam":
-                # Squeeze and ensure targets are one hot encoded (for AAM)
-                preds = outputs.squeeze(1)
-                targets = labels.squeeze(1)
-                targets = F.one_hot(targets.long(), preds.shape[1]).float()
-
-                # Compute loss with weights
-                preds = self.hparams.AAM_loss(preds, targets)
-
-                # Pass through log softmax
-                preds = F.log_softmax(preds, dim=1)
-
-                # Pass through KLDiv Loss, apply weight and average
-                # KLDLoss = torch.nn.KLDivLoss(reduction="none")
-                loss = KLDLoss(preds, targets) * weights
-                loss = loss.sum() / targets.sum()
-
-            elif self.hparams.loss == "focal":
-                loss = self.hparams.focal_loss(outputs, labels)
-            elif self.hparams.loss == "bce":
-                loss = self.hparams.bce_loss(outputs, labels, weight=batch.weight)
-            else:
-                raise ValueError("Unknown loss specified, expected 'focal', 'aam' or 'bce'")
+            loss = self.hparams.bce_loss(outputs, labels, weight=weight)
 
         # Validation / Test
         else:
@@ -153,6 +133,7 @@ class ParkinsonBrain(sb.core.Brain):
             )
 
             # Log metrics split by given categories
+            results = []
             for category in self.hparams.metric_categories:
                 if category == "reason" and stage != sb.Stage.TEST:
                     continue
@@ -162,12 +143,22 @@ class ParkinsonBrain(sb.core.Brain):
                 )
                 logger.info(f"Comb avg breakdown by {category}")
                 logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=300))
+                results.extend(
+                    [
+                        {"category": category, "key": key, **cat_metrics[key]}
+                        for key in sorted(cat_metrics)
+                    ]
+                )
 
             # Dump metrics to file only on test
             if stage == sb.Stage.TEST:
                 with open(self.metrics_json, "w") as f:
                     json.dump(combined_avg, f)
                 logger.info(f"Results stored {self.metrics_json}")
+
+                results = pd.DataFrame(results)
+                results.to_csv(self.metrics_csv)
+
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
@@ -504,6 +495,7 @@ if __name__ == "__main__":
 
     logger.info("Final test result:")
     parkinson_brain.metrics_json = hparams["test_metrics_json"]
+    parkinson_brain.metrics_csv = hparams["test_metrics_csv"]
     parkinson_brain.evaluate(
         test_set=datasets["test"],
         #max_key=hparams["error_metric"],

@@ -153,15 +153,15 @@ def collect_features(attention_scores, test_data):
         corrs.append(energy_correlation(e, a))
 
     print("Median correlation:", torch.tensor(corrs).median())
-    bins = torch.arange(11) / 10 - 0.7
-    plt.rcParams["figure.figsize"] = (5,4)
-    plt.hist(torch.tensor(corrs).cpu().numpy(), bins=bins.numpy())
-    plt.axvline(x=0.0, color="white", linestyle="--")
-    plt.title("Correlations between Energy and Attention")
-    plt.xlabel("Correlation between Energy and Attention")
-    plt.ylabel("Count of 30-second samples")
-    plt.savefig("energy-attention-corrs.png", dpi=300, bbox_inches="tight")
-    plt.clf()
+    #bins = torch.arange(11) / 10 - 0.7
+    #plt.rcParams["figure.figsize"] = (5,4)
+    #plt.hist(torch.tensor(corrs).cpu().numpy(), bins=bins.numpy())
+    #plt.axvline(x=0.0, color="white", linestyle="--")
+    #plt.title("Correlations between Energy and Attention")
+    #plt.xlabel("Correlation between Energy and Attention")
+    #plt.ylabel("Count of 30-second samples")
+    #plt.savefig("energy-attention-corrs.png", dpi=300, bbox_inches="tight")
+    #plt.clf()
 
     return features, feats_attn, pause, energy
 
