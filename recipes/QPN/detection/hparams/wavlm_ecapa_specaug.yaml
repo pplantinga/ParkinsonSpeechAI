@@ -1,0 +1,174 @@
+# ################################
+# Model: Parkinson's identification with ECAPA
+# Author: Briac Cordelle & Peter Plantinga
+# ################################
+
+# Basic parameters
+seed: 2028
+__set_seed: !apply:torch.manual_seed [!ref <seed>]
+lr_factor: 1
+
+# Save folders and paths
+experiment_name: wavlm_large_dnn
+storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
+output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
+save_folder: !ref <output_folder>/save
+train_log: !ref <output_folder>/train_log.txt
+predictions_file: !ref <output_folder>/predictions.csv
+encoded_labels: !ref <save_folder>/label_encoder.txt
+
+# Data files
+data_folder: !PLACEHOLDER
+train_annotation: !ref <storage_folder>/train.json
+valid_annotation: !ref <storage_folder>/valid.json
+test_annotation: !ref <storage_folder>/test.json
+valid_metrics_json: !ref <output_folder>/valid_metrics.json
+test_metrics_json: !ref <output_folder>/test_metrics.json
+
+skip_prep: False
+ckpt_interval_minutes: 15 # save checkpoint every N min
+
+# Training parameters
+epochs: 20
+warmup_epochs: 2
+samples_per_epoch: 1024
+total_batch_size: 32
+batch_size: 4
+grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
+lr: 0.0001
+base_lr: 0.000001
+max_lr: !ref <lr>
+step_size: 50
+sample_rate: 16000
+chunk_size: 30.0 # seconds
+loss: bce
+
+# This is formatted as key => list of values to keep
+train_keep_keys:
+    task: [dpt]
+    #task: [vowel_repeat]
+    #lang: [en, other]
+test_keep_keys:
+    task: [dpt]
+    #task: [vowel_repeat]
+
+# Test parameters
+test_batch_size: 1
+metric_categories: [sex, lang]
+threshold: 0.5
+
+# Model parameters
+# For the pretrained_source, use the path to the model dir
+pretrained_source: !PLACEHOLDER
+freeze_pretrained: True
+feature_size: 1024
+embedding_size: 1280
+dropout: 0.2
+out_neurons: 1
+
+# Dataloader options
+# Shuffling handled by sampler in train.py
+num_workers: 4
+train_dataloader_options:
+    batch_size: !ref <batch_size>
+    num_workers: !ref <num_workers>
+
+valid_dataloader_options:
+    batch_size: !ref <test_batch_size>
+    num_workers: !ref <num_workers>
+
+test_dataloader_options:
+    batch_size: !ref <test_batch_size>
+    num_workers: !ref <num_workers>
+
+# Models
+apply_spec_augment: True
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+    source: !ref <pretrained_source>
+    output_norm: True
+    freeze_feature_extractor: True
+    apply_spec_augment: !ref <apply_spec_augment>
+    freeze: !ref <freeze_pretrained>
+    save_path: !ref <output_folder>/wavlm-large
+
+embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
+    input_size: !ref <feature_size>
+    channels: [1024, 1024, 1024, 1024, 3072]
+    kernel_sizes: [5, 3, 3, 3, 1]
+    dilations: [1, 2, 3, 4, 1]
+    groups: [1, 1, 1, 1, 1]
+    attention_channels: 128
+    lin_neurons: !ref <embedding_size>
+    dropout: 0.2
+
+classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
+    input_size: !ref <embedding_size>
+    out_neurons: !ref <out_neurons>
+
+# Functions
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+    limit: !ref <epochs>
+
+#mean_var_norm: !new:speechbrain.processing.features.InputNormalization
+#    norm_type: sentence
+#    std_norm: False
+
+modules:
+    compute_features: !ref <compute_features>
+    embedding_model: !ref <embedding_model>
+    classifier: !ref <classifier>
+    #mean_var_norm: !ref <mean_var_norm>
+
+softmax: !new:speechbrain.nnet.activations.Softmax
+log_softmax: !new:speechbrain.nnet.activations.Softmax
+    apply_log: True
+
+#focal_loss: !new:focal_loss.FocalLoss
+#    gamma: 2.0
+#    alpha: [!ref <weight_hc>, !ref <weight_pd>]
+
+kld_loss: !name:speechbrain.nnet.losses.kldiv_loss
+    reduction: sum
+
+aam_loss: !new:speechbrain.nnet.losses.AdditiveAngularMargin
+    margin: 0.2
+    scale: 30
+
+bce_loss: !name:speechbrain.nnet.losses.bce_loss
+    allowed_len_diff: 0
+    label_smoothing: 0.01
+
+#opt_class: !name:torch.optim.Adam
+#    lr: !ref <lr>
+#    weight_decay: 0.0001
+opt_class: !name:bitsandbytes.optim.Adam8bit
+    lr: !ref <lr>
+    weight_decay: 0.0001
+
+#lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
+#    base_lr: !ref <base_lr>
+#    max_lr: !ref <max_lr>
+#    step_size: !ref <step_size>
+
+lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
+    num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
+    num_training_steps: !ref <epochs> * <samples_per_epoch> // <total_batch_size>
+
+# Logging + checkpoints
+train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
+    save_file: !ref <train_log>
+
+# Error computation
+error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
+    positive_label: 1
+error_metric: chunk_F-score
+
+checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
+    checkpoints_dir: !ref <save_folder>
+    recoverables:
+        #compute_features: !ref <compute_features>
+        embedding_model: !ref <embedding_model>
+        classifier: !ref <classifier>
+        #normalizer: !ref <mean_var_norm>
+        counter: !ref <epoch_counter>
+        #lr_annealing: !ref <lr_annealing>

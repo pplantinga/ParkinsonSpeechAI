@@ -422,7 +422,8 @@ if __name__ == "__main__":
             "chunk_size": hparams["chunk_size"],
         },
     )
-    sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
+    if "prepare_noise_data" in hparams:
+        sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
     # sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
