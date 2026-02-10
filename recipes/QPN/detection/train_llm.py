@@ -268,8 +268,8 @@ def dataio_prep(hparams):
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("PD", 1)
-    label_encoder.enforce_label("HC", 0)
+    label_encoder.enforce_label("Disease", 1)
+    label_encoder.enforce_label("Control", 0)
 
     @sb.utils.data_pipeline.takes("wav")
     @sb.utils.data_pipeline.provides("sig")

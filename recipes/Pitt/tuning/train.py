@@ -1,37 +1,26 @@
 # !/usr/bin/python3
-"""Recipe for training a detector on the McGill Neuro Parkinson's dataset.
+"""Recipe for training a detector on the Pitt Corpus, an Alzheimers dataset.
 We employ an encoder followed by a classifier. This recipe then infers on a separate dataset.
 
 To run this recipe, use the following command:
-> python train_ecapa_tdnn.py {hyperparameter_file}
+> python train.py {hyperparameter_file}
 
 Using your own hyperparameter file or one of the following:
-    hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
+    hparams/whisper_dnn.yaml (for whisper + dnn)
 
 Author
-    * Briac Cordelle 2025
+    * Briac Cordelle 2026
 """
 
-import os
-import random
 import sys
-import csv
 import json
-import logging
-import pprint
-import tempfile
-import collections
 
 import torch
 import torchaudio
 from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
-from speechbrain.dataio.sampler import BalancingDataSampler
-
-from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
-from tqdm import tqdm
 
 logger = sb.utils.logger.get_logger("train.py")
 
@@ -40,7 +29,7 @@ class AlzheimerBrain(sb.core.Brain):
 
     def compute_forward(self, batch, stage):
         """
-        Computation pipeline based on a encoder + speaker classifier for parkinson's detection.
+        Computation pipeline based on a encoder + speaker classifier for alzheimer's detection.
         Data augmentation and environmental corruption are applied to the
         input speech if present.
         """
@@ -243,89 +232,15 @@ class AlzheimerBrain(sb.core.Brain):
         summary["bce"] = round(cross_ent.item(), 3)
         return summary
 
-
-def dataio_prep_neuro(hparams):
+def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
 
     # Initialization of the label encoder. The label encoder assigns to each
-    # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
+    # of the observed label a unique index (e.g, 'hc': 0, 'ad': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("Disease", 1)
-    label_encoder.enforce_label("Control", 0)
-
-    # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "start")
-    @sb.utils.data_pipeline.provides("sig")
-    def audio_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
-            wav,
-            num_frames=int(duration * hparams["sample_rate"]),
-            frame_offset=int(start * hparams["sample_rate"]),
-        )
-
-        return sig.squeeze(0)
-
-    # Define label pipeline:
-    @sb.utils.data_pipeline.takes("info_dict")
-    @sb.utils.data_pipeline.provides(
-        "patient_type", "patient_type_encoded", "weight", "to_balance"
-    )
-    def label_pipeline(info_dict):
-        """Defines the pipeline to process the patient type labels.
-        Note that we have to assign a different integer to each class
-        through the label encoder.
-        """
-        yield info_dict["ptype"]
-        patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
-        yield patient_type_encoded
-
-        # Weight PD less since there's more in the data
-        # Weight males less since there are more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
-        yield weight
-
-        # Balance on ptype and sex
-        balance = info_dict["ptype"] + "_" + info_dict["sex"]
-        #balance += "_FR" if info_dict["lang"] == "fr" else "_EN/O"
-        yield balance
-
-    # Define datasets. We also connect the dataset with the data processing
-    # functions defined above.
-    datasets = {}
-    train_info = {
-        "pd_train": hparams["pd_train_annotation"],
-        "pd_valid": hparams["pd_valid_annotation"],
-        "pd_test": hparams["pd_test_annotation"],
-    }
-
-    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
-    for dataset in train_info:
-        datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
-            json_path=train_info[dataset],
-            dynamic_items=[audio_pipeline, label_pipeline],
-            output_keys=out_keys,
-        )
-
-    #hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
-    #    dataset=datasets["pd_train"],
-    #    key="to_balance",
-    #    num_samples=hparams["samples_per_epoch"],
-    #    replacement=True,
-    #)
-
-    return datasets
-
-def dataio_prep_pitt(hparams):
-    """Creates the datasets and their data processing pipelines."""
-
-    # Initialization of the label encoder. The label encoder assigns to each
-    # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
-    label_encoder = sb.dataio.encoder.CategoricalEncoder()
-    label_encoder.expect_len(2)
-    label_encoder.enforce_label("Disease", 1)
-    label_encoder.enforce_label("Control", 0)
+    label_encoder.enforce_label("AD", 1)
+    label_encoder.enforce_label("HC", 0)
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -354,9 +269,9 @@ def dataio_prep_pitt(hparams):
     # functions defined above.
     datasets = {}
     train_info = {
-        "ad_train": hparams["ad_train_annotation"],
-        "ad_valid": hparams["ad_valid_annotation"],
-        "ad_test": hparams["ad_test_annotation"],
+        "train": hparams["train_annotation"],
+        "valid": hparams["valid_annotation"],
+        "test": hparams["test_annotation"],
     }
 
     for dataset in train_info:
@@ -389,34 +304,21 @@ if __name__ == "__main__":
     )
 
     # Dataset prep
-    from prepare_neuro import prepare_neuro
     from prepare_pitt import prepare_pitt
-
-    sb.utils.distributed.run_on_main(
-        prepare_neuro,
-        kwargs={
-            "data_folder": hparams["pd_data_folder"],
-            "train_annotation": hparams["pd_train_annotation"],
-            "test_annotation": hparams["pd_test_annotation"],
-            "valid_annotation": hparams["pd_valid_annotation"],
-            "chunk_size": hparams["chunk_size"],
-        }
-    )
     sb.utils.distributed.run_on_main(
         prepare_pitt,
         kwargs={
-            "data_folder": hparams["ad_data_folder"],
-            "train_annotation": hparams["ad_train_annotation"],
-            "valid_annotation": hparams["ad_valid_annotation"],
-            "test_annotation": hparams["ad_test_annotation"],
+            "data_folder": hparams["data_folder"],
+            "train_annotation": hparams["train_annotation"],
+            "valid_annotation": hparams["valid_annotation"],
+            "test_annotation": hparams["test_annotation"],
             "chunk_size": hparams["chunk_size"],
         }
     )
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
-    pd_datasets = dataio_prep_neuro(hparams)
-    ad_datasets = dataio_prep_pitt(hparams)
+    datasets = dataio_prep(hparams)
 
     # Brain class initialization
     alzheimer_brain = AlzheimerBrain(
@@ -430,33 +332,25 @@ if __name__ == "__main__":
     # Training
     alzheimer_brain.fit(
         alzheimer_brain.hparams.epoch_counter,
-        train_set=ad_datasets["ad_train"],
-        valid_set=ad_datasets["ad_valid"],
+        train_set=datasets["train"],
+        valid_set=datasets["valid"],
         train_loader_kwargs=hparams["train_dataloader_options"],
         valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
     # Run validation and test set to get the predictions
     logger.info("Final validation result AD:")
-    alzheimer_brain.metrics_json = hparams["ad_valid_metrics_json"]
+    alzheimer_brain.metrics_json = hparams["valid_metrics_json"]
     alzheimer_brain.evaluate(
-        test_set=ad_datasets["ad_valid"],
+        test_set=datasets["valid"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )
 
     logger.info("Final test result AD:")
-    alzheimer_brain.metrics_json = hparams["ad_test_metrics_json"]
+    alzheimer_brain.metrics_json = hparams["test_metrics_json"]
     alzheimer_brain.evaluate(
-        test_set=ad_datasets["ad_test"],
-        #max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["test_dataloader_options"],
-    )
-
-    logger.info("Final test result PD:")
-    alzheimer_brain.metrics_json = hparams["pd_test_metrics_json"]
-    alzheimer_brain.evaluate(
-        test_set=pd_datasets["pd_test"],
+        test_set=datasets["test"],
         #max_key=hparams["error_metric"],
         test_loader_kwargs=hparams["test_dataloader_options"],
     )

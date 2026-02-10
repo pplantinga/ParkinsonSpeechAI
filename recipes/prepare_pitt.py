@@ -83,7 +83,7 @@ def create_json(json_file, ground_truth, chunk_size, transcripts=None, overlap=N
         audioinfo = torchaudio.info(row["path"])
         duration = audioinfo.num_frames / audioinfo.sample_rate
 
-        ptype = "AD" if row["dx"] == "ProbableAD" else "HC"
+        ptype = "Disease" if row["dx"] == "ProbableAD" else "Control"
 
         # Write chunks to dict
         max_start = max(duration - hop_size, 1)

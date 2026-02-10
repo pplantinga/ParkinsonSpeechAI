@@ -54,7 +54,7 @@ def main():
         SELECT trial_id
         FROM trial_values
         ORDER BY value DESC
-        LIMIT 5
+        LIMIT 10
     """)
     trial_ids = [row[0] for row in cursor.fetchall()]
 
@@ -84,8 +84,9 @@ def main():
                 hparams_path,
                 f"--data_folder={data_folder}",
                 f"--storage_folder={storage_folder}",
-                f"--experiment_name={experiment_name}_trial_{trial_id}",
+                f"--experiment_name={experiment_name}",
                 f"--seed={seed}",
+                f"--trial={trial_id}",
             ]
 
             for name, value in decoded_params.items():
