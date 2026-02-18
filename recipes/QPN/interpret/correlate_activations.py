@@ -1,6 +1,7 @@
 """Correlate the activations with various features
 """
-import hyperpyyaml, torch, speechbrain, json, torchaudio, argparse, scipy, pandas, sklearn, numpy
+import hyperpyyaml, torch, speechbrain, json, torchaudio, argparse, scipy, pandas, sklearn, numpy, pingouin, tqdm
+import seaborn as sns
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
@@ -71,8 +72,7 @@ def collect_activations(models, test_data):
     attention_scores = {}
     predictions = {}
     labels = {}
-    for sample_id, sample in test_data.items():
-        print(sample_id)
+    for sample_id, sample in tqdm.tqdm(test_data.items()):
         audio = audio_pipeline(sample["wav"], sample["duration"], sample["start"])
 
         # Forward pass
@@ -109,7 +109,7 @@ def compute_f1_score(predictions, labels):
     label_array = numpy.array(list(per_person_label.values()))
     predi_array = numpy.array(list(per_person_predi.values()))
 
-    print(sklearn.metrics.f1_score(label_array, predi_array))
+    #print(sklearn.metrics.f1_score(label_array, predi_array))
 
 @torch.no_grad()
 def collect_features(attention_scores, test_data):
@@ -152,7 +152,7 @@ def collect_features(attention_scores, test_data):
         #corrs.append(correlation(sma_norm(e), sma_norm(a)))
         corrs.append(energy_correlation(e, a))
 
-    print("Median correlation:", torch.tensor(corrs).median())
+    #print("Median correlation:", torch.tensor(corrs).median())
     #bins = torch.arange(11) / 10 - 0.7
     #plt.rcParams["figure.figsize"] = (5,4)
     #plt.hist(torch.tensor(corrs).cpu().numpy(), bins=bins.numpy())
@@ -255,73 +255,93 @@ def compute_correlations(features, activations, predictions, attributes, pause):
     prediction_matrix = torch.stack(tuple(predictions.values()))
     pause_matrix = torch.stack(tuple(pause.values()), dim=-1)
 
-    print(feature_matrix.shape)
-    print(activation_matrix.shape)
-    print(prediction_matrix.shape)
-    print(attribute_matrix.shape)
-    print(pause_matrix.shape)
+    #print(feature_matrix.shape)
+    #print(activation_matrix.shape)
+    #print(prediction_matrix.shape)
+    #print(attribute_matrix.shape)
+    #print(pause_matrix.shape)
 
 
     # Correlate predictions with activations as a baseline for each
     scores = []
     for i in range(activation_matrix.size(0)):
-        score = []
+        print(f"\nEvaluating activation #{i}")
+        score = [i]
         activations = activation_matrix[i].count_nonzero()
         if activations < 10:
+            print("Non-activating feature!")
             continue
 
         print(f"Activations for feature {i}: {activations}")
-        score.append(activations)
+        #score.append(activations)
 
         indexes = activation_matrix[i].nonzero().squeeze()
         activations = activation_matrix[i, indexes]
         predictions = prediction_matrix[indexes]
 
         corr = correlation(activations, predictions)
-        print(f"Correlation of active feats with prediction: {corr}")
-        score.append(corr)
+        #print(f"Correlation of active feats with prediction: {corr}")
         corr, pvalue = scipy.stats.spearmanr(activations.cpu(), predictions.cpu())
-        print(f"Rank Correlation of active with prediction: {corr}")
-        print(f"Rank Correlation pvalue of active w/predict: {pvalue}")
+        #print(f"Rank Correlation of active with prediction: {corr}")
+        #print(f"Rank Correlation pvalue of active w/predict: {pvalue}")
+        score.append(corr)
 
-        for j in range(5):
+        max_feat = 0
+        max_feat_name = ""
+        max_pvalue = 0
+        for j, name in enumerate(["Age", "Sex", "Status", "L1", "Language"]):
             attributes = attribute_matrix[j, indexes]
             corr, pvalue = scipy.stats.spearmanr(activations.cpu(), attributes.cpu())
-            print(f"Correlation of activations with attribute {j}: {corr}")
+            #if abs(corr) > 0.5:
+            #    print(f"Correlation of activations with attribute {j}: {corr}")
+            if abs(corr) > abs(max_feat):
+                max_feat = corr
+                max_feat_name = name
+                max_pvalue = pvalue
 
-        max_corr = 0
-        max_feat_index = -1
-        for j in range(pause_matrix.size(0)):
+        for j, name in enumerate(["Pause Amount", "Pase Ratio", "Pause Count", "Longest Pause"]):
             pause_feat = pause_matrix[j, indexes]
-            corr, _ = scipy.stats.spearmanr(activations.cpu(), pause_feat.cpu())
+            corr, pvalue = scipy.stats.spearmanr(activations.cpu(), pause_feat.cpu())
             #pause_corr = correlation(activations, pause_feat)
 
-            if abs(corr) > abs(max_corr):
-                max_corr = corr
-                max_feat_index = j
-        print("Max pause index", max_feat_index)
-        print("Max pause correlation", max_corr)
-
+            if abs(corr) > abs(max_feat):
+                max_feat = corr
+                max_feat_name = name
+                max_pvalue = pvalue
 
         # Try different features
-        max_feat = 0
-        max_feat_index = -1
-        max_pvalue = 0
-        for j in range(feature_matrix.size(0)):
+        #max_pvalue = 0
+        #max_partial_r = 0
+        #max_partial_p = 0
+        for j, name in enumerate(
+            ["F0", "HNR", "Jitter", "Shimmer", "GNE", "Spec. Centroid", "Spec. Spread",
+             "Spec. Skew", "Spec. Kurtosis", "Spec. Entropy", "Spec. Flatness", "Spec. Crest",
+             "Spec. Flux", "0th MFCC", "1st MFCC", "2nd MFCC", "3rd MFCC"]
+        ):
             feature = feature_matrix[j, indexes]
-            #feat_corr = correlation(activations, feature).abs()
             feat_corr, pvalue = scipy.stats.spearmanr(activations.cpu(), feature.cpu())
+
+            # In case we're just lucky -- i.e. the correlation is only a result of both
+            # correlates (the feature and the activation) being themselves dependent
+            # (and correlated) to the disease status -- we will run a mediation analysis
+            #df = pandas.DataFrame(
+            #    {"status": attribute_matrix[2, indexes].cpu(), "feat": feature.cpu(), "activ": activations.cpu()}
+            #)
+            #partial_stats = pingouin.partial_corr(df, "feat", "activ", "status", method="spearman")
 
             if i == 61 and j == 12:
                 plot_correlations(activations, predictions, feature, feat_corr)
 
             if abs(feat_corr) > abs(max_feat):
                 max_feat = feat_corr
-                max_feat_index = j
+                max_feat_name = name
                 max_pvalue = pvalue
+                #max_partial_r = partial_stats["r"].item()
+                #max_partial_p = partial_stats["p-val"].item()
 
-        print(f"Max corr feat {max_feat_index} with score {max_feat} and pvalue {max_pvalue}")
-        score.append(max_feat_index)
+        print(f"Max corr feat {max_feat_name} with score {max_feat} and pvalue {max_pvalue}")
+        #print(f"Partial corr {max_partial_r} and partial p {max_partial_p}")
+        score.append(max_feat_name)
         score.append(max_feat)
 
         scores.append(score)
@@ -335,16 +355,21 @@ def plot_correlations(activations, predictions, feature, corr):
     feature *= 10 ** 5
     predictions = predictions.sigmoid()
 
-    #cm = plt.cm.get_cmap('RdYlBu')
-    sc = plt.scatter(activations.cpu(), feature.cpu(), c=predictions.cpu())#, vmin=0, vmax=20, s=35, cmap=cm)
+    fig = plt.figure(figsize=(5, 3))
 
-    plt.annotate("ρ = {:.3f}".format(corr), (0.15, 0.8), xycoords="figure fraction")
-    plt.title("Dictionary Entry #61")
+    #cm = plt.cm.get_cmap('RdYlBu')
+    sc = plt.scatter(activations.cpu(), feature.cpu(), c=predictions.cpu(), s=20)#, vmin=0, vmax=20, s=35, cmap=cm)
+
+    # Set the color limits
+    plt.clim(0.3, 0.65)
+    plt.annotate("ρ = {:.3f}".format(corr), (0.19, 0.85), xycoords="figure fraction")
+    #plt.title("Dictionary Entry #61")
     plt.xlabel("Activation Strength")
     plt.ylabel("Spectral Flux (x10^5)")
-    cb = plt.colorbar(sc, pad=0.08, label="Predicted Probability of PD")
-    cb.set_label("Predicted Probability of PD", labelpad=-52)
-    plt.savefig("correlation_spec_flux.pdf", dpi=300, bbox_inches="tight")
+    plt.ylim(bottom=0.0)
+    cb = plt.colorbar(sc, pad=0.09, label="Predicted Probability of PD")
+    cb.set_label("Predicted Probability of PD", labelpad=-49)
+    plt.savefig("correlation_spec_flux.pdf", bbox_inches="tight")
     plt.clf()
 
     #plt.scatter(activations.cpu(), predictions.cpu())
@@ -352,6 +377,50 @@ def plot_correlations(activations, predictions, feature, corr):
     #plt.clf()
     #plt.scatter(activations.cpu(), feature.cpu())
     #plt.savefig("correlation-activation.png")
+
+
+def plot_comparison(correlation_df):
+
+    # Clean up low correlation entries to "Other"
+    plot_df = correlation_df.replace({"L1": "Other", "Status": "Other", "Jitter": "Other", "Spec. Spread": "Other", "GNE": "Other"})
+    # Shorten names
+    plot_df = plot_df.replace({"Spec. Flux": "Sp. Flux", "Spec. Flatness": "Sp. Flatness"})
+    # Set the order by best correlation
+    desired_order = ["Sp. Flux", "Sp. Flatness", "Language", "HNR", "Other"]
+
+    fig = plt.figure(figsize=(4, 3))
+    ax = plt.gca()
+
+    hues = sns.color_palette("rocket", len(desired_order))
+    for i, v in enumerate([0.851, 0.816, 0.738, 0.682]):
+        ax.vlines(x=[-v, v], ymin=-1, ymax=1, colors=hues[i], linestyles='dashed', alpha=0.8, zorder=-1)
+    sns.scatterplot(
+        plot_df, x="Feat corr.", y="Pred corr.", hue="Feat name", style="Feat name",
+        hue_order=desired_order, s=100, ax=ax, palette=hues
+    )
+    ax.set_xlabel("Correlation with associated feature")
+    ax.set_ylabel("Correlation with model prediction")
+
+    ax.set_xticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+    ax.set_yticks([-1.0, -0.5, 0.0, 0.5, 1.0])
+    
+    # Split legend into two to avoid covering data
+    handles, labels = ax.get_legend_handles_labels()
+
+    # Update each handle to include a line
+    for handle in handles:
+        handle.set_linestyle('--')
+        handle.set_linewidth(1.5)
+
+    # Add the first legend manually to the Axes, so it is not removed by the second call
+    first_legend = ax.legend(handles[:2], labels[:2], loc='upper center', title="Feature name")
+    ax.add_artist(first_legend)
+
+    # Create the second legend (this one is automatically added)
+    ax.legend(handles[2:], labels[2:], loc='lower center')
+
+
+    plt.savefig("correlation_comparison.pdf", bbox_inches="tight")
 
 
 def write_to_csv(
@@ -418,11 +487,14 @@ if __name__ == "__main__":
     attributes = collect_attributes(test_data)
 
     correlations = compute_correlations(feats, activations, predictions, attributes, pause)
+    correlation_df = pandas.DataFrame(correlations, columns=["SAE index", "Pred corr.", "Feat name", "Feat corr."])
 
-    #plot_correlations(correlations)
+    print("\nSummary\n--------")
+    best_corr_row = correlation_df.loc[correlation_df["Feat corr."].abs().idxmax()]
+    print(f"Best sae: {best_corr_row['SAE index'].item()}")
+    print(f"Best feat: {best_corr_row['Feat name']}")
+    print(f"Max corr: {best_corr_row['Feat corr.'].item():.3f}")
 
-    #activations_train = {}
-    #feats_train = {}
-    #predictions_train = {}
+    plot_comparison(correlation_df)
 
     #write_to_csv(activations, activations_train, feats, feats_train, predictions, predictions_train)

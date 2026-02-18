@@ -9,16 +9,15 @@ import matplotlib.pyplot as plt
 from generate_scores_human_samples_qpn import (
     load_audio_and_resample,
     score_items,
+    get_first_lang,
 )
 
 
 data_paths = {
     "qpn": "/home/competerscience/Documents/Repositories/ParkinsonSpeechAI/recipes/QPN/interpret/results/",
     "pc_gita": "/home/competerscience/Documents/Repositories/speechbrain/recipes/PC-GITA/pd_detection/manifest.csv",
-    "italian": "/home/competerscience/Documents/data/Italian_Parkinsons_Voice_and_Speech/italian_parkinson",
     "mvdr_kcl": "/home/competerscience/Documents/data/mvdr_kcl/",
 }
-italian_codes = {"B": "read text", "D": "pa-ta", "F": "read phrase"}
 
 
 #########################
@@ -44,7 +43,9 @@ def load_qpn():
                     "duration": 180,
                     "task": item["info_dict"]["task"],
                     "status": item["info_dict"]["ptype"],
+                    "updrs": item["info_dict"]["updrs"],
                     "dataset": "qpn",
+                    "first_lang": get_first_lang(item["info_dict"]),
                 }
                 for uid, item in json.load(f).items()
                 if uid.endswith("0") and item["info_dict"]["task"] != "vowel_repeat"
@@ -65,6 +66,7 @@ def load_pc_gita():
             "duration": 180,
             "task": item["task"],
             "status": "HC" if item["UPDRS"] is None else "PD",
+            "updrs": item["UPDRS"],
             "dataset": "pc_gita",
         }
         for item in csv.iter_rows(named=True)

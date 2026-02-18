@@ -12,8 +12,8 @@ Voice
 
 Articulation
 ------------
-* SFB (Spectral Flux at word Boundaries)
-* VOT (Voice Onset Time)
+* SFSB (Spectral Flux at Speech Boundaries)
+* VOT (Voice Onset Delay)
 
 Prosody
 -------
@@ -48,7 +48,7 @@ from sklearn.metrics import accuracy_score
 data_paths = {
     "qpn": "/home/competerscience/Documents/Repositories/ParkinsonSpeechAI/recipes/QPN/interpret/results/",
 }
-SCORES = ["SFB", "F0SD", "DPI", "UPR", "VOT", "GNE"]
+SCORES = ["SFSB", "F0SD", "DPI", "UPR", "VOT", "GNE"]
 
 def load_qpn(filename):
     with open(pathlib.Path(data_paths["qpn"]) / filename) as f:
@@ -136,7 +136,7 @@ def score_items(dataset, save_csv, device="cuda"):
     vocal_features = VocalFeatures(step_size=0.02, log_scores=False)
 
     score_fns = {
-        "SFB": compute_sfb,
+        "SFSB": compute_sfb,
         "F0SD": compute_f0sd,
         "DPI": compute_dpi,
         "UPR": compute_upr,
@@ -349,10 +349,10 @@ if __name__ == "__main__":
     test_df = load_qpn("test.json")
 
     # Add all scores to all items
-    train_df = score_items(train_df, "train_scores_2.csv")
+    train_df = score_items(train_df, "train_scores.csv")
     print(len(train_df) - len(train_df.drop_nans()), "nans in train")
-    test_df = score_items(test_df, "test_scores_2.csv")
-    valid_df = score_items(valid_df, "valid_scores_2.csv")
+    test_df = score_items(test_df, "test_scores.csv")
+    valid_df = score_items(valid_df, "valid_scores.csv")
 
     # Normalize columns for two-feature logistic regression
     df = train_df.vstack(valid_df).vstack(test_df).drop_nans()

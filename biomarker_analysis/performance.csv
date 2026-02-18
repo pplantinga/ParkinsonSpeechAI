@@ -1,0 +1,16 @@
+Category,Value,Count,Whisper F1,Whisper err,Human Expert F1,Human err
+Spoken Task,Vowel,38,46.5%,18.82%,54.0%,7.6%
+Spoken Task,Repeat,42,66.5%,8.00%,59.8%,6.4%
+Spoken Task,Recall,80,65.4%,0.87%,60.8%,4.6%
+Spoken Task,Picture,78,72.3%,4.53%,65.8%,5.0%
+Spoken Task,Read,72,80.2%,3.04%,80.7%,2.8%
+Severity,Mild,48,37.6%,5.60%,29.3%,6.6%
+Severity,Moderate,80,91.6%,1.68%,88.9%,2.5%
+Severity,Severe,19,74.7%,14.07%,75.7%,11.2%
+Age Group,53-62,44,57.2%,6.74%,49.3%,7.0%
+Age Group,63-72,54,77.7%,6.67%,73.9%,8.6%
+Age Group,73-82,63,77.2%,1.60%,81.3%,1.8%
+Sex,Female,156,57.8%,4.62%,59.0%,3.0%
+Sex,Male,154,77.5%,4.55%,71.9%,2.8%
+Language,L1,210,70.4%,1.60%,67.1%,2.2%
+Language,L2+,62,74.6%,4.05%,69.2%,4.1%
