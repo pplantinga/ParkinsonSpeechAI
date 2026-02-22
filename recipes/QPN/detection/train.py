@@ -29,6 +29,7 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeightedRandomSampler
+from speechbrain.lobes.models.huggingface_transformers.whisper import Whisper
 
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
@@ -61,7 +62,10 @@ class ParkinsonBrain(sb.core.Brain):
             wavs, lens = self.hparams.wav_augment(wavs, lens)
 
         # Compute features
-        feats = self.modules.compute_features(wavs, lens)
+        if isinstance(self.modules.compute_features, Whisper):
+            feats = self.modules.compute_features(wavs, lens, do_augment=(stage == sb.Stage.TRAIN))
+        else:
+            feats = self.modules.compute_features(wavs, lens)
         # feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
