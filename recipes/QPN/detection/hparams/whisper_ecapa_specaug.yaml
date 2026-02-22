@@ -19,9 +19,13 @@ encoded_labels: !ref <save_folder>/label_encoder.txt
 
 # Data files
 data_folder: !PLACEHOLDER
+noise_folder: !ref <data_folder>/noise
+rir_folder: !ref <data_folder>/rir
 train_annotation: !ref <storage_folder>/train.json
 valid_annotation: !ref <storage_folder>/valid.json
 test_annotation: !ref <storage_folder>/test.json
+noise_annotation: !ref <save_folder>/noise.csv
+rir_annotation: !ref <save_folder>/rir.csv
 valid_metrics_json: !ref <output_folder>/valid_metrics.json
 test_metrics_json: !ref <output_folder>/test_metrics.json
 
@@ -82,31 +86,61 @@ test_dataloader_options:
     num_workers: !ref <num_workers>
 
 # AUGMENTATIONS
+# -------------
 
-# Augmenter: Combines previously defined augmentations to perform data augmentation
-top_k: 9
-wav_augment: !new:wav2aug.gpu.Wav2Aug
-    sample_rate: !ref <sample_rate>
-    top_k: !ref <top_k>
+# Time drop (T = 100 frames)
+time_drop: !new:speechbrain.augment.freq_domain.SpectrogramDrop
+    drop_length_low: 100
+    drop_length_high: 101
+    drop_count_low: 1
+    drop_count_high: 1
 
-# Models
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+# Frequency drop 
+freq_drop: !new:speechbrain.augment.freq_domain.SpectrogramDrop
+    drop_length_low: 27
+    drop_length_high: 28
+    drop_count_low: 1
+    drop_count_high: 1
+    dim: 2
+
+# Time warp
+time_warp: !new:speechbrain.augment.freq_domain.Warping
+    warp_window: 80
+    warp_mode: bicubic
+    dim: 1
+
+fea_augment: !new:speechbrain.augment.augmenter.Augmenter
+    min_augmentations: 3
+    max_augmentations: 3
+    augment_prob: 1.0
+    augmentations: [
+        !ref <time_drop>,
+        !ref <freq_drop>,
+        !ref <time_warp>
+    ]
+
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
     source: !ref <pretrained_source>
-    output_norm: True
-    freeze_feature_extractor: True
+    encoder_only: True
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/wavlm-large
+    save_path: !ref <output_folder>/whisper
+    augmenter: !ref <fea_augment>
 
-embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-   input_size: !ref <feature_size>
-   channels: [1024, 1024, 1024, 1024, 3072]
-   kernel_sizes: [5, 3, 3, 3, 1]
-   dilations: [1, 2, 3, 4, 1]
-   groups: [1, 1, 1, 1, 1]
-   attention_channels: 128
-   lin_neurons: !ref <embedding_size>
-   dropout: 0.2
-
+embedding_model: !new:torch.nn.Sequential
+    - !new:speechbrain.nnet.linear.Linear
+        input_size: !ref <feature_size>
+        n_neurons: !ref <embedding_size>
+    - !new:torch.nn.Dropout
+        p: !ref <dropout>
+    - !new:torch.nn.LeakyReLU
+    - !new:speechbrain.nnet.pooling.AttentionPooling
+        input_dim: !ref <embedding_size>
+    - !new:speechbrain.nnet.linear.Linear
+        input_size: !ref <embedding_size>
+        n_neurons: !ref <embedding_size>
+    - !new:torch.nn.Dropout
+        p: !ref <dropout>
+    - !new:torch.nn.LeakyReLU
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: !ref <embedding_size>
@@ -116,23 +150,14 @@ classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <epochs>
 
-#mean_var_norm: !new:speechbrain.processing.features.InputNormalization
-#    norm_type: sentence
-#    std_norm: False
-
 modules:
     compute_features: !ref <compute_features>
     embedding_model: !ref <embedding_model>
     classifier: !ref <classifier>
-    #mean_var_norm: !ref <mean_var_norm>
 
 softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
-
-#focal_loss: !new:focal_loss.FocalLoss
-#    gamma: 2.0
-#    alpha: [!ref <weight_hc>, !ref <weight_pd>]
 
 kld_loss: !name:speechbrain.nnet.losses.kldiv_loss
     reduction: sum
@@ -149,11 +174,6 @@ weight_decay: 1e-4
 opt_class: !name:torch.optim.AdamW
     lr: !ref <lr>
     weight_decay: !ref <weight_decay>
-
-#lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
-#    base_lr: !ref <base_lr>
-#    max_lr: !ref <max_lr>
-#    step_size: !ref <step_size>
 
 lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
     num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
