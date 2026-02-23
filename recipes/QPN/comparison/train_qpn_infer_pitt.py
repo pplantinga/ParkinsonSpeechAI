@@ -282,8 +282,8 @@ def dataio_prep_neuro(hparams):
 
         # Weight PD less since there's more in the data
         # Weight males less since there are more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
+        weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
+        weight *= hparams["weight_male"] if info_dict["sex"] == "M" else hparams["weight_female"]
         yield weight
 
         # Balance on ptype and sex

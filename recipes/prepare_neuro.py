@@ -30,7 +30,7 @@ def prepare_neuro(
     path_type_dict = get_path_type_dicts(data_folder)
 
     create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=None)
-    create_json(test_annotation, path_type_dict["pd_test"], chunk_size)
+    create_json(test_annotation, path_type_dict["test"], chunk_size)
     create_json(valid_annotation, path_type_dict["valid"], chunk_size)
 
 def get_path_type_dicts(data_folder):
@@ -79,10 +79,6 @@ def get_path_type_dicts(data_folder):
 
         path_type_dict[dataset] = batch1_patients | batch2_patients | batch3_patients
 
-    path_type_dict["pd_test"] = path_type_dict["test_fr"] | path_type_dict["test_en"]
-    del path_type_dict["test_fr"]
-    del path_type_dict["test_en"]
-
     return path_type_dict
 
 
@@ -92,27 +88,10 @@ def get_patient_traits(files, sheet, batch):
 
     for row in range(2, sheet.max_row + 1):  # Start from row 2 to skip the header
         pid = sheet.cell(row=row, column=1).value
-        if batch == "Batch1" or batch == "Batch3":
-            ptype = sheet.cell(row=row, column=2).value
-        else:
-            ptype = sheet.cell(row=row, column=4).value
-
-        if batch == "Batch1" or batch == "Batch3":
-            sex = sheet.cell(row=row, column=3).value
-        else:
-            sex = sheet.cell(row=row, column=5).value
-
-        if batch == "Batch1" or batch == "Batch3":
-            l1 = sheet.cell(row=row, column=4).value
-        else:
-            l1 = sheet.cell(row=row, column=6).value
-
-        if batch == "Batch1":
-            age = sheet.cell(row=row, column=5).value
-        elif batch == "Batch3":
-            age = sheet.cell(row=row, column=6).value
-        else:
-            age = 0
+        ptype = sheet.cell(row=row, column=2).value
+        sex = sheet.cell(row=row, column=3).value
+        l1 = sheet.cell(row=row, column=4).value
+        age = sheet.cell(row=row, column=6).value
 
         # Check if the patient ID is in the recordings, if it is add to dict
         if pid is not None and pid.rstrip() in pids:
@@ -179,6 +158,8 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
         info_dict.update({"pid": items[1], "task": items[2], "lang": items[-1]})
 
         # Corrections
+        if info_dict["task"] not in ["a1", "a2", "a3", "a4", "vowel_repeat", "dpt", "recall", "repeat", "hbd", "read"]:
+            info_dict["task"] = items[3] # for some batch 3 files
         if info_dict["task"] in ["a1", "a2", "a3", "a4"]:
             info_dict["task"] = "vowel_repeat"
         if info_dict["lang"] not in ["en", "fr"]:

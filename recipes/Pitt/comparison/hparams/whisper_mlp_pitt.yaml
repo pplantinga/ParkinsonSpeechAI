@@ -158,6 +158,10 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper
 #    source: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
 
+mean_var_norm: !new:speechbrain.processing.features.InputNormalization
+    norm_type: sentence
+    std_norm: False
+
 embedding_model: !new:torch.nn.Sequential
     - !new:speechbrain.nnet.linear.Linear
         input_size: !ref <feature_size>
@@ -184,6 +188,7 @@ epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
 
 modules:
     compute_features: !ref <compute_features>
+    mean_var_norm: !ref <mean_var_norm>
     embedding_model: !ref <embedding_model>
     classifier: !ref <classifier>
 

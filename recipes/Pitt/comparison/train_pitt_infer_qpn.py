@@ -54,6 +54,7 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
+        feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
