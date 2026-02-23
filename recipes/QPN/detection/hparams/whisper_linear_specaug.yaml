@@ -109,6 +109,10 @@ time_warp: !new:speechbrain.augment.freq_domain.Warping
     warp_mode: bicubic
     dim: 1
 
+toggle_time_drop: True
+toggle_freq_drop: True
+toggle_time_warp: True
+
 fea_augment: !new:speechbrain.augment.augmenter.Augmenter
     min_augmentations: 3
     max_augmentations: 3
@@ -117,6 +121,11 @@ fea_augment: !new:speechbrain.augment.augmenter.Augmenter
         !ref <time_drop>,
         !ref <freq_drop>,
         !ref <time_warp>
+    ]
+    enable_augmentations: [
+        !ref <toggle_time_drop>,
+        !ref <toggle_freq_drop>,
+        !ref <toggle_time_warp>
     ]
 
 compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
