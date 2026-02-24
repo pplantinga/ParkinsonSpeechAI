@@ -13,3 +13,6 @@ __pycache__
 
 # Run scripts
 **/run_scripts/
+
+# Pretrained models
+**/pretrained/

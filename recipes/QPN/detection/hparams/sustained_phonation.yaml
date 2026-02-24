@@ -4,13 +4,13 @@
 # ################################
 
 # Basic parameters
-seed: 2086
+seed: 2046
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_small_all
-storage_folder: results
+experiment_name: hubert_large_audioset_svp
+storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -23,13 +23,11 @@ noise_folder: !ref <data_folder>/noise
 rir_folder: !ref <data_folder>/rir
 train_annotation: !ref <storage_folder>/train.json
 valid_annotation: !ref <storage_folder>/valid.json
-#test_annotation: !ref <storage_folder>/test.json
-test_annotation: !ref <storage_folder>/human_samples.json
+test_annotation: !ref <storage_folder>/test.json
 noise_annotation: !ref <save_folder>/noise.csv
 rir_annotation: !ref <save_folder>/rir.csv
 valid_metrics_json: !ref <output_folder>/valid_metrics.json
 test_metrics_json: !ref <output_folder>/test_metrics.json
-test_metrics_csv: !ref <output_folder>/test_metrics.csv
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
@@ -43,40 +41,42 @@ epochs: 20
 warmup_epochs: 2
 samples_per_epoch: 1024
 total_batch_size: 32
-batch_size: 8
+batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.00015
+lr: 0.0001
+base_lr: 0.000001
+max_lr: !ref <lr>
+step_size: 50
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 loss: bce
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
-    #task: [vowel_repeat, repeat, read, recall, dpt]
-    task: [repeat, read, recall, dpt]
-    #task: [vowel_repeat]
+    #task: [dpt]
+    task: [vowel_repeat]
     #lang: [en, other]
 test_keep_keys:
-    task: [vowel_repeat, repeat, read, recall, dpt]
-    #task: [vowel_repeat]
+    #task: [dpt]
+    task: [vowel_repeat]
 
 # Test parameters
-test_batch_size: 2
-metric_categories: [sex, lang, task, first_lang, severity, age_range, reason]
+test_batch_size: 1
+metric_categories: [sex, lang]
 threshold: 0.5
 
 # Model parameters
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 768
+feature_size: 1024
 embedding_size: 768
 dropout: 0.2
 out_neurons: 1
 
 # Dataloader options
 # Shuffling handled by sampler in train.py
-num_workers: 4
+num_workers: 8
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>
@@ -132,20 +132,20 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
     drop_freq_width: 0.05
 
 # Time drop: randomly drops a number of temporal chunks.
-#drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
-#    drop_length_low: !ref <sample_rate> * 2
-#    drop_length_high: !ref <sample_rate> * 4
-#    drop_count_low: 2
-#    drop_count_high: 4
+drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
+    drop_length_low: 1000
+    drop_length_high: 2000
+    drop_count_low: 1
+    drop_count_high: 5
 
 # Augmenter: Combines previously defined augmentations to perform data augmentation
 wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     parallel_augment: False
     concat_original: False
-    min_augmentations: 2
-    max_augmentations: 2
-    augment_prob: 0.95
-    augmentations: [!ref <add_noise>, !ref <drop_freq>] #, !ref <drop_chunk>, !ref <speed_perturb>]
+    min_augmentations: 3
+    max_augmentations: 3
+    augment_prob: 0.9
+    augmentations: [!ref <add_noise>, !ref <drop_chunk>, !ref <drop_freq>]
 
 # Models
 #compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
@@ -155,22 +155,22 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/wavlm-large
 
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
-    source: !ref <pretrained_source>
-    encoder_only: True
-    freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/whisper
-
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.hubert.HuBERT
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
 #    source: !ref <pretrained_source>
+#    encoder_only: True
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/whisper
 
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.hubert.HuBERT
+    source: !ref <pretrained_source>
+    freeze: !ref <freeze_pretrained>
+    save_path: !ref <output_folder>/whisper
+
 #compute_features: !new:nemo_encoder.NeMoEncoder
 #    source: !ref <pretrained_source>
-    #source: !ref <pretrained_source> / canary-1b.nemo
-    #nemo_type: "MultiTask"
-    #source_dir: !ref <pretrained_source>
+#    #source: !ref <pretrained_source> / canary-1b.nemo
+#    #nemo_type: "MultiTask"
+#    #source_dir: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
 
 #compute_features: !new:xeus_encoder.XEUS_Encoder
@@ -178,9 +178,11 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/xeus
 
-#compute_features: !new:eat.EAT_AS2M
-#    source: !ref <pretrained_source>
-#    freeze: !ref <freeze_pretrained>
+#compute_features: !new:vocal_feat_encoder.VocalFeatureEncoder
+#    add_energy: False
+#compute_features: !new:speechbrain.lobes.features.VocalFeatures
+#    step_size: 0.02
+#    log_scores: True
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>
@@ -234,13 +236,32 @@ softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
+#focal_loss: !new:focal_loss.FocalLoss
+#    gamma: 2.0
+#    alpha: [!ref <weight_hc>, !ref <weight_pd>]
+
+kld_loss: !name:speechbrain.nnet.losses.kldiv_loss
+    reduction: sum
+
+aam_loss: !new:speechbrain.nnet.losses.AdditiveAngularMargin
+    margin: 0.2
+    scale: 30
+
 bce_loss: !name:speechbrain.nnet.losses.bce_loss
     allowed_len_diff: 0
     label_smoothing: 0.01
 
-opt_class: !name:torch.optim.Adam
+#opt_class: !name:torch.optim.Adam
+#    lr: !ref <lr>
+#    weight_decay: 0.0001
+opt_class: !name:bitsandbytes.optim.Adam8bit
     lr: !ref <lr>
-    weight_decay: 0.01
+    weight_decay: 0.0001
+
+#lr_annealing: !new:speechbrain.nnet.schedulers.CyclicLRScheduler
+#    base_lr: !ref <base_lr>
+#    max_lr: !ref <max_lr>
+#    step_size: !ref <step_size>
 
 lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
     num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
@@ -264,3 +285,5 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
         #normalizer: !ref <mean_var_norm>
         counter: !ref <epoch_counter>
         #lr_annealing: !ref <lr_annealing>
+
+#pretrainer: !new:speechbrain.utils.pretrainer.Pretrainer

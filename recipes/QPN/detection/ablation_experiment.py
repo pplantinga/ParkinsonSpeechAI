@@ -1,48 +1,17 @@
-# !/usr/bin/python3
-"""Recipe for training a detector on the McGill Neuro Parkinson's dataset.
-We employ an encoder followed by a classifier.
-
-To run this recipe, use the following command:
-> python train_ecapa_tdnn.py {hyperparameter_file}
-
-Using your own hyperparameter file or one of the following:
-    hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
-
-Author
-    * Briac Cordelle 2024
-    * Peter Plantinga 2024
+"""
+Explore how well the "speech boundaries" hypothesis explains the model behavior
+by ablating away the speech boundaries and measuring performance ont he final task.
 """
 
-import os
-import random
 import sys
-import csv
 import json
 import logging
 import pprint
-import tempfile
-import collections
-
 import torch
-import torchaudio
-from hyperpyyaml import load_hyperpyyaml
-
 import speechbrain as sb
-from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeightedRandomSampler
-
-from torch.utils.data import DataLoader
+from hyperpyyaml import load_hyperpyyaml
 from torch.nn.functional import binary_cross_entropy
-from tqdm import tqdm
-import opensmile
-import pandas as pd
 
-logger = sb.utils.logger.get_logger("train.py")
-
-
-smile = opensmile.Smile(
-    feature_set=opensmile.FeatureSet.ComParE_2016,
-    feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
-)
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
@@ -57,13 +26,8 @@ class ParkinsonBrain(sb.core.Brain):
         batch = batch.to(self.device)
         wavs, lens = batch.sig
 
-        # Augmentations, if specified
-        if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
-            wavs, lens = self.hparams.wav_augment(wavs, lens)
-
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
-        # feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -78,11 +42,6 @@ class ParkinsonBrain(sb.core.Brain):
         # Get predictions and labels
         labels, _ = batch.patient_type_encoded
         outputs, lens = outputs
-
-        # Concatenate labels in case of wav_augment
-        if stage == sb.Stage.TRAIN and hasattr(self.hparams, "wav_augment"):
-            labels = self.hparams.wav_augment.replicate_labels(labels)
-            weight = self.hparams.wav_augment.replicate_labels(batch.weight)
 
         # Compute loss
         if stage == sb.Stage.TRAIN:
@@ -111,75 +70,34 @@ class ParkinsonBrain(sb.core.Brain):
         """Gets called at the end of an epoch."""
         # Compute/store important stats
         stage_stats = {"loss": stage_loss}
-        if stage == sb.Stage.TRAIN:
-            self.train_stats = stage_stats
-        else:
-            # Combine chunks using two strategies
-            combined_avg = self.combine_chunks(how="avg")
+        # Combine chunks using two strategies
+        combined_avg = self.combine_chunks(how="avg")
 
-            # Generate overall metrics, using stored threshold for test set
-            avg_threshold = None if stage == sb.Stage.VALID else self.avg_threshold
-            metrics_comb_avg = self.metrics_by_category(
-                combined_avg, target_category=None, threshold=avg_threshold
+        # Generate overall metrics, using stored threshold for test set
+        avg_threshold = None #if stage == sb.Stage.VALID else self.avg_threshold
+        metrics_comb_avg = self.metrics_by_category(
+            combined_avg, target_category=None, threshold=avg_threshold
+        )
+
+        # Log overall metrics
+        chunk_stats = self.summarize_metrics(
+            self.error_metrics, self.hparams.threshold
+        )
+        stage_stats.update({f"chunk_{k}": v for k, v in chunk_stats.items()})
+        stage_stats.update(
+            {f"comb_avg_{k}": v for k, v in metrics_comb_avg["overall"].items()}
+        )
+        print(stage_stats)
+
+        # Log metrics split by given categories
+        for category in self.hparams.metric_categories:
+            threshold = metrics_comb_avg["overall"]["threshold"]
+            cat_metrics = self.metrics_by_category(
+                combined_scores=combined_avg, target_category=category, threshold=threshold
             )
+            #print(f"Comb avg breakdown by {category}")
+            #print(pprint.pformat(cat_metrics, indent=2, compact=True, width=300))
 
-            # Log overall metrics
-            chunk_stats = self.summarize_metrics(
-                self.error_metrics, self.hparams.threshold
-            )
-            stage_stats.update({f"chunk_{k}": v for k, v in chunk_stats.items()})
-            stage_stats.update(
-                {f"comb_avg_{k}": v for k, v in metrics_comb_avg["overall"].items()}
-            )
-
-            # Log metrics split by given categories
-            results = []
-            for category in self.hparams.metric_categories:
-                if category == "reason" and stage != sb.Stage.TEST:
-                    continue
-                threshold = metrics_comb_avg["overall"]["threshold"]
-                cat_metrics = self.metrics_by_category(
-                    combined_scores=combined_avg, target_category=category, threshold=threshold
-                )
-                logger.info(f"Comb avg breakdown by {category}")
-                logger.info(pprint.pformat(cat_metrics, indent=2, compact=True, width=300))
-                results.extend(
-                    [
-                        {"category": category, "key": key, **cat_metrics[key]}
-                        for key in sorted(cat_metrics)
-                    ]
-                )
-
-            # Dump metrics to file only on test
-            if stage == sb.Stage.TEST:
-                with open(self.metrics_json, "w") as f:
-                    json.dump(combined_avg, f)
-                logger.info(f"Results stored {self.metrics_json}")
-
-                results = pd.DataFrame(results)
-                results.to_csv(self.metrics_csv)
-
-
-        # Perform end-of-iteration things, like annealing, logging, etc.
-        if stage == sb.Stage.VALID:
-            lr = self.lr_scheduler.get_last_lr()
-
-            self.hparams.train_logger.log_stats(
-                stats_meta={"epoch": epoch, "lr": lr},
-                train_stats=self.train_stats,
-                valid_stats=stage_stats,
-            )
-            self.checkpointer.save_and_keep_only(
-                meta=stage_stats,
-                max_keys=[self.hparams.error_metric],
-                min_keys=["loss"],
-            )
-
-        if stage == sb.Stage.TEST:
-            self.hparams.train_logger.log_stats(
-                {"Epoch loaded": self.hparams.epoch_counter.current},
-                test_stats=stage_stats,
-            )
 
     def on_evaluate_start(self, max_key=None, min_key=None):
         """Recover best checkpoint for evaluation, keeping track of threshold"""
@@ -188,27 +106,6 @@ class ParkinsonBrain(sb.core.Brain):
                 max_key=max_key, min_key=min_key
             )
             self.avg_threshold = checkpoint.meta["comb_avg_threshold"]
-
-    def init_optimizers(self):
-        """Called during ``on_fit_start()``, initialize optimizers
-        after parameters are fully configured (e.g. DDP, jit).
-        """
-
-        all_params = self.modules.parameters()
-
-        if self.opt_class is not None:
-            self.optimizer = self.opt_class(all_params)
-            self.optimizers_dict = {"opt_class": self.optimizer}
-
-            if self.checkpointer is not None:
-                self.checkpointer.add_recoverable("optimizer", self.optimizer)
-
-            self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
-
-    def on_fit_batch_end(self, batch, outputs, loss, should_step):
-        """Update scheduler if an update was made."""
-        if should_step:
-            self.lr_scheduler.step()
 
     def combine_chunks(self, how="avg"):
         """Aggregates predictions made on all individual chunks"""
@@ -317,49 +214,65 @@ class ParkinsonBrain(sb.core.Brain):
         return summary
 
 
+def ablate_boundary_segments(sig, width=-1, random=False):
+    """Use energy-based measure to find boundaries and ablate them."""
+    if width < 0:
+        return sig
+
+    energy = sig.square().unfold(dimension=0, size=640, step=320).sum(dim=1)
+    median = torch.nn.functional.pad(energy, (4, 4)).unfold(dimension=0, size=9, step=1).median(dim=1).values
+    segments = (median > 0.01).float()
+    boundaries = segments.diff().abs()
+    indexes = boundaries.nonzero(as_tuple=True)[0]
+
+    # 640 for central frame, plus 320 on either side per width marker
+    ablate_width = (width + 1) * 640
+    #generator = torch.Generator().manual_seed(123)
+    for index in indexes:
+        # Ablate random section if needed
+        if random:
+            start = torch.randint(sig.size(0), (1,))#, generator=generator)
+        else:
+            start = max(0, (index - width) * 320)
+
+        # ABLATE!
+        sig[start:start+ablate_width] = 0
+
+    return sig
+
+
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
 
-    # Initialization of the label encoder. The label encoder assigns to each
-    # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
     label_encoder.enforce_label("PD", 1)
     label_encoder.enforce_label("HC", 0)
 
-    # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "start")
-    @sb.utils.data_pipeline.provides("sig")
-    def opensmile_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
-            wav,
-            num_frames=int(duration * hparams["sample_rate"]),
-            frame_offset=int(start * hparams["sample_rate"]),
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-            torchaudio.save(f.name, sig, fs)
-            feats = smile.process_file(f.name)
-
-        return torch.tensor(feats.to_numpy())
-
-    # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
     @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
+        sig, fs = sb.dataio.audio_io.load(
             wav,
             num_frames=int(duration * hparams["sample_rate"]),
             frame_offset=int(start * hparams["sample_rate"]),
         )
 
-        return sig.squeeze(0)
+        # ABLATE THE BOUNDARIES
+        # random controls whether the function returns an identical
+        # number / size of random segments for comparison
+        random = False
+        sig = ablate_boundary_segments(sig.squeeze(0), width=5, random=random)
 
-    # Define label pipeline:
+        # PREPEND BLANK FRAMES AS AN ATTENTION SINK
+        # https://arxiv.org/abs/2309.17453
+        # Without this, ablating (boundaries or random) both *help* performance
+        sig = torch.nn.functional.pad(sig, (1000, 0))
+
+        return sig
+
     @sb.utils.data_pipeline.takes("info_dict")
-    @sb.utils.data_pipeline.provides(
-        "patient_type", "patient_type_encoded", "weight", "to_balance"
-    )
+    @sb.utils.data_pipeline.provides("patient_type", "patient_type_encoded")
     def label_pipeline(info_dict):
         """Defines the pipeline to process the patient type labels.
         Note that we have to assign a different integer to each class
@@ -369,67 +282,29 @@ def dataio_prep(hparams):
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
 
-        # Weight PD less since there's more in the data
-        weight = 1
-        #weight *= 0.7 if patient_type_encoded else 1.5
-        #weight *= 0.7 if info_dict["sex"] == "M" else 1.5
-        #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
-        yield weight
-
-        # Balance on ptype and sex
-        #balance = info_dict["ptype"] + "_" + info_dict["sex"]
-        balance = info_dict["ptype"] + "_" + info_dict["task"]
-        #balance += "_FR" if info_dict["lang"] == "fr" else "_EN/O"
-        yield balance
-
-    # Define datasets. We also connect the dataset with the data processing
-    # functions defined above.
     datasets = {}
     train_info = {
-        "train": hparams["train_annotation"],
         "valid": hparams["valid_annotation"],
         "test": hparams["test_annotation"],
     }
 
-    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
+    out_keys = ["id", "sig", "patient_type_encoded", "info_dict"]
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
-            #dynamic_items=[opensmile_pipeline, label_pipeline],
             output_keys=out_keys,
         )
 
-    # Remove keys from training data for e.g. training only on men
-    for key, values in hparams["train_keep_keys"].items():
-        datasets["train"] = datasets["train"].filtered_sorted(
-            key_test={"info_dict": lambda x: x[key] in values},
-        )
-    for key, values in hparams["test_keep_keys"].items():
-        for dataset in ["valid", "test"]:
+        for key, values in hparams["test_keep_keys"].items():
             datasets[dataset] = datasets[dataset].filtered_sorted(
                 key_test={"info_dict": lambda x: x[key] in values},
             )
-
-    hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
-        dataset=datasets["train"],
-        key="to_balance",
-        num_samples=hparams["samples_per_epoch"],
-        replacement=True,
-    )
-    #hparams["train_dataloader_options"]["sampler"] = ReproducibleWeightedRandomSampler(
-    #    weights=[d["weight"] for d in datasets["train"]],
-    #    num_samples=hparams["samples_per_epoch"],
-    #    replacement=True,
-    #    seed=hparams["seed"],
-    #)
 
     return datasets
 
 
 if __name__ == "__main__":
-    torch.backends.cudnn.benchmark = True
-
     # CLI:
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
@@ -453,18 +328,14 @@ if __name__ == "__main__":
             "chunk_size": hparams["chunk_size"],
         },
     )
-    sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
-    # sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
 
-    # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
 
-    # Create experiment directory
-    sb.core.create_experiment_directory(
-        experiment_directory=hparams["output_folder"],
-        hyperparams_to_save=hparams_file,
-        overrides=overrides,
-    )
+    # Load pretrained model
+    classifier_sd = torch.load("pretrained/classifier.ckpt")
+    hparams["classifier"].load_state_dict(classifier_sd)
+    embedding_sd = torch.load("pretrained/embedding_model.ckpt")
+    hparams["embedding_model"].load_state_dict(embedding_sd)
 
     # Brain class initialization
     parkinson_brain = ParkinsonBrain(
@@ -472,30 +343,9 @@ if __name__ == "__main__":
         opt_class=hparams["opt_class"],
         hparams=hparams,
         run_opts=run_opts,
-        checkpointer=hparams["checkpointer"],
+        #checkpointer=hparams["checkpointer"],
     )
 
-    # Training
-    parkinson_brain.fit(
-        parkinson_brain.hparams.epoch_counter,
-        train_set=datasets["train"],
-        valid_set=datasets["valid"],
-        train_loader_kwargs=hparams["train_dataloader_options"],
-        valid_loader_kwargs=hparams["valid_dataloader_options"],
-    )
-
-    # Run validation and test set to get the predictions
-    #logger.info("Final validation result:")
-    #parkinson_brain.metrics_json = hparams["valid_metrics_json"]
-    #parkinson_brain.evaluate(
-    #    test_set=datasets["valid"],
-    #    #max_key=hparams["error_metric"],
-    #    test_loader_kwargs=hparams["test_dataloader_options"],
-    #)
-
-    logger.info("Final test result:")
-    parkinson_brain.metrics_json = hparams["test_metrics_json"]
-    parkinson_brain.metrics_csv = hparams["test_metrics_csv"]
     parkinson_brain.evaluate(
         test_set=datasets["test"],
         #max_key=hparams["error_metric"],
