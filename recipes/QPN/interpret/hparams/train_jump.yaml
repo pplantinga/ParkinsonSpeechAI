@@ -1,16 +1,12 @@
-# ################################
-# Model: Parkinson's identification with ECAPA
-# Author: Briac Cordelle & Peter Plantinga
-# ################################
 
 # Basic parameters
-seed: 2086
+seed: 2051
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_small_all
-storage_folder: results
+experiment_name: whisper_small_sae_jump
+storage_folder: !PLACEHOLDER # where you want to save results
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
@@ -23,13 +19,11 @@ noise_folder: !ref <data_folder>/noise
 rir_folder: !ref <data_folder>/rir
 train_annotation: !ref <storage_folder>/train.json
 valid_annotation: !ref <storage_folder>/valid.json
-#test_annotation: !ref <storage_folder>/test.json
-test_annotation: !ref <storage_folder>/human_samples.json
+test_annotation: !ref <storage_folder>/test.json
 noise_annotation: !ref <save_folder>/noise.csv
 rir_annotation: !ref <save_folder>/rir.csv
 valid_metrics_json: !ref <output_folder>/valid_metrics.json
 test_metrics_json: !ref <output_folder>/test_metrics.json
-test_metrics_csv: !ref <output_folder>/test_metrics.csv
 
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
@@ -39,30 +33,32 @@ NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.z
 RIR_DATASET_URL: https://www.dropbox.com/scl/fi/linhy77c36mu10965a836/RIRs.zip?rlkey=pg9cu8vrpn2u173vhiqyu743u&dl=1
 
 # Training parameters
-epochs: 20
-warmup_epochs: 2
-samples_per_epoch: 1024
+epochs: 30
+warmup_epochs: 5
+samples_per_epoch: 490
 total_batch_size: 32
-batch_size: 8
+batch_size: 32
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.00015
+lr: 0.01
 sample_rate: 16000
 chunk_size: 30.0 # seconds
-loss: bce
+sparsity_warmup: 100 # steps
+sparsity_coefficient: 1.0
+diversity_warmup: 100 # steps
+diversity_coefficient: 0.1
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
-    #task: [vowel_repeat, repeat, read, recall, dpt]
-    task: [repeat, read, recall, dpt]
+    task: [dpt]
     #task: [vowel_repeat]
     #lang: [en, other]
 test_keep_keys:
-    task: [vowel_repeat, repeat, read, recall, dpt]
+    task: [dpt]
     #task: [vowel_repeat]
 
 # Test parameters
-test_batch_size: 2
-metric_categories: [sex, lang, task, first_lang, severity, age_range, reason]
+test_batch_size: 1
+metric_categories: [sex, lang]
 threshold: 0.5
 
 # Model parameters
@@ -71,8 +67,9 @@ pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
 feature_size: 768
 embedding_size: 768
-dropout: 0.2
+dropout: 0.1
 out_neurons: 1
+dictionary_size: 200
 
 # Dataloader options
 # Shuffling handled by sampler in train.py
@@ -80,6 +77,7 @@ num_workers: 4
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>
+    shuffle: True
 
 valid_dataloader_options:
     batch_size: !ref <test_batch_size>
@@ -133,19 +131,19 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
 
 # Time drop: randomly drops a number of temporal chunks.
 #drop_chunk: !new:speechbrain.augment.time_domain.DropChunk
-#    drop_length_low: !ref <sample_rate> * 2
-#    drop_length_high: !ref <sample_rate> * 4
-#    drop_count_low: 2
-#    drop_count_high: 4
+#    drop_length_low: 1000
+#    drop_length_high: 2000
+#    drop_count_low: 1
+#    drop_count_high: 5
 
 # Augmenter: Combines previously defined augmentations to perform data augmentation
-wav_augment: !new:speechbrain.augment.augmenter.Augmenter
-    parallel_augment: False
-    concat_original: False
-    min_augmentations: 2
-    max_augmentations: 2
-    augment_prob: 0.95
-    augmentations: [!ref <add_noise>, !ref <drop_freq>] #, !ref <drop_chunk>, !ref <speed_perturb>]
+#wav_augment: !new:speechbrain.augment.augmenter.Augmenter
+#    parallel_augment: False
+#    concat_original: False
+#    min_augmentations: 2
+#    max_augmentations: 2
+#    augment_prob: 0.9
+#    augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
 #compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
@@ -167,20 +165,15 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper
 #    save_path: !ref <output_folder>/whisper
 
 #compute_features: !new:nemo_encoder.NeMoEncoder
-#    source: !ref <pretrained_source>
-    #source: !ref <pretrained_source> / canary-1b.nemo
-    #nemo_type: "MultiTask"
-    #source_dir: !ref <pretrained_source>
+#    source: !ref <pretrained_source> / canary-1b.nemo
 #    freeze: !ref <freeze_pretrained>
+#    nemo_type: "MultiTask"
+#    source_dir: !ref <pretrained_source>
 
 #compute_features: !new:xeus_encoder.XEUS_Encoder
 #    source: !ref <pretrained_source>
 #    freeze: !ref <freeze_pretrained>
 #    save_path: !ref <output_folder>/xeus
-
-#compute_features: !new:eat.EAT_AS2M
-#    source: !ref <pretrained_source>
-#    freeze: !ref <freeze_pretrained>
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
 #    input_size: !ref <feature_size>
@@ -191,11 +184,7 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper
 #    attention_channels: 128
 #    lin_neurons: !ref <embedding_size>
 #    dropout: 0.2
-#
-#embedding_model: !new:speechbrain.lobes.models.VanillaNN.VanillaNN
-#    input_shape: [null, null, !ref <feature_size>]
-#    dnn_blocks: !ref <dnn_blocks>
-#    dnn_neurons: !ref <embedding_size>
+
 embedding_model: !new:torch.nn.Sequential
     - !new:speechbrain.nnet.linear.Linear
         input_size: !ref <feature_size>
@@ -208,39 +197,42 @@ embedding_model: !new:torch.nn.Sequential
     - !new:speechbrain.nnet.linear.Linear
         input_size: !ref <embedding_size>
         n_neurons: !ref <embedding_size>
-    - !new:torch.nn.Dropout
-        p: !ref <dropout>
-    - !new:torch.nn.LeakyReLU
+    # We want to target the full output before dropout/activation
+    #- !new:torch.nn.Dropout
+    #    p: !ref <dropout>
+    #- !new:torch.nn.LeakyReLU
 
-classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
-    input_size: !ref <embedding_size>
-    out_neurons: !ref <out_neurons>
+# Add this after the last linear -- layer 4
+sae_layer: 4.w
+embedding_sae: !new:speechbrain.nnet.adapters.AdaptedModel
+    model_to_adapt: !ref <embedding_model>
+    adapter_class: !name:sparse_autoencoder.SparseAutoEncoder
+    target_layers: [!ref <sae_layer>]
+    manual_adapter_insertion: True
+    adapter_kwargs:
+        dict_size: !ref <dictionary_size>
+        activation_fn: !new:jumprelu.JumpReLU
+            input_size: !ref <dictionary_size>
+            #fixed_threshold: 0.01
+        storing_activations: True
+        sparse_loss_fn: L0
 
 # Functions
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
     limit: !ref <epochs>
 
-#mean_var_norm: !new:speechbrain.processing.features.InputNormalization
-#    norm_type: sentence
-#    std_norm: False
-
 modules:
     compute_features: !ref <compute_features>
     embedding_model: !ref <embedding_model>
-    classifier: !ref <classifier>
-    #mean_var_norm: !ref <mean_var_norm>
+    embedding_sae: !ref <embedding_sae>
 
 softmax: !new:speechbrain.nnet.activations.Softmax
 log_softmax: !new:speechbrain.nnet.activations.Softmax
     apply_log: True
 
-bce_loss: !name:speechbrain.nnet.losses.bce_loss
-    allowed_len_diff: 0
-    label_smoothing: 0.01
-
-opt_class: !name:torch.optim.Adam
+opt_class: !name:bitsandbytes.optim.Adam8bit
     lr: !ref <lr>
-    weight_decay: 0.01
+    weight_decay: 0.0001
 
 lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
     num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
@@ -250,17 +242,14 @@ lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
 
-# Error computation
-error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
-    positive_label: 1
-error_metric: chunk_F-score
-
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>
     recoverables:
-        #compute_features: !ref <compute_features>
-        embedding_model: !ref <embedding_model>
-        classifier: !ref <classifier>
-        #normalizer: !ref <mean_var_norm>
+        embedding_sae: !ref <embedding_sae>
         counter: !ref <epoch_counter>
-        #lr_annealing: !ref <lr_annealing>
+
+pretrainer: !new:speechbrain.utils.parameter_transfer.Pretrainer
+    loadables:
+        embedding_model: !ref <embedding_model>
+    paths:
+        embedding_model: pretrained/whisper_small/embedding_model.ckpt

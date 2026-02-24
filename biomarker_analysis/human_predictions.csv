@@ -1,0 +1,578 @@
+,rater_id,sample_index,uid,task,shared,pid,duration,l1,status,lang,age,updrs,start,sex,sample_index.1,file,decision,confidence,cause,otherCauseText,origCause,first_lang,correct,age_range,severity
+0,rater_1,0,qpn_MNI0438_recall_childhood_en_Batch2_1,recall,global,MNI0438,30.0,English,HC,en,0,0.0,30.0,M,,sample_0.wav,control,leaning,healthy,,,True,1,unknown,unknown
+1,rater_1,1,qpn_PD01182_read_fr_Batch1_0,read,global,PD01182,30.0,French,HC,fr,82,12.0,0.0,M,,sample_1.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+2,rater_1,2,qpn_PD01067_read_en_Batch1_0,read,global,PD01067,30.0,English,HC,en,67,,0.0,F,,sample_2.wav,control,confident,healthy,,,True,1,63-72,unknown
+3,rater_1,3,qpn_PD00267_dpt_fr_Batch1_0,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,,sample_3.wav,parkinsons,certain,voice,,,True,1,73-82,moderate
+4,rater_1,4,qpn_PD01270_recall_childhood_fr_Batch1_0,recall,individual,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,,sample_4.wav,control,certain,healthy,,,True,0,63-72,mild
+5,rater_1,5,qpn_MNI0301_read_fr_Batch2_0,read,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,,sample_5.wav,control,certain,healthy,,,True,1,unknown,unknown
+6,rater_1,6,qpn_MNI0301_a1_Batch2_0,vowel_repeat,global,MNI0301,7.5510625,French,HC,other,0,0.0,0.0,F,,sample_6.wav,parkinsons,leaning,voice,,,False,0,unknown,unknown
+7,rater_1,7,qpn_MNI0381_recall_la_fr_Batch2_0,recall,individual,MNI0381,30.0,French,HC,fr,0,0.0,0.0,F,,sample_7.wav,control,confident,healthy,,,True,1,unknown,unknown
+8,rater_1,8,qpn_PD00509_repeat_combined_en_Batch1_0,repeat,individual,PD00509,13.6780625,English,PD,en,77,39.0,0.0,M,,sample_8.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+9,rater_1,9,qpn_PD01270_recall_la_fr_Batch1_2,recall,global,PD01270,30.0,French,PD,fr,70,7.0,60.0,F,,sample_9.wav,parkinsons,leaning,prosody,,,True,1,63-72,mild
+10,rater_1,10,qpn_PD01182_repeat_combined_en_Batch1_0,repeat,individual,PD01182,8.9169375,French,HC,en,82,12.0,0.0,M,,sample_10.wav,parkinsons,leaning,prosody,,,False,0,73-82,mild
+11,rater_1,11,qpn_MNI0249_recall_la_fr_Batch2_0,recall,individual,MNI0249,30.0,French,PD,fr,0,50.0,0.0,M,,sample_11.wav,parkinsons,leaning,prosody,,,True,1,unknown,moderate
+12,rater_1,12,qpn_PD01318_dpt_fr_Batch1_2,dpt,individual,PD01318,30.0,French,HC,fr,68,,60.0,F,,sample_12.wav,control,certain,healthy,,,True,1,63-72,unknown
+13,rater_1,13,qpn_PD01156_read_fr_Batch1_0,read,global,PD01156,30.0,French,PD,fr,82,47.0,0.0,F,,sample_13.wav,parkinsons,certain,prosody,,,True,1,73-82,moderate
+14,rater_1,14,qpn_MNI0420_a1_Batch2_0,vowel_repeat,individual,MNI0420,15.933625,English,HC,other,0,0.0,0.0,F,,sample_14.wav,parkinsons,confident,voice,,,False,0,unknown,unknown
+15,rater_1,15,qpn_MNI0286_read_en_Batch2_0,read,global,MNI0286,30.0,English,PD,en,0,0.0,0.0,M,,sample_15.wav,parkinsons,certain,voice,,,True,1,unknown,unknown
+16,rater_1,16,qpn_PD01130_dpt_en_Batch1_2,dpt,global,PD01130,30.0,English,HC,en,65,,60.0,F,,sample_16.wav,parkinsons,confident,prosody,,,True,0,63-72,unknown
+17,rater_1,17,qpn_MNI0460_recall_la_en_Batch2_0,recall,individual,MNI0460,30.0,English,HC,en,0,0.0,0.0,M,,sample_17.wav,control,certain,healthy,,,True,1,unknown,unknown
+18,rater_1,18,qpn_MNI0301_recall_childhood_fr_Batch2_0,recall,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,,sample_18.wav,control,certain,healthy,,,True,1,unknown,unknown
+19,rater_1,19,qpn_PD01273_a2_Batch1_0,vowel_repeat,global,PD01273,17.45475,French,HC,other,61,,0.0,M,,sample_19.wav,parkinsons,confident,voice,,,False,0,53-62,unknown
+20,rater_1,20,qpn_PD01130_repeat_combined_en_Batch1_0,repeat,individual,PD01130,9.7095,English,HC,en,65,,0.0,F,,sample_20.wav,control,certain,healthy,,,True,1,63-72,unknown
+21,rater_1,21,qpn_PD01270_dpt_fr_Batch1_0,dpt,global,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,,sample_21.wav,parkinsons,unsure,prosody,,,True,1,63-72,mild
+22,rater_1,22,qpn_PD01273_dpt_fr_Batch1_0,dpt,individual,PD01273,30.0,French,HC,fr,61,,0.0,M,,sample_22.wav,control,certain,healthy,,,True,1,53-62,unknown
+23,rater_1,23,qpn_PD01268_dpt_fr_Batch1_0,dpt,global,PD01268,30.0,French,HC,fr,63,,0.0,F,,sample_23.wav,control,certain,healthy,,,True,1,63-72,unknown
+24,rater_1,24,qpn_PD01383_read_fr_Batch2_0,read,individual,PD01383,30.0,French,HC,fr,0,0.0,0.0,M,,sample_24.wav,parkinsons,confident,voice,,,True,0,unknown,unknown
+25,rater_1,25,qpn_PD01387_read_en_Batch1_1,read,individual,PD01387,30.0,French,PD,en,61,,30.0,F,,sample_25.wav,parkinsons,confident,voice,,,False,1,53-62,unknown
+26,rater_1,26,qpn_PD01270_read_fr_Batch1_0,read,individual,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,,sample_26.wav,control,confident,healthy,,,True,0,63-72,mild
+27,rater_1,27,qpn_MNI0605_recall_childhood_fr_Batch2_1,recall,global,MNI0605,30.0,French,HC,fr,0,0.0,30.0,M,,sample_27.wav,parkinsons,unsure,language,,,True,0,unknown,unknown
+28,rater_1,28,qpn_PD01289_read_en_Batch1_0,read,individual,PD01289,30.0,French,HC,en,62,,0.0,F,,sample_28.wav,control,certain,healthy,,,False,1,53-62,unknown
+29,rater_1,29,qpn_MNI0417_repeat_combined_en_Batch2_0,repeat,global,MNI0417,15.033,English,HC,en,0,0.0,0.0,F,,sample_29.wav,parkinsons,confident,voice,,,True,0,unknown,unknown
+30,rater_1,30,qpn_PD00267_dpt_fr_Batch1_1,dpt,individual,PD00267,30.0,French,PD,fr,80,56.0,30.0,M,,sample_30.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+31,rater_1,31,qpn_MNI0454_recall_childhood_en_Batch2_0,recall,individual,MNI0454,30.0,English,HC,en,0,0.0,0.0,F,,sample_31.wav,parkinsons,leaning,prosody,,,True,0,unknown,unknown
+32,rater_1,32,qpn_PD01182_dpt_fr_Batch1_2,dpt,global,PD01182,30.0,French,HC,fr,82,12.0,60.0,M,,sample_32.wav,parkinsons,confident,voice,,,True,0,73-82,mild
+33,rater_1,34,qpn_PD01071_read_fr_Batch1_0,read,individual,PD01071,30.0,English,HC,fr,82,26.0,0.0,F,,sample_34.wav,parkinsons,confident,voice,,,False,0,73-82,mild
+34,rater_1,35,qpn_PD00119_dpt_en_Batch1_0,dpt,global,PD00119,30.0,English,PD,en,66,39.0,0.0,M,,sample_35.wav,parkinsons,leaning,voice,,,True,1,63-72,moderate
+35,rater_1,36,qpn_MNI0380_dpt_en_Batch2_1,dpt,individual,MNI0380,30.0,English,PD,en,0,29.0,30.0,F,,sample_36.wav,control,leaning,other,"she seems to be hypernasal, which makes me hesitate",,True,0,unknown,mild
+36,rater_1,37,qpn_PD01130_recall_childhood_en_Batch1_1,recall,global,PD01130,30.0,English,HC,en,65,,30.0,F,,sample_37.wav,control,leaning,healthy,,,True,1,63-72,unknown
+37,rater_1,38,qpn_PD00119_dpt_en_Batch1_1,dpt,individual,PD00119,30.0,English,PD,en,66,39.0,30.0,M,,sample_38.wav,parkinsons,leaning,voice,,,True,1,63-72,moderate
+38,rater_1,39,qpn_MNI0379_recall_la_en_Batch2_1,recall,global,MNI0379,30.0,English,PD,en,0,87.0,30.0,F,,sample_39.wav,control,certain,healthy,,,True,0,unknown,severe
+39,rater_1,40,qpn_PD01182_read_en_Batch1_0,read,global,PD01182,30.0,French,HC,en,82,12.0,0.0,M,,sample_40.wav,parkinsons,unsure,other,English seems like his second language. But we here raucity and quality changes in some words,,False,0,73-82,mild
+40,rater_1,41,qpn_PD01182_repeat_combined_fr_Batch1_0,repeat,global,PD01182,9.822625,French,HC,fr,82,12.0,0.0,M,,sample_41.wav,parkinsons,unsure,voice,,,True,0,73-82,mild
+41,rater_1,42,qpn_PD00959_repeat_combined_fr_Batch2_0,repeat,global,PD00959,12.9015625,French,PD,fr,0,51.0,0.0,F,,sample_42.wav,parkinsons,certain,voice,,,True,1,unknown,moderate
+42,rater_1,43,qpn_PD00653_read_en_Batch1_0,read,global,PD00653,30.0,English,PD,en,77,,0.0,F,,sample_43.wav,parkinsons,unsure,voice,,,True,1,73-82,unknown
+43,rater_1,44,qpn_PD00653_a1_Batch1_0,vowel_repeat,individual,PD00653,20.769,English,PD,other,77,,0.0,F,,sample_44.wav,control,unsure,healthy,,,False,0,73-82,unknown
+44,rater_1,45,qpn_PD00952_a1_Batch1_0,vowel_repeat,individual,PD00952,18.0620625,Other,HC,other,53,,0.0,M,,sample_45.wav,parkinsons,leaning,voice,,,False,0,53-62,unknown
+45,rater_1,46,qpn_PD00119_read_en_Batch1_0,read,individual,PD00119,30.0,English,PD,en,66,39.0,0.0,M,,sample_46.wav,parkinsons,leaning,voice,,,True,1,63-72,moderate
+46,rater_1,47,qpn_MNI0380_recall_la_en_Batch2_0,recall,individual,MNI0380,30.0,English,PD,en,0,29.0,0.0,F,,sample_47.wav,control,,other,there is a big difference between the first 15 and last 15 seconds which made me hesitate. at first the initiation is very slow,,True,0,unknown,mild
+47,rater_1,48,qpn_PD00396_recall_la_fr_Batch1_0,recall,global,PD00396,4.0044375,French,PD,fr,80,41.0,0.0,M,,sample_48.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+48,rater_1,49,qpn_MNI0438_dpt_en_Batch2_1,dpt,individual,MNI0438,30.0,English,HC,en,0,0.0,30.0,M,,sample_49.wav,control,certain,healthy,,,True,1,unknown,unknown
+49,rater_1,50,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,,sample_50.wav,parkinsons,unsure,voice,,,False,1,53-62,unknown
+50,rater_1,51,qpn_PD01022_dpt_en_Batch2_1,dpt,global,PD01022,30.0,French,PD,en,0,63.0,30.0,F,,sample_51.wav,parkinsons,unsure,voice,i think I hear a bit of mumble but could be the fact that English is not her mother tongue,,False,1,unknown,severe
+51,rater_1,52,qpn_PD01273_recall_childhood_fr_Batch1_0,recall,individual,PD01273,30.0,French,HC,fr,61,,0.0,M,,sample_52.wav,control,leaning,other,some hesitations,,True,1,53-62,unknown
+52,rater_1,54,qpn_MNI0382_recall_la_en_Batch2_0,recall,individual,MNI0382,30.0,English,PD,en,0,35.0,0.0,M,,sample_54.wav,parkinsons,confident,voice,,,True,1,unknown,moderate
+53,rater_1,55,qpn_PD01156_repeat_combined_en_Batch1_0,repeat,individual,PD01156,16.0944375,French,PD,en,82,47.0,0.0,F,,sample_55.wav,parkinsons,confident,prosody,,,False,1,73-82,moderate
+54,rater_1,56,qpn_PD00509_a3_Batch1_0,vowel_repeat,individual,PD00509,18.25,English,PD,other,77,39.0,0.0,M,,sample_56.wav,parkinsons,certain,voice,,,False,1,73-82,moderate
+55,rater_1,57,qpn_MNI0249_read_fr_Batch2_0,read,individual,MNI0249,30.0,French,PD,fr,0,50.0,0.0,M,,sample_57.wav,parkinsons,unsure,voice,,,True,1,unknown,moderate
+56,rater_1,58,qpn_MNI0420_dpt_en_Batch2_2,dpt,individual,MNI0420,30.0,English,HC,en,0,0.0,60.0,F,,sample_58.wav,control,confident,healthy,,,True,1,unknown,unknown
+57,rater_1,59,qpn_PD01156_dpt_fr_Batch1_1,dpt,individual,PD01156,30.0,French,PD,fr,82,47.0,30.0,F,,sample_59.wav,parkinsons,leaning,prosody,,,True,1,73-82,moderate
+58,rater_1,60,qpn_PD00952_read_en_Batch1_0,read,individual,PD00952,30.0,Other,HC,en,53,,0.0,M,,sample_60.wav,parkinsons,unsure,prosody,he seems like a Francophone. unsure if the uneven prosody is due to that,,False,0,53-62,unknown
+59,rater_1,61,qpn_PD01314_dpt_en_Batch1_3,dpt,global,PD01314,30.0,Other,HC,en,55,,90.0,M,,sample_61.wav,control,certain,healthy,,,False,1,53-62,unknown
+60,rater_1,63,qpn_PD01245_a1_Batch1_0,vowel_repeat,global,PD01245,17.642,English,PD,other,70,11.0,0.0,F,,sample_63.wav,control,leaning,healthy,,,False,0,63-72,mild
+61,rater_2,0,qpn_MNI0438_recall_childhood_en_Batch2_3,recall,individual,MNI0438,30.0,English,HC,en,0,0.0,90.0,M,,sample_0.wav,control,confident,healthy,,,True,1,unknown,unknown
+62,rater_2,1,qpn_PD01289_a2_Batch1_0,vowel_repeat,individual,PD01289,28.2518125,French,HC,other,62,,0.0,F,,sample_1.wav,parkinsons,certain,voice,,,False,0,53-62,unknown
+63,rater_2,2,qpn_PD00959_dpt_fr_Batch2_0,dpt,individual,PD00959,30.0,French,PD,fr,0,51.0,0.0,F,,sample_2.wav,parkinsons,leaning,voice,,,True,1,unknown,moderate
+64,rater_2,3,qpn_MNI0249_a1_Batch2_0,vowel_repeat,individual,MNI0249,12.0764375,French,PD,other,0,50.0,0.0,M,,sample_3.wav,parkinsons,confident,voice,,,False,1,unknown,moderate
+65,rater_2,4,qpn_PD00959_repeat_combined_fr_Batch2_0,repeat,global,PD00959,12.9015625,French,PD,fr,0,51.0,0.0,F,,sample_4.wav,parkinsons,leaning,voice,,,True,1,unknown,moderate
+66,rater_2,6,qpn_PD01182_read_fr_Batch1_0,read,global,PD01182,30.0,French,HC,fr,82,12.0,0.0,M,,sample_6.wav,control,unsure,voice,,,True,1,73-82,mild
+67,rater_2,7,qpn_PD01156_read_fr_Batch1_0,read,global,PD01156,30.0,French,PD,fr,82,47.0,0.0,F,,sample_7.wav,parkinsons,confident,prosody,,,True,1,73-82,moderate
+68,rater_2,8,qpn_PD01273_read_en_Batch1_1,read,individual,PD01273,30.0,French,HC,en,61,,30.0,M,,sample_8.wav,control,confident,healthy,,,False,1,53-62,unknown
+69,rater_2,9,qpn_MNI0379_recall_la_en_Batch2_1,recall,global,MNI0379,30.0,English,PD,en,0,87.0,30.0,F,,sample_9.wav,control,confident,healthy,,,True,0,unknown,severe
+70,rater_2,10,qpn_MNI0380_recall_childhood_en_Batch2_3,recall,individual,MNI0380,30.0,English,PD,en,0,29.0,90.0,F,,sample_10.wav,control,certain,healthy,,,True,0,unknown,mild
+71,rater_2,11,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,,sample_11.wav,parkinsons,confident,voice,,,False,1,53-62,unknown
+72,rater_2,12,qpn_PD00267_repeat_combined_fr_Batch1_0,repeat,individual,PD00267,8.65975,French,PD,fr,80,56.0,0.0,M,,sample_12.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+73,rater_2,13,qpn_MNI0382_recall_childhood_en_Batch2_0,recall,individual,MNI0382,30.0,English,PD,en,0,35.0,0.0,M,,sample_13.wav,control,confident,healthy,,,True,0,unknown,moderate
+74,rater_2,14,qpn_PD00267_dpt_fr_Batch1_0,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,,sample_14.wav,parkinsons,certain,prosody,,,True,1,73-82,moderate
+75,rater_2,15,qpn_PD01268_dpt_fr_Batch1_0,dpt,global,PD01268,30.0,French,HC,fr,63,,0.0,F,,sample_15.wav,control,certain,healthy,,,True,1,63-72,unknown
+76,rater_2,16,qpn_MNI0454_dpt_en_Batch2_2,dpt,individual,MNI0454,30.0,English,HC,en,0,0.0,60.0,F,,sample_16.wav,control,leaning,other,could be some dysphonia related to age and not PD,,True,1,unknown,unknown
+77,rater_2,17,qpn_PD00119_dpt_en_Batch1_0,dpt,global,PD00119,30.0,English,PD,en,66,39.0,0.0,M,,sample_17.wav,parkinsons,confident,voice,,,True,1,63-72,moderate
+78,rater_2,18,qpn_PD01182_dpt_fr_Batch1_2,dpt,global,PD01182,30.0,French,HC,fr,82,12.0,60.0,M,,sample_18.wav,control,unsure,other,could be a presbydysphonia and not PD,,True,1,73-82,mild
+79,rater_2,19,qpn_PD01383_dpt_fr_Batch2_0,dpt,individual,PD01383,30.0,French,HC,fr,0,0.0,0.0,M,,sample_19.wav,control,confident,healthy,,,True,1,unknown,unknown
+80,rater_2,20,qpn_PD01022_dpt_en_Batch2_0,dpt,individual,PD01022,30.0,French,PD,en,0,63.0,0.0,F,,sample_20.wav,control,leaning,healthy,,,False,0,unknown,severe
+81,rater_2,22,qpn_PD01130_read_fr_Batch1_0,read,individual,PD01130,30.0,English,HC,fr,65,,0.0,F,,sample_22.wav,control,confident,healthy,,,False,1,63-72,unknown
+82,rater_2,23,qpn_PD01314_dpt_en_Batch1_3,dpt,global,PD01314,30.0,Other,HC,en,55,,90.0,M,,sample_23.wav,parkinsons,leaning,language,,,False,0,53-62,unknown
+83,rater_2,24,qpn_PD01067_read_en_Batch1_0,read,global,PD01067,30.0,English,HC,en,67,,0.0,F,,sample_24.wav,control,confident,healthy,,,True,1,63-72,unknown
+84,rater_2,25,qpn_MNI0286_read_en_Batch2_0,read,global,MNI0286,30.0,English,PD,en,0,0.0,0.0,M,,sample_25.wav,parkinsons,unsure,language,could be aphasia?,,True,1,unknown,unknown
+85,rater_2,26,qpn_PD01693_recall_la_fr_Batch2_0,recall,individual,PD01693,30.0,French,PD,fr,0,36.0,0.0,F,,sample_26.wav,control,unsure,other,may have some voice features?,,True,0,unknown,moderate
+86,rater_2,27,qpn_PD00267_recall_la_fr_Batch1_1,recall,individual,PD00267,30.0,French,PD,fr,80,56.0,30.0,M,,sample_27.wav,parkinsons,confident,prosody,,,True,1,73-82,moderate
+87,rater_2,28,qpn_PD01289_dpt_fr_Batch1_1,dpt,individual,PD01289,30.0,French,HC,fr,62,,30.0,F,,sample_28.wav,control,leaning,healthy,,,True,1,53-62,unknown
+88,rater_2,29,qpn_MNI0605_recall_childhood_fr_Batch2_1,recall,global,MNI0605,30.0,French,HC,fr,0,0.0,30.0,M,,sample_29.wav,control,leaning,healthy,,,True,1,unknown,unknown
+89,rater_2,30,qpn_PD01156_read_en_Batch1_1,read,individual,PD01156,30.0,French,PD,en,82,47.0,30.0,F,,sample_30.wav,parkinsons,leaning,prosody,,,False,1,73-82,moderate
+90,rater_2,31,qpn_MNI0380_a2_Batch2_0,vowel_repeat,individual,MNI0380,25.33775,English,PD,other,0,29.0,0.0,F,,sample_31.wav,control,leaning,other,some voice instability toward the end of the MPT which does not seem associated to PD?,,False,0,unknown,mild
+91,rater_2,32,qpn_MNI0605_read_fr_Batch2_0,read,individual,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,,sample_32.wav,control,confident,healthy,,,True,1,unknown,unknown
+92,rater_2,33,qpn_MNI0420_recall_childhood_en_Batch2_2,recall,individual,MNI0420,30.0,English,HC,en,0,0.0,60.0,F,,sample_33.wav,control,confident,healthy,,,True,1,unknown,unknown
+93,rater_2,34,qpn_MNI0286_read_en_Batch2_1,read,individual,MNI0286,30.0,English,PD,en,0,0.0,30.0,M,,sample_34.wav,parkinsons,confident,prosody,,,True,1,unknown,unknown
+94,rater_2,35,qpn_MNI0415_dpt_fr_Batch2_0,dpt,individual,MNI0415,30.0,French,PD,fr,0,40.0,0.0,M,,sample_35.wav,control,leaning,healthy,,,True,0,unknown,moderate
+95,rater_2,37,qpn_MNI0460_dpt_en_Batch2_3,dpt,individual,MNI0460,30.0,English,HC,en,0,0.0,90.0,M,,sample_37.wav,control,certain,healthy,,,True,1,unknown,unknown
+96,rater_2,38,qpn_PD01182_repeat_combined_fr_Batch1_0,repeat,global,PD01182,9.822625,French,HC,fr,82,12.0,0.0,M,,sample_38.wav,parkinsons,certain,voice,,,True,0,73-82,mild
+97,rater_2,39,qpn_PD01270_dpt_fr_Batch1_0,dpt,global,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,,sample_39.wav,control,confident,healthy,,,True,0,63-72,mild
+98,rater_2,40,qpn_PD00952_repeat_combined_en_Batch1_0,repeat,individual,PD00952,10.649,Other,HC,en,53,,0.0,M,,sample_40.wav,parkinsons,unsure,voice,,,False,0,53-62,unknown
+99,rater_2,41,qpn_MNI0286_dpt_en_Batch2_0,dpt,individual,MNI0286,30.0,English,PD,en,0,0.0,0.0,M,,sample_41.wav,parkinsons,unsure,language,,,True,1,unknown,unknown
+100,rater_2,42,qpn_MNI0415_read_fr_Batch2_0,read,individual,MNI0415,30.0,French,PD,fr,0,40.0,0.0,M,,sample_42.wav,parkinsons,confident,prosody,,,True,1,unknown,moderate
+101,rater_2,43,qpn_MNI0301_recall_la_fr_Batch2_3,recall,individual,MNI0301,30.0,French,HC,fr,0,0.0,90.0,F,,sample_43.wav,control,confident,healthy,,,True,1,unknown,unknown
+102,rater_2,44,qpn_PD01182_read_en_Batch1_0,read,global,PD01182,30.0,French,HC,en,82,12.0,0.0,M,,sample_44.wav,parkinsons,confident,voice,,,False,0,73-82,mild
+103,rater_2,45,qpn_PD01289_repeat_combined_fr_Batch1_0,repeat,individual,PD01289,7.758,French,HC,fr,62,,0.0,F,,sample_45.wav,parkinsons,leaning,voice,,,True,0,53-62,unknown
+104,rater_2,46,qpn_MNI0605_a2_Batch2_0,vowel_repeat,individual,MNI0605,12.4995625,French,HC,other,0,0.0,0.0,M,,sample_46.wav,parkinsons,unsure,voice,possible PD hypophonia/dysphonia?,,False,0,unknown,unknown
+105,rater_2,47,qpn_PD01182_recall_childhood_fr_Batch1_0,recall,individual,PD01182,30.0,French,HC,fr,82,12.0,0.0,M,,sample_47.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+106,rater_2,48,qpn_MNI0301_read_fr_Batch2_0,read,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,,sample_48.wav,control,confident,healthy,,,True,1,unknown,unknown
+107,rater_2,49,qpn_PD01387_repeat_combined_fr_Batch1_0,repeat,individual,PD01387,17.309625,French,PD,fr,61,,0.0,F,,sample_49.wav,parkinsons,leaning,voice,uncertain... voice appears slightly hypophonic and strained but could be related to s dyphonia and not PD,,True,1,53-62,unknown
+108,rater_2,50,qpn_PD01270_recall_la_fr_Batch1_2,recall,global,PD01270,30.0,French,PD,fr,70,7.0,60.0,F,,sample_50.wav,parkinsons,leaning,voice,,,True,1,63-72,mild
+109,rater_2,51,qpn_MNI0301_recall_childhood_fr_Batch2_0,recall,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,,sample_51.wav,control,leaning,healthy,,,True,1,unknown,unknown
+110,rater_2,52,qpn_PD00653_read_en_Batch1_0,read,global,PD00653,30.0,English,PD,en,77,,0.0,F,,sample_52.wav,parkinsons,confident,voice,,,True,1,73-82,unknown
+111,rater_2,53,qpn_MNI0301_a1_Batch2_0,vowel_repeat,global,MNI0301,7.5510625,French,HC,other,0,0.0,0.0,F,,sample_53.wav,parkinsons,confident,voice,,,False,0,unknown,unknown
+112,rater_2,54,qpn_PD01130_dpt_en_Batch1_2,dpt,global,PD01130,30.0,English,HC,en,65,,60.0,F,,sample_54.wav,parkinsons,leaning,language,"some hypophonia, dysfluency and lexical retrieval issues but could also be from another neuro disease?",,True,0,63-72,unknown
+113,rater_2,55,qpn_PD01245_a1_Batch1_0,vowel_repeat,global,PD01245,17.642,English,PD,other,70,11.0,0.0,F,,sample_55.wav,parkinsons,leaning,voice,,,False,1,63-72,mild
+114,rater_2,56,qpn_MNI0438_recall_childhood_en_Batch2_1,recall,global,MNI0438,30.0,English,HC,en,0,0.0,30.0,M,,sample_56.wav,parkinsons,leaning,voice,,,True,0,unknown,unknown
+115,rater_2,57,qpn_PD01273_a2_Batch1_0,vowel_repeat,global,PD01273,17.45475,French,HC,other,61,,0.0,M,,sample_57.wav,parkinsons,leaning,voice,,,False,0,53-62,unknown
+116,rater_2,58,qpn_PD00396_recall_la_fr_Batch1_0,recall,global,PD00396,4.0044375,French,PD,fr,80,41.0,0.0,M,,sample_58.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+117,rater_2,59,qpn_MNI0419_read_en_Batch2_0,read,individual,MNI0419,30.0,English,HC,en,0,0.0,0.0,F,,sample_59.wav,control,confident,healthy,,,True,1,unknown,unknown
+118,rater_2,60,qpn_PD01022_dpt_en_Batch2_1,dpt,global,PD01022,30.0,French,PD,en,0,63.0,30.0,F,,sample_60.wav,control,confident,healthy,,,False,0,unknown,severe
+119,rater_2,61,qpn_PD01130_recall_childhood_en_Batch1_1,recall,global,PD01130,30.0,English,HC,en,65,,30.0,F,,sample_61.wav,parkinsons,leaning,voice,,,True,0,63-72,unknown
+120,rater_2,62,qpn_PD01387_read_fr_Batch1_0,read,individual,PD01387,30.0,French,PD,fr,61,,0.0,F,,sample_62.wav,parkinsons,leaning,voice,,,True,1,53-62,unknown
+121,rater_2,63,qpn_MNI0417_repeat_combined_en_Batch2_0,repeat,global,MNI0417,15.033,English,HC,en,0,0.0,0.0,F,,sample_63.wav,parkinsons,leaning,prosody,,,True,0,unknown,unknown
+122,rater_3,1,qpn_PD01245_a1_Batch1_0,vowel_repeat,global,PD01245,17.642,English,PD,other,70,11.0,0.0,F,1.0,sample_1.wav,control,unsure,healthy,,,False,0,63-72,mild
+123,rater_3,2,qpn_MNI0573_a1_Batch2_0,vowel_repeat,individual,MNI0573,26.841875,French,HC,other,0,0.0,0.0,F,2.0,sample_2.wav,control,unsure,healthy,,,False,1,unknown,unknown
+124,rater_3,3,qpn_PD00509_dpt_en_Batch1_0,dpt,individual,PD00509,30.0,English,PD,en,77,39.0,0.0,M,3.0,sample_3.wav,parkinsons,unsure,voice,,,True,1,73-82,moderate
+125,rater_3,4,qpn_PD00959_repeat_combined_fr_Batch2_0,repeat,global,PD00959,12.9015625,French,PD,fr,0,51.0,0.0,F,4.0,sample_4.wav,parkinsons,unsure,voice,,,True,1,unknown,moderate
+126,rater_3,5,qpn_PD01022_dpt_fr_Batch2_0,dpt,individual,PD01022,30.0,French,PD,fr,0,63.0,0.0,F,5.0,sample_5.wav,control,confident,healthy,,,True,0,unknown,severe
+127,rater_3,6,qpn_PD00119_dpt_en_Batch1_0,dpt,global,PD00119,30.0,English,PD,en,66,39.0,0.0,M,6.0,sample_6.wav,parkinsons,leaning,voice,,,True,1,63-72,moderate
+128,rater_3,7,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,7.0,sample_7.wav,parkinsons,leaning,prosody,,,False,1,53-62,unknown
+129,rater_3,8,qpn_PD00267_recall_la_fr_Batch1_0,recall,individual,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,8.0,sample_8.wav,parkinsons,certain,prosody,,,True,1,73-82,moderate
+130,rater_3,9,qpn_PD00396_read_en_Batch1_0,read,individual,PD00396,30.0,French,PD,en,80,41.0,0.0,M,9.0,sample_9.wav,parkinsons,leaning,voice,,,False,1,73-82,moderate
+131,rater_3,10,qpn_MNI0605_dpt_fr_Batch2_0,dpt,individual,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,10.0,sample_10.wav,control,confident,healthy,,,True,1,unknown,unknown
+132,rater_3,11,qpn_PD01156_read_en_Batch1_2,read,individual,PD01156,30.0,French,PD,en,82,47.0,60.0,F,11.0,sample_11.wav,control,leaning,healthy,,,False,0,73-82,moderate
+133,rater_3,12,qpn_PD01273_repeat_combined_fr_Batch1_0,repeat,individual,PD01273,10.01175,French,HC,fr,61,,0.0,M,12.0,sample_12.wav,control,certain,healthy,,,True,1,53-62,unknown
+134,rater_3,13,qpn_PD00952_a2_Batch1_0,vowel_repeat,individual,PD00952,19.4821875,Other,HC,other,53,,0.0,M,13.0,sample_13.wav,control,leaning,healthy,,,False,1,53-62,unknown
+135,rater_3,14,qpn_PD00267_read_fr_Batch1_0,read,individual,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,14.0,sample_14.wav,control,leaning,healthy,,,True,0,73-82,moderate
+136,rater_3,15,qpn_PD01270_recall_la_fr_Batch1_2,recall,global,PD01270,30.0,French,PD,fr,70,7.0,60.0,F,15.0,sample_15.wav,control,unsure,healthy,,,True,0,63-72,mild
+137,rater_3,16,qpn_PD01067_read_en_Batch1_0,read,global,PD01067,30.0,English,HC,en,67,,0.0,F,16.0,sample_16.wav,parkinsons,unsure,voice,,,True,0,63-72,unknown
+138,rater_3,17,qpn_PD00653_read_en_Batch1_0,read,global,PD00653,30.0,English,PD,en,77,,0.0,F,17.0,sample_17.wav,parkinsons,leaning,voice,,,True,1,73-82,unknown
+139,rater_3,18,qpn_PD01273_a2_Batch1_0,vowel_repeat,global,PD01273,17.45475,French,HC,other,61,,0.0,M,18.0,sample_18.wav,control,unsure,healthy,,,False,1,53-62,unknown
+140,rater_3,19,qpn_MNI0301_recall_childhood_fr_Batch2_0,recall,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,19.0,sample_19.wav,control,confident,healthy,,,True,1,unknown,unknown
+141,rater_3,20,qpn_PD01182_dpt_fr_Batch1_2,dpt,global,PD01182,30.0,French,HC,fr,82,12.0,60.0,M,20.0,sample_20.wav,parkinsons,confident,voice,,,True,0,73-82,mild
+142,rater_3,21,qpn_MNI0379_recall_la_en_Batch2_1,recall,global,MNI0379,30.0,English,PD,en,0,87.0,30.0,F,21.0,sample_21.wav,control,unsure,healthy,,,True,0,unknown,severe
+143,rater_3,22,qpn_PD01156_read_fr_Batch1_0,read,global,PD01156,30.0,French,PD,fr,82,47.0,0.0,F,22.0,sample_22.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+144,rater_3,23,qpn_MNI0414_dpt_en_Batch2_3,dpt,individual,MNI0414,30.0,French,HC,en,0,0.0,90.0,M,23.0,sample_23.wav,parkinsons,unsure,prosody,,,False,0,unknown,unknown
+145,rater_3,24,qpn_PD01130_recall_childhood_en_Batch1_1,recall,global,PD01130,30.0,English,HC,en,65,,30.0,F,24.0,sample_24.wav,control,confident,healthy,,,True,1,63-72,unknown
+146,rater_3,25,qpn_PD01182_read_en_Batch1_0,read,global,PD01182,30.0,French,HC,en,82,12.0,0.0,M,25.0,sample_25.wav,parkinsons,leaning,prosody,,,False,0,73-82,mild
+147,rater_3,26,qpn_PD01268_repeat_combined_en_Batch1_0,repeat,individual,PD01268,10.0089375,French,HC,en,63,,0.0,F,26.0,sample_26.wav,parkinsons,leaning,voice,,,False,0,63-72,unknown
+148,rater_3,27,qpn_MNI0605_read_fr_Batch2_0,read,individual,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,27.0,sample_27.wav,control,leaning,healthy,,,True,1,unknown,unknown
+149,rater_3,28,qpn_PD00267_dpt_fr_Batch1_0,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,28.0,sample_28.wav,parkinsons,certain,voice,,,True,1,73-82,moderate
+150,rater_3,29,qpn_PD01182_repeat_combined_fr_Batch1_0,repeat,global,PD01182,9.822625,French,HC,fr,82,12.0,0.0,M,29.0,sample_29.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+151,rater_3,30,qpn_PD01270_dpt_fr_Batch1_0,dpt,global,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,30.0,sample_30.wav,control,confident,healthy,,,True,0,63-72,mild
+152,rater_3,31,qpn_MNI0249_dpt_fr_Batch2_0,dpt,individual,MNI0249,30.0,French,PD,fr,0,50.0,0.0,M,31.0,sample_31.wav,parkinsons,confident,voice,,,True,1,unknown,moderate
+153,rater_3,32,qpn_PD00396_recall_la_fr_Batch1_0,recall,global,PD00396,4.0044375,French,PD,fr,80,41.0,0.0,M,32.0,sample_32.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+154,rater_3,33,qpn_MNI0414_recall_childhood_en_Batch2_1,recall,individual,MNI0414,30.0,French,HC,en,0,0.0,30.0,M,33.0,sample_33.wav,control,unsure,healthy,,,False,1,unknown,unknown
+155,rater_3,34,qpn_PD01022_dpt_en_Batch2_1,dpt,global,PD01022,30.0,French,PD,en,0,63.0,30.0,F,34.0,sample_34.wav,parkinsons,confident,prosody,,,False,1,unknown,severe
+156,rater_3,35,qpn_PD01273_read_en_Batch1_0,read,individual,PD01273,30.0,French,HC,en,61,,0.0,M,35.0,sample_35.wav,control,unsure,healthy,,,False,1,53-62,unknown
+157,rater_3,36,qpn_PD01268_dpt_fr_Batch1_0,dpt,global,PD01268,30.0,French,HC,fr,63,,0.0,F,36.0,sample_36.wav,control,confident,healthy,,,True,1,63-72,unknown
+158,rater_3,37,qpn_MNI0573_recall_la_fr_Batch2_0,recall,individual,MNI0573,30.0,French,HC,fr,0,0.0,0.0,F,37.0,sample_37.wav,parkinsons,confident,prosody,,,True,0,unknown,unknown
+159,rater_3,38,qpn_MNI0605_recall_la_fr_Batch2_2,recall,individual,MNI0605,30.0,French,HC,fr,0,0.0,60.0,M,38.0,sample_38.wav,control,confident,healthy,,,True,1,unknown,unknown
+160,rater_3,39,qpn_PD01314_dpt_en_Batch1_3,dpt,global,PD01314,30.0,Other,HC,en,55,,90.0,M,39.0,sample_39.wav,control,certain,other,I recognize the voice,,False,1,53-62,unknown
+161,rater_3,40,qpn_PD01130_dpt_en_Batch1_2,dpt,global,PD01130,30.0,English,HC,en,65,,60.0,F,40.0,sample_40.wav,parkinsons,unsure,language,,,True,0,63-72,unknown
+162,rater_3,41,qpn_PD01270_recall_la_fr_Batch1_0,recall,individual,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,41.0,sample_41.wav,control,confident,healthy,,,True,0,63-72,mild
+163,rater_3,42,qpn_PD01245_recall_la_en_Batch1_0,recall,individual,PD01245,19.4455,English,PD,en,70,11.0,0.0,F,42.0,sample_42.wav,parkinsons,confident,prosody,,,True,1,63-72,mild
+164,rater_3,43,qpn_MNI0454_recall_la_en_Batch2_3,recall,individual,MNI0454,30.0,English,HC,en,0,0.0,90.0,F,43.0,sample_43.wav,control,confident,healthy,,,True,1,unknown,unknown
+165,rater_3,45,qpn_PD01693_read_fr_Batch2_0,read,individual,PD01693,30.0,French,PD,fr,0,36.0,0.0,F,45.0,sample_45.wav,control,leaning,healthy,,,True,0,unknown,moderate
+166,rater_3,46,qpn_MNI0438_recall_childhood_en_Batch2_1,recall,global,MNI0438,30.0,English,HC,en,0,0.0,30.0,M,46.0,sample_46.wav,control,unsure,healthy,,,True,1,unknown,unknown
+167,rater_3,47,qpn_MNI0419_dpt_en_Batch2_1,dpt,individual,MNI0419,30.0,English,HC,en,0,0.0,30.0,F,47.0,sample_47.wav,control,leaning,healthy,,,True,1,unknown,unknown
+168,rater_3,48,qpn_PD01130_read_en_Batch1_0,read,individual,PD01130,30.0,English,HC,en,65,,0.0,F,48.0,sample_48.wav,control,leaning,healthy,,,True,1,63-72,unknown
+169,rater_3,49,qpn_MNI0379_dpt_en_Batch2_0,dpt,individual,MNI0379,28.755,English,PD,en,0,87.0,0.0,F,49.0,sample_49.wav,parkinsons,unsure,voice,,,True,1,unknown,severe
+170,rater_3,50,qpn_MNI0605_recall_childhood_fr_Batch2_1,recall,global,MNI0605,30.0,French,HC,fr,0,0.0,30.0,M,50.0,sample_50.wav,control,confident,healthy,,,True,1,unknown,unknown
+171,rater_3,51,qpn_PD01182_read_fr_Batch1_0,read,global,PD01182,30.0,French,HC,fr,82,12.0,0.0,M,51.0,sample_51.wav,parkinsons,confident,voice,,,True,0,73-82,mild
+172,rater_3,52,qpn_PD01133_a2_Batch1_0,vowel_repeat,individual,PD01133,12.0705,English,PD,other,63,43.0,0.0,M,52.0,sample_52.wav,parkinsons,certain,voice,,,False,1,63-72,moderate
+173,rater_3,53,qpn_PD00267_repeat_combined_en_Batch1_0,repeat,individual,PD00267,9.9551875,French,PD,en,80,56.0,0.0,M,53.0,sample_53.wav,parkinsons,certain,prosody,,,False,1,73-82,moderate
+174,rater_3,54,qpn_MNI0573_read_fr_Batch2_0,read,individual,MNI0573,30.0,French,HC,fr,0,0.0,0.0,F,54.0,sample_54.wav,control,leaning,healthy,,,True,1,unknown,unknown
+175,rater_3,55,qpn_MNI0301_a1_Batch2_0,vowel_repeat,global,MNI0301,7.5510625,French,HC,other,0,0.0,0.0,F,55.0,sample_55.wav,parkinsons,confident,prosody,,,False,0,unknown,unknown
+176,rater_3,56,qpn_MNI0301_read_fr_Batch2_0,read,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,56.0,sample_56.wav,control,confident,healthy,,,True,1,unknown,unknown
+177,rater_3,57,qpn_PD01318_dpt_fr_Batch1_0,dpt,individual,PD01318,30.0,French,HC,fr,68,,0.0,F,57.0,sample_57.wav,control,leaning,healthy,,,True,1,63-72,unknown
+178,rater_3,58,qpn_MNI0286_read_en_Batch2_0,read,global,MNI0286,30.0,English,PD,en,0,0.0,0.0,M,58.0,sample_58.wav,parkinsons,leaning,voice,,,True,1,unknown,unknown
+179,rater_3,59,qpn_PD00653_repeat_combined_fr_Batch1_0,repeat,individual,PD00653,10.15275,English,PD,fr,77,,0.0,F,59.0,sample_59.wav,parkinsons,certain,voice,,,False,1,73-82,unknown
+180,rater_3,60,qpn_PD00509_recall_la_en_Batch1_1,recall,individual,PD00509,30.0,English,PD,en,77,39.0,30.0,M,60.0,sample_60.wav,parkinsons,certain,prosody,,,True,1,73-82,moderate
+181,rater_3,62,qpn_MNI0417_repeat_combined_en_Batch2_0,repeat,global,MNI0417,15.033,English,HC,en,0,0.0,0.0,F,62.0,sample_62.wav,parkinsons,leaning,voice,,,True,0,unknown,unknown
+182,rater_4,0,qpn_PD01273_a2_Batch1_0,vowel_repeat,global,PD01273,17.45475,French,HC,other,61,,0.0,M,0.0,sample_0.wav,parkinsons,unsure,voice,,,False,0,53-62,unknown
+183,rater_4,1,qpn_PD01182_repeat_combined_fr_Batch1_0,repeat,global,PD01182,9.822625,French,HC,fr,82,12.0,0.0,M,1.0,sample_1.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+184,rater_4,2,qpn_PD00396_dpt_fr_Batch1_1,dpt,individual,PD00396,30.0,French,PD,fr,80,41.0,30.0,M,2.0,sample_2.wav,parkinsons,confident,prosody,,,True,1,73-82,moderate
+185,rater_4,3,qpn_MNI0380_recall_la_en_Batch2_2,recall,individual,MNI0380,30.0,English,PD,en,0,29.0,60.0,F,3.0,sample_3.wav,control,confident,healthy,,,True,0,unknown,mild
+186,rater_4,4,qpn_PD01387_repeat_combined_en_Batch1_0,repeat,individual,PD01387,6.430875,French,PD,en,61,,0.0,F,4.0,sample_4.wav,parkinsons,leaning,voice,Imprecise Articulation (including French part),,False,1,53-62,unknown
+187,rater_4,5,qpn_PD01270_dpt_fr_Batch1_0,dpt,global,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,5.0,sample_5.wav,control,leaning,other,"Mostly typical speech but systematic use of the same sentence structure beginning with ""Je vois...""",,True,0,63-72,mild
+188,rater_4,6,qpn_PD00396_recall_la_fr_Batch1_0,recall,global,PD00396,4.0044375,French,PD,fr,80,41.0,0.0,M,6.0,sample_6.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+189,rater_4,7,qpn_PD00653_read_fr_Batch1_0,read,individual,PD00653,30.0,English,PD,fr,77,,0.0,F,7.0,sample_7.wav,parkinsons,certain,prosody,"Main is short rushes of speech, but also mild breathy voice and mild articulatory imprecision",,False,1,73-82,unknown
+190,rater_4,8,qpn_PD01314_read_fr_Batch1_0,read,individual,PD01314,30.0,Other,HC,fr,55,,0.0,M,8.0,sample_8.wav,control,confident,other,Second language speaker?,,False,1,53-62,unknown
+191,rater_4,9,qpn_PD01693_dpt_fr_Batch2_0,dpt,individual,PD01693,30.0,French,PD,fr,0,36.0,0.0,F,9.0,sample_9.wav,control,certain,healthy,,,True,0,unknown,moderate
+192,rater_4,10,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,10.0,sample_10.wav,parkinsons,unsure,voice,,,False,1,53-62,unknown
+193,rater_4,11,qpn_PD01133_repeat_combined_fr_Batch1_0,repeat,individual,PD01133,7.4008125,English,PD,fr,63,43.0,0.0,M,11.0,sample_11.wav,parkinsons,unsure,voice,"Mumbly and mildly breathy, but it apprears to be a second language speaker and the recording is noisy.",,False,1,63-72,moderate
+194,rater_4,13,qpn_PD01182_recall_la_fr_Batch1_1,recall,individual,PD01182,30.0,French,HC,fr,82,12.0,30.0,M,13.0,sample_13.wav,control,confident,healthy,,,True,1,73-82,mild
+195,rater_4,14,qpn_PD01270_a3_Batch1_0,vowel_repeat,individual,PD01270,19.84875,French,PD,other,70,7.0,0.0,F,14.0,sample_14.wav,control,confident,other,Duration of sustained phonation and loudness,,False,0,63-72,mild
+196,rater_4,15,qpn_PD01133_dpt_en_Batch1_1,dpt,individual,PD01133,30.0,English,PD,en,63,43.0,30.0,M,15.0,sample_15.wav,parkinsons,leaning,prosody,Main is speech prosody; Second is voice quality,,True,1,63-72,moderate
+197,rater_4,16,qpn_PD01156_read_fr_Batch1_0,read,global,PD01156,30.0,French,PD,fr,82,47.0,0.0,F,16.0,sample_16.wav,parkinsons,leaning,prosody,,,True,1,73-82,moderate
+198,rater_4,17,qpn_MNI0460_dpt_en_Batch2_1,dpt,individual,MNI0460,30.0,English,HC,en,0,0.0,30.0,M,17.0,sample_17.wav,control,confident,healthy,,,True,1,unknown,unknown
+199,rater_4,18,qpn_MNI0249_recall_childhood_fr_Batch2_0,recall,individual,MNI0249,30.0,French,PD,fr,0,50.0,0.0,M,18.0,sample_18.wav,control,confident,healthy,,,True,0,unknown,moderate
+200,rater_4,19,qpn_PD01318_read_en_Batch1_0,read,individual,PD01318,30.0,French,HC,en,68,,0.0,F,19.0,sample_19.wav,control,certain,healthy,,,False,1,63-72,unknown
+201,rater_4,20,qpn_PD01182_read_en_Batch1_0,read,global,PD01182,30.0,French,HC,en,82,12.0,0.0,M,20.0,sample_20.wav,control,confident,healthy,,,False,1,73-82,mild
+202,rater_4,21,qpn_MNI0379_read_en_Batch2_0,read,individual,MNI0379,30.0,English,PD,en,0,87.0,0.0,F,21.0,sample_21.wav,parkinsons,leaning,prosody,,,True,1,unknown,severe
+203,rater_4,22,qpn_MNI0286_read_en_Batch2_0,read,global,MNI0286,30.0,English,PD,en,0,0.0,0.0,M,22.0,sample_22.wav,parkinsons,certain,prosody,main = speech prosody; second = mumbly,,True,1,unknown,unknown
+204,rater_4,23,qpn_MNI0573_dpt_fr_Batch2_1,dpt,individual,MNI0573,30.0,French,HC,fr,0,0.0,30.0,F,23.0,sample_23.wav,parkinsons,unsure,language,,,True,0,unknown,unknown
+205,rater_4,24,qpn_MNI0605_recall_childhood_fr_Batch2_1,recall,global,MNI0605,30.0,French,HC,fr,0,0.0,30.0,M,24.0,sample_24.wav,control,leaning,healthy,,,True,1,unknown,unknown
+206,rater_4,25,qpn_PD01245_a1_Batch1_0,vowel_repeat,global,PD01245,17.642,English,PD,other,70,11.0,0.0,F,25.0,sample_25.wav,control,confident,healthy,,voice,False,0,63-72,mild
+207,rater_4,26,qpn_MNI0301_read_fr_Batch2_0,read,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,26.0,sample_26.wav,control,certain,healthy,,,True,1,unknown,unknown
+208,rater_4,27,qpn_PD01314_recall_childhood_en_Batch1_0,recall,individual,PD01314,30.0,Other,HC,en,55,,0.0,M,27.0,sample_27.wav,parkinsons,leaning,voice,,,False,0,53-62,unknown
+209,rater_4,28,qpn_PD00267_dpt_fr_Batch1_0,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,28.0,sample_28.wav,parkinsons,certain,prosody,1- speech prosody; 2- voice quality,,True,1,73-82,moderate
+210,rater_4,29,qpn_PD01182_dpt_fr_Batch1_2,dpt,global,PD01182,30.0,French,HC,fr,82,12.0,60.0,M,29.0,sample_29.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+211,rater_4,30,qpn_PD01130_dpt_en_Batch1_2,dpt,global,PD01130,30.0,English,HC,en,65,,60.0,F,30.0,sample_30.wav,parkinsons,leaning,language,,,True,0,63-72,unknown
+212,rater_4,31,qpn_PD01270_recall_la_fr_Batch1_2,recall,global,PD01270,30.0,French,PD,fr,70,7.0,60.0,F,31.0,sample_31.wav,parkinsons,leaning,language,,,True,1,63-72,mild
+213,rater_4,32,qpn_PD01133_read_en_Batch1_0,read,individual,PD01133,30.0,English,PD,en,63,43.0,0.0,M,32.0,sample_32.wav,parkinsons,certain,voice,,,True,1,63-72,moderate
+214,rater_4,33,qpn_MNI0438_recall_childhood_en_Batch2_1,recall,global,MNI0438,30.0,English,HC,en,0,0.0,30.0,M,33.0,sample_33.wav,control,leaning,healthy,,,True,1,unknown,unknown
+215,rater_4,34,qpn_PD01133_recall_la_en_Batch1_0,recall,individual,PD01133,30.0,English,PD,en,63,43.0,0.0,M,34.0,sample_34.wav,parkinsons,certain,voice,1- voice quality; 2- prosody,,True,1,63-72,moderate
+216,rater_4,35,qpn_PD01182_read_fr_Batch1_0,read,global,PD01182,30.0,French,HC,fr,82,12.0,0.0,M,35.0,sample_35.wav,parkinsons,leaning,prosody,,,True,0,73-82,mild
+217,rater_4,36,qpn_MNI0301_recall_childhood_fr_Batch2_2,recall,individual,MNI0301,30.0,French,HC,fr,0,0.0,60.0,F,36.0,sample_36.wav,control,certain,healthy,,,True,1,unknown,unknown
+218,rater_4,37,qpn_PD01067_read_en_Batch1_0,read,global,PD01067,30.0,English,HC,en,67,,0.0,F,37.0,sample_37.wav,parkinsons,confident,prosody,"Uneven prosody, combined with increased mumbling during speed-ups",,True,0,63-72,unknown
+219,rater_4,38,qpn_MNI0414_repeat_combined_en_Batch2_0,repeat,individual,MNI0414,14.261375,French,HC,en,0,0.0,0.0,M,38.0,sample_38.wav,control,,other,"There is something off with the articulation, but not necessarily PD-like.",,False,1,unknown,unknown
+220,rater_4,39,qpn_PD01071_repeat_combined_fr_Batch1_0,repeat,individual,PD01071,16.496625,English,HC,fr,82,26.0,0.0,F,39.0,sample_39.wav,parkinsons,leaning,other,"Sounds PD-like, but difficult to judge as it sounds like her 2nd language.",,False,0,73-82,mild
+221,rater_4,40,qpn_MNI0379_recall_la_en_Batch2_1,recall,global,MNI0379,30.0,English,PD,en,0,87.0,30.0,F,40.0,sample_40.wav,control,confident,healthy,,,True,0,unknown,severe
+222,rater_4,41,qpn_PD01273_dpt_fr_Batch1_1,dpt,individual,PD01273,30.0,French,HC,fr,61,,30.0,M,41.0,sample_41.wav,control,certain,healthy,,,True,1,53-62,unknown
+223,rater_4,42,qpn_PD00119_dpt_en_Batch1_0,dpt,global,PD00119,30.0,English,PD,en,66,39.0,0.0,M,42.0,sample_42.wav,parkinsons,confident,prosody,Combination of speech prosody and voice quality,,True,1,63-72,moderate
+224,rater_4,43,qpn_PD00959_repeat_combined_fr_Batch2_0,repeat,global,PD00959,12.9015625,French,PD,fr,0,51.0,0.0,F,43.0,sample_43.wav,control,,other,Voice quality is not within normal limits,,True,0,unknown,moderate
+225,rater_4,44,qpn_MNI0301_recall_childhood_fr_Batch2_0,recall,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,44.0,sample_44.wav,control,certain,healthy,,,True,1,unknown,unknown
+226,rater_4,45,qpn_PD00952_a3_Batch1_0,vowel_repeat,individual,PD00952,16.1465,Other,HC,other,53,,0.0,M,45.0,sample_45.wav,parkinsons,leaning,voice,,,False,0,53-62,unknown
+227,rater_4,46,qpn_MNI0380_dpt_en_Batch2_0,dpt,individual,MNI0380,30.0,English,PD,en,0,29.0,0.0,F,46.0,sample_46.wav,control,certain,healthy,,,True,0,unknown,mild
+228,rater_4,47,qpn_PD01314_dpt_en_Batch1_3,dpt,global,PD01314,30.0,Other,HC,en,55,,90.0,M,47.0,sample_47.wav,parkinsons,leaning,voice,Mild breathiness and softness of the voice; It sounds like there is tremor in the microphone,,False,0,53-62,unknown
+229,rater_4,48,qpn_PD00267_a1_Batch1_0,vowel_repeat,individual,PD00267,24.6380625,French,PD,other,80,56.0,0.0,M,48.0,sample_48.wav,parkinsons,leaning,voice,,,False,1,73-82,moderate
+230,rater_4,49,qpn_PD01022_dpt_en_Batch2_1,dpt,global,PD01022,30.0,French,PD,en,0,63.0,30.0,F,49.0,sample_49.wav,parkinsons,leaning,language,Language use and articulation,,False,1,unknown,severe
+231,rater_4,50,qpn_PD01268_read_fr_Batch1_0,read,individual,PD01268,30.0,French,HC,fr,63,,0.0,F,50.0,sample_50.wav,control,confident,healthy,,,True,1,63-72,unknown
+232,rater_4,51,qpn_PD01289_a3_Batch1_0,vowel_repeat,individual,PD01289,27.067125,French,HC,other,62,,0.0,F,51.0,sample_51.wav,parkinsons,certain,voice,,,False,0,53-62,unknown
+233,rater_4,52,qpn_MNI0417_repeat_combined_en_Batch2_0,repeat,global,MNI0417,15.033,English,HC,en,0,0.0,0.0,F,52.0,sample_52.wav,control,confident,healthy,,,True,1,unknown,unknown
+234,rater_4,54,qpn_MNI0417_recall_childhood_en_Batch2_3,recall,individual,MNI0417,30.0,English,HC,en,0,0.0,90.0,F,54.0,sample_54.wav,control,confident,healthy,,,True,1,unknown,unknown
+235,rater_4,57,qpn_MNI0399_read_fr_Batch2_0,read,individual,MNI0399,30.0,French,PD,fr,0,64.0,0.0,M,57.0,sample_57.wav,parkinsons,confident,prosody,,,True,1,unknown,severe
+236,rater_4,58,qpn_PD01268_dpt_fr_Batch1_0,dpt,global,PD01268,30.0,French,HC,fr,63,,0.0,F,58.0,sample_58.wav,control,certain,healthy,,,True,1,63-72,unknown
+237,rater_4,59,qpn_PD01130_recall_childhood_en_Batch1_1,recall,global,PD01130,30.0,English,HC,en,65,,30.0,F,59.0,sample_59.wav,control,confident,healthy,,,True,1,63-72,unknown
+238,rater_4,60,qpn_PD01130_dpt_en_Batch1_0,dpt,individual,PD01130,30.0,English,HC,en,65,,0.0,F,60.0,sample_60.wav,control,leaning,other,Prosody is mildly off,,True,1,63-72,unknown
+239,rater_4,61,qpn_PD00653_read_en_Batch1_0,read,global,PD00653,30.0,English,PD,en,77,,0.0,F,61.0,sample_61.wav,parkinsons,confident,voice,1- Voice quality and 2- speech prosody,,True,1,73-82,unknown
+240,rater_4,62,qpn_MNI0301_a1_Batch2_0,vowel_repeat,global,MNI0301,7.5510625,French,HC,other,0,0.0,0.0,F,62.0,sample_62.wav,parkinsons,leaning,voice,"very short maximum phonation time, limited phonatory control (voice quality)",,False,0,unknown,unknown
+241,rater_4,63,qpn_PD01273_read_en_Batch1_3,read,individual,PD01273,30.0,French,HC,en,61,,90.0,M,63.0,sample_63.wav,control,confident,healthy,,,False,1,53-62,unknown
+242,rater_5,0,qpn_PD01387_dpt_fr_Batch1_0,dpt,individual,PD01387,30.0,French,PD,fr,61,,0.0,F,,sample_0.wav,control,leaning,healthy,,,True,0,53-62,unknown
+243,rater_5,1,qpn_PD00396_read_en_Batch1_1,read,individual,PD00396,30.0,French,PD,en,80,41.0,30.0,M,,sample_1.wav,parkinsons,confident,voice,,,False,1,73-82,moderate
+244,rater_5,2,qpn_MNI0301_a1_Batch2_0,vowel_repeat,global,MNI0301,7.5510625,French,HC,other,0,0.0,0.0,F,,sample_2.wav,parkinsons,leaning,voice,,,False,0,unknown,unknown
+245,rater_5,3,qpn_PD01398_recall_la_en_Batch1_0,recall,individual,PD01398,10.94,English,PD,en,61,31.0,0.0,F,,sample_3.wav,control,,healthy,,,True,0,53-62,mild
+246,rater_5,4,qpn_PD01182_read_en_Batch1_0,read,global,PD01182,30.0,French,HC,en,82,12.0,0.0,M,,sample_4.wav,parkinsons,leaning,prosody,,,False,0,73-82,mild
+247,rater_5,5,qpn_MNI0388_a1_Batch2_0,vowel_repeat,individual,MNI0388,13.3035625,French,HC,other,0,0.0,0.0,F,,sample_5.wav,control,confident,healthy,,,False,1,unknown,unknown
+248,rater_5,6,qpn_PD00653_a3_Batch1_0,vowel_repeat,individual,PD00653,18.1603125,English,PD,other,77,,0.0,F,,sample_6.wav,parkinsons,unsure,voice,,,False,1,73-82,unknown
+249,rater_5,7,qpn_PD00396_repeat_combined_en_Batch1_0,repeat,individual,PD00396,14.1935625,French,PD,en,80,41.0,0.0,M,,sample_7.wav,parkinsons,confident,voice,,,False,1,73-82,moderate
+250,rater_5,8,qpn_MNI0417_recall_la_en_Batch2_1,recall,individual,MNI0417,30.0,English,HC,en,0,0.0,30.0,F,,sample_8.wav,control,confident,healthy,,,True,1,unknown,unknown
+251,rater_5,9,qpn_PD01133_read_fr_Batch1_0,read,individual,PD01133,30.0,English,PD,fr,63,43.0,0.0,M,,sample_9.wav,parkinsons,confident,prosody,,,False,1,63-72,moderate
+252,rater_5,10,qpn_MNI0301_read_fr_Batch2_0,read,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,,sample_10.wav,control,confident,healthy,,,True,1,unknown,unknown
+253,rater_5,11,qpn_MNI0286_read_en_Batch2_0,read,global,MNI0286,30.0,English,PD,en,0,0.0,0.0,M,,sample_11.wav,parkinsons,unsure,prosody,,,True,1,unknown,unknown
+254,rater_5,12,qpn_PD01245_a1_Batch1_0,vowel_repeat,global,PD01245,17.642,English,PD,other,70,11.0,0.0,F,,sample_12.wav,control,confident,healthy,,,False,0,63-72,mild
+255,rater_5,13,qpn_PD01314_dpt_en_Batch1_3,dpt,global,PD01314,30.0,Other,HC,en,55,,90.0,M,,sample_13.wav,control,unsure,other,Is the background sound a tremor of hand on table?,,False,1,53-62,unknown
+256,rater_5,14,qpn_PD01245_dpt_en_Batch1_1,dpt,individual,PD01245,30.0,English,PD,en,70,11.0,30.0,F,,sample_14.wav,parkinsons,confident,voice,,,True,1,63-72,mild
+257,rater_5,15,qpn_MNI0460_repeat_combined_en_Batch2_0,repeat,individual,MNI0460,11.3408125,English,HC,en,0,0.0,0.0,M,,sample_15.wav,control,certain,healthy,,,True,1,unknown,unknown
+258,rater_5,16,qpn_PD01273_a2_Batch1_0,vowel_repeat,global,PD01273,17.45475,French,HC,other,61,,0.0,M,,sample_16.wav,parkinsons,unsure,voice,,,False,0,53-62,unknown
+259,rater_5,17,qpn_PD01071_dpt_en_Batch1_2,dpt,individual,PD01071,30.0,English,HC,en,82,26.0,60.0,F,,sample_17.wav,parkinsons,confident,language,,,True,0,73-82,mild
+260,rater_5,18,qpn_PD01268_dpt_fr_Batch1_0,dpt,global,PD01268,30.0,French,HC,fr,63,,0.0,F,,sample_18.wav,control,confident,healthy,,,True,1,63-72,unknown
+261,rater_5,19,qpn_PD01130_recall_childhood_en_Batch1_1,recall,global,PD01130,30.0,English,HC,en,65,,30.0,F,,sample_19.wav,control,confident,healthy,,,True,1,63-72,unknown
+262,rater_5,20,qpn_PD00959_recall_la_fr_Batch2_2,recall,individual,PD00959,30.0,French,PD,fr,0,51.0,60.0,F,,sample_20.wav,parkinsons,confident,voice,,,True,1,unknown,moderate
+263,rater_5,21,qpn_PD00267_dpt_fr_Batch1_0,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,,sample_21.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+264,rater_6,0,qpn_PD00267_dpt_fr_Batch1_0,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,0.0,sample_0.wav,parkinsons,unsure,language,repetitions of single words and sentence parts,,True,1,73-82,moderate
+265,rater_6,1,qpn_PD00959_repeat_combined_fr_Batch2_0,repeat,global,PD00959,12.9015625,French,PD,fr,0,51.0,0.0,F,1.0,sample_1.wav,parkinsons,unsure,voice,"roughness, strain, breathiness",,True,1,unknown,moderate
+266,rater_6,2,qpn_PD01273_a2_Batch1_0,vowel_repeat,global,PD01273,17.45475,French,HC,other,61,,0.0,M,2.0,sample_2.wav,control,confident,other,long steady duration,,False,1,53-62,unknown
+267,rater_6,3,qpn_PD00653_dpt_en_Batch1_0,dpt,individual,PD00653,23.703875,English,PD,en,77,,0.0,F,3.0,sample_3.wav,control,leaning,other,some breathy quality in the voice but that could be compatible with presbyphonia,,True,0,73-82,unknown
+268,rater_6,4,qpn_PD01065_dpt_fr_Batch1_0,dpt,individual,PD01065,30.0,French,PD,fr,62,,0.0,M,4.0,sample_4.wav,control,certain,healthy,,,True,0,53-62,unknown
+269,rater_6,5,qpn_PD01268_dpt_fr_Batch1_0,dpt,global,PD01268,30.0,French,HC,fr,63,,0.0,F,5.0,sample_5.wav,control,certain,healthy,,,True,1,63-72,unknown
+270,rater_6,6,qpn_PD00653_read_en_Batch1_0,read,global,PD00653,30.0,English,PD,en,77,,0.0,F,6.0,sample_6.wav,parkinsons,leaning,voice,"breathy voice quality, somewhat hyponasal also",,True,1,73-82,unknown
+271,rater_6,7,qpn_PD01067_read_en_Batch1_0,read,global,PD01067,30.0,English,HC,en,67,,0.0,F,7.0,sample_7.wav,control,certain,other,Typical voice although presence of hyponasality,,True,1,63-72,unknown
+272,rater_6,8,qpn_MNI0417_a1_Batch2_0,vowel_repeat,individual,MNI0417,15.657875,English,HC,other,0,0.0,0.0,F,8.0,sample_8.wav,parkinsons,leaning,voice,Poor control of the sublottic pressure in relation to the vocal fold tension,,False,0,unknown,unknown
+273,rater_6,9,qpn_PD01182_dpt_fr_Batch1_1,dpt,individual,PD01182,30.0,French,HC,fr,82,12.0,30.0,M,9.0,sample_9.wav,parkinsons,unsure,voice,"presence of vocal fry, some sence of being short of breath",,True,0,73-82,mild
+274,rater_6,10,qpn_MNI0301_read_fr_Batch2_0,read,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,10.0,sample_10.wav,control,certain,other,singsongy easily produced prosody. clear voice,,True,1,unknown,unknown
+275,rater_6,11,qpn_MNI0421_a2_Batch2_0,vowel_repeat,individual,MNI0421,9.54525,Other,HC,other,0,0.0,0.0,M,11.0,sample_11.wav,parkinsons,unsure,voice,"Pressed voice quality, strain, vocal fry",,False,0,unknown,unknown
+276,rater_6,12,qpn_PD01270_recall_la_fr_Batch1_2,recall,global,PD01270,30.0,French,PD,fr,70,7.0,60.0,F,12.0,sample_12.wav,control,unsure,other,"somewhat slow speech, vocal fry and sometimes pressed phonation in the end of sentences",,True,0,63-72,mild
+277,rater_6,14,qpn_MNI0301_recall_childhood_fr_Batch2_0,recall,global,MNI0301,30.0,French,HC,fr,0,0.0,0.0,F,14.0,sample_14.wav,control,certain,healthy,,,True,1,unknown,unknown
+278,rater_6,15,qpn_PD01268_recall_la_fr_Batch1_0,recall,individual,PD01268,30.0,French,HC,fr,63,,0.0,F,15.0,sample_15.wav,parkinsons,unsure,prosody,"search for words, some slight tremor, vocal fry",,True,0,63-72,unknown
+279,rater_6,16,qpn_MNI0286_read_en_Batch2_0,read,global,MNI0286,30.0,English,PD,en,0,0.0,0.0,M,16.0,sample_16.wav,parkinsons,certain,other,"voice quality: breathy, vocal fry. Articulation: imprecise; prosody monotonous",,True,1,unknown,unknown
+280,rater_6,17,qpn_MNI0438_recall_childhood_en_Batch2_1,recall,global,MNI0438,30.0,English,HC,en,0,0.0,30.0,M,17.0,sample_17.wav,parkinsons,unsure,voice,"nasal quality, somewhat breathy quality, some slight phonationbreaks at some point.",,True,0,unknown,unknown
+281,rater_6,18,qpn_PD01022_dpt_en_Batch2_1,dpt,global,PD01022,30.0,French,PD,en,0,63.0,30.0,F,18.0,sample_18.wav,parkinsons,,prosody,"short of breath, searching for words (that could be do to second language maybe), imprecise articulation (second language?) change in vocal register in the end",,False,1,unknown,severe
+282,rater_6,19,qpn_PD01130_recall_childhood_en_Batch1_1,recall,global,PD01130,30.0,English,HC,en,65,,30.0,F,19.0,sample_19.wav,parkinsons,leaning,voice,"vocal fry, somewhat breathy, a bit monotonous, some slight tremor at one point",,True,0,63-72,unknown
+283,rater_6,20,qpn_MNI0417_recall_childhood_en_Batch2_0,recall,individual,MNI0417,30.0,English,HC,en,0,0.0,0.0,F,20.0,sample_20.wav,control,leaning,healthy,,,True,1,unknown,unknown
+284,rater_6,21,qpn_PD01182_read_fr_Batch1_0,read,global,PD01182,30.0,French,HC,fr,82,12.0,0.0,M,21.0,sample_21.wav,parkinsons,confident,voice,"Phonation breaks, breathy, roughness,",,True,0,73-82,mild
+285,rater_6,22,qpn_MNI0605_recall_childhood_fr_Batch2_1,recall,global,MNI0605,30.0,French,HC,fr,0,0.0,30.0,M,22.0,sample_22.wav,parkinsons,,voice,slightly imprecise articulation - dialect?,,True,0,unknown,unknown
+286,rater_6,23,qpn_PD01182_read_en_Batch1_0,read,global,PD01182,30.0,French,HC,en,82,12.0,0.0,M,23.0,sample_23.wav,parkinsons,certain,voice,"Breahty, somewhat nasal, roughness, voice breaks, hesitations",,False,0,73-82,mild
+287,rater_6,25,qpn_PD00952_dpt_en_Batch1_1,dpt,individual,PD00952,30.0,Other,HC,en,53,,30.0,M,25.0,sample_25.wav,control,leaning,other,"although presence of breathy and rough voice quality, the prosody is OK and the speech is well articulated",,False,1,53-62,unknown
+288,rater_6,26,qpn_PD01182_repeat_combined_fr_Batch1_0,repeat,global,PD01182,9.822625,French,HC,fr,82,12.0,0.0,M,26.0,sample_26.wav,parkinsons,certain,voice,,,True,0,73-82,mild
+289,rater_6,27,qpn_MNI0605_repeat_combined_fr_Batch2_0,repeat,individual,MNI0605,12.9121875,French,HC,fr,0,0.0,0.0,M,27.0,sample_27.wav,parkinsons,unsure,other,articulation,,True,0,unknown,unknown
+290,rater_6,28,qpn_PD01022_recall_la_fr_Batch2_0,recall,individual,PD01022,30.0,French,PD,fr,0,63.0,0.0,F,28.0,sample_28.wav,control,certain,healthy,,,True,0,unknown,severe
+291,rater_6,29,qpn_MNI0301_a1_Batch2_0,vowel_repeat,global,MNI0301,7.5510625,French,HC,other,0,0.0,0.0,F,29.0,sample_29.wav,parkinsons,leaning,voice,,,False,0,unknown,unknown
+292,rater_6,30,qpn_PD01318_repeat_combined_en_Batch1_0,repeat,individual,PD01318,12.360625,French,HC,en,68,,0.0,F,30.0,sample_30.wav,control,confident,healthy,,,False,1,63-72,unknown
+293,rater_6,31,qpn_PD01245_a1_Batch1_0,vowel_repeat,global,PD01245,17.642,English,PD,other,70,11.0,0.0,F,31.0,sample_31.wav,parkinsons,unsure,voice,"tremor, breathy quality",,False,1,63-72,mild
+294,rater_6,32,qpn_PD01314_read_en_Batch1_0,read,individual,PD01314,30.0,Other,HC,en,55,,0.0,M,32.0,sample_32.wav,parkinsons,unsure,voice,,,False,0,53-62,unknown
+295,rater_6,33,qpn_PD01071_read_fr_Batch1_1,read,individual,PD01071,30.0,English,HC,fr,82,26.0,30.0,F,33.0,sample_33.wav,parkinsons,certain,voice,,,False,0,73-82,mild
+296,rater_6,34,qpn_PD00396_recall_la_fr_Batch1_0,recall,global,PD00396,4.0044375,French,PD,fr,80,41.0,0.0,M,34.0,sample_34.wav,parkinsons,unsure,voice,,,True,1,73-82,moderate
+297,rater_6,36,qpn_PD01314_dpt_en_Batch1_3,dpt,global,PD01314,30.0,Other,HC,en,55,,90.0,M,36.0,sample_36.wav,parkinsons,leaning,voice,"breathy voice quality, intermittent presence of tremor",,False,0,53-62,unknown
+298,rater_6,37,qpn_PD01270_dpt_fr_Batch1_0,dpt,global,PD01270,30.0,French,PD,fr,70,7.0,0.0,F,37.0,sample_37.wav,parkinsons,unsure,voice,"somewhat breathy voice quality, vocal fry, somewhat monotonous, but precise articulation and good flow",,True,1,63-72,mild
+299,rater_6,38,qpn_PD01289_dpt_fr_Batch1_0,dpt,individual,PD01289,30.0,French,HC,fr,62,,0.0,F,38.0,sample_38.wav,parkinsons,,voice,,,True,0,53-62,unknown
+300,rater_6,39,qpn_MNI0605_recall_la_fr_Batch2_1,recall,individual,MNI0605,30.0,French,HC,fr,0,0.0,30.0,M,39.0,sample_39.wav,parkinsons,leaning,language,"Difficile ""a /valuer car on est teint/ par le contenu du discours",,True,0,unknown,unknown
+301,rater_6,40,qpn_MNI0605_read_fr_Batch2_0,read,individual,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,40.0,sample_40.wav,parkinsons,confident,voice,voice quality and articulation,,True,0,unknown,unknown
+302,rater_6,41,qpn_PD01133_dpt_en_Batch1_0,dpt,individual,PD01133,30.0,English,PD,en,63,43.0,0.0,M,41.0,sample_41.wav,parkinsons,confident,voice,"breathy, nasal voice quality, monotonous,",,True,1,63-72,moderate
+303,rater_6,42,qpn_MNI0417_repeat_combined_en_Batch2_0,repeat,global,MNI0417,15.033,English,HC,en,0,0.0,0.0,F,42.0,sample_42.wav,parkinsons,unsure,voice,the articulatory space feels small,,True,0,unknown,unknown
+304,rater_6,43,qpn_MNI0415_repeat_combined_fr_Batch2_0,repeat,individual,MNI0415,11.2199375,French,PD,fr,0,40.0,0.0,M,43.0,sample_43.wav,parkinsons,leaning,voice,,,True,1,unknown,moderate
+305,rater_6,44,qpn_PD01065_read_en_Batch1_0,read,individual,PD01065,30.0,French,PD,en,62,,0.0,M,44.0,sample_44.wav,parkinsons,unsure,prosody,,,False,1,53-62,unknown
+306,rater_6,45,qpn_PD01387_a3_Batch1_0,vowel_repeat,individual,PD01387,30.0,French,PD,other,61,,0.0,F,45.0,sample_45.wav,control,,other,unsure of what was asked of this person - voice seems a little tremorous at the start but feels like it might have been the task that induced that,,False,0,53-62,unknown
+307,rater_6,46,qpn_PD01130_dpt_en_Batch1_2,dpt,global,PD01130,30.0,English,HC,en,65,,60.0,F,46.0,sample_46.wav,parkinsons,confident,language,voice quality and somewhat disfluent plus language use,,True,0,63-72,unknown
+308,rater_6,47,qpn_MNI0415_recall_la_en_Batch2_2,recall,individual,MNI0415,30.0,French,PD,en,0,40.0,60.0,M,47.0,sample_47.wav,control,leaning,healthy,,,False,0,unknown,moderate
+309,rater_6,48,qpn_PD01398_repeat_combined_en_Batch1_0,repeat,individual,PD01398,12.371,English,PD,en,61,31.0,0.0,F,48.0,sample_48.wav,parkinsons,certain,voice,,,True,1,53-62,mild
+310,rater_6,49,qpn_MNI0454_dpt_en_Batch2_1,dpt,individual,MNI0454,30.0,English,HC,en,0,0.0,30.0,F,49.0,sample_49.wav,control,leaning,voice,,,True,1,unknown,unknown
+311,rater_6,50,qpn_PD00119_dpt_en_Batch1_0,dpt,global,PD00119,30.0,English,PD,en,66,39.0,0.0,M,50.0,sample_50.wav,control,leaning,other,saturation of the recording - difficult to know what is acoustic artifacts versus real voice quality,,True,0,63-72,moderate
+312,rater_6,51,qpn_PD01314_recall_la_en_Batch1_0,recall,individual,PD01314,30.0,Other,HC,en,55,,0.0,M,51.0,sample_51.wav,parkinsons,leaning,voice,"breathy, voice quality, vocal fry, somewhat nasal",,False,0,53-62,unknown
+313,rater_6,52,qpn_MNI0420_read_en_Batch2_0,read,individual,MNI0420,30.0,English,HC,en,0,0.0,0.0,F,52.0,sample_52.wav,control,confident,other,a little slow and monotonous speech - but could be normal,,True,1,unknown,unknown
+314,rater_6,53,qpn_MNI0415_recall_childhood_fr_Batch2_0,recall,individual,MNI0415,30.0,French,PD,fr,0,40.0,0.0,M,53.0,sample_53.wav,parkinsons,unsure,voice,,,True,1,unknown,moderate
+315,rater_6,54,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,54.0,sample_54.wav,parkinsons,leaning,voice,,,False,1,53-62,unknown
+316,rater_6,55,qpn_PD01182_dpt_fr_Batch1_2,dpt,global,PD01182,30.0,French,HC,fr,82,12.0,60.0,M,55.0,sample_55.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+317,rater_6,56,qpn_MNI0379_recall_la_en_Batch2_1,recall,global,MNI0379,30.0,English,PD,en,0,87.0,30.0,F,56.0,sample_56.wav,parkinsons,confident,voice,tremor,,True,1,unknown,severe
+318,rater_6,57,qpn_PD01245_read_en_Batch1_0,read,individual,PD01245,30.0,English,PD,en,70,11.0,0.0,F,57.0,sample_57.wav,parkinsons,unsure,prosody,"monotony, somewhat breathy voice quality",,True,1,63-72,mild
+319,rater_6,58,qpn_PD00119_a1_Batch1_0,vowel_repeat,individual,PD00119,20.5124375,English,PD,other,66,39.0,0.0,M,58.0,sample_58.wav,parkinsons,leaning,voice,,,False,1,63-72,moderate
+320,rater_6,59,qpn_PD01156_read_fr_Batch1_0,read,global,PD01156,30.0,French,PD,fr,82,47.0,0.0,F,59.0,sample_59.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+321,rater_6,60,qpn_PD00396_read_fr_Batch1_0,read,individual,PD00396,30.0,French,PD,fr,80,41.0,0.0,M,60.0,sample_60.wav,parkinsons,certain,voice,,,True,1,73-82,moderate
+322,rater_6,61,qpn_PD00653_recall_la_en_Batch1_0,recall,individual,PD00653,30.0,English,PD,en,77,,0.0,F,61.0,sample_61.wav,parkinsons,confident,voice,,,True,1,73-82,unknown
+323,rater_7,0,qpn_PD01268_recall_childhood_fr_Batch1_1,recall,individual,PD01268,30.0,French,HC,fr,63,,15.0,F,,sample_0.wav,control,confident,healthy,,,True,1,63-72,unknown
+324,rater_7,1,qpn_MNI0382_dpt_en_Batch2_0,dpt,individual,MNI0382,29.849125,English,PD,en,0,35.0,0.0,M,,sample_1.wav,parkinsons,leaning,voice,,,True,1,unknown,moderate
+325,rater_7,2,qpn_PD01067_a1_Batch1_0,vowel_repeat,global,PD01067,6.774,English,HC,other,67,,0.0,F,,sample_2.wav,control,leaning,voice,,,False,1,63-72,unknown
+326,rater_7,3,qpn_MNI0421_recall_la_en_Batch2_5,recall,individual,MNI0421,21.755187500000005,Other,HC,en,0,0.0,75.0,M,,sample_3.wav,control,confident,prosody,,,False,1,unknown,unknown
+327,rater_7,4,qpn_MNI0605_read_fr_Batch2_0,read,global,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,,sample_4.wav,parkinsons,unsure,voice,,,True,0,unknown,unknown
+328,rater_7,5,qpn_MNI0438_dpt_en_Batch2_5,dpt,global,MNI0438,30.0,English,HC,en,0,0.0,75.0,M,,sample_5.wav,parkinsons,leaning,voice,,,True,0,unknown,unknown
+329,rater_7,6,qpn_MNI0414_read_en_Batch2_3,read,global,MNI0414,19.318937500000004,French,HC,en,0,0.0,45.0,M,,sample_6.wav,parkinsons,confident,voice,,,False,0,unknown,unknown
+330,rater_7,7,qpn_PD01693_a2_Batch2_0,vowel_repeat,individual,PD01693,13.35475,French,PD,other,0,36.0,0.0,F,,sample_7.wav,parkinsons,confident,voice,,,False,1,unknown,moderate
+331,rater_7,8,qpn_PD01133_recall_childhood_en_Batch1_0,recall,global,PD01133,30.0,English,PD,en,63,43.0,0.0,M,,sample_8.wav,parkinsons,confident,prosody,,,True,1,63-72,moderate
+332,rater_7,9,qpn_PD00959_recall_childhood_fr_Batch2_0,recall,individual,PD00959,30.0,French,PD,fr,0,51.0,0.0,F,,sample_9.wav,parkinsons,confident,voice,,,True,1,unknown,moderate
+333,rater_7,11,qpn_PD00267_recall_la_fr_Batch1_0,recall,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,,sample_11.wav,parkinsons,certain,voice,,,True,1,73-82,moderate
+334,rater_7,12,qpn_MNI0286_read_en_Batch2_2,read,individual,MNI0286,30.0,English,PD,en,0,0.0,30.0,M,,sample_12.wav,parkinsons,confident,voice,,,True,1,unknown,unknown
+335,rater_7,13,qpn_PD00653_repeat_2_en_Batch1_0,repeat,individual,PD00653,1.98875,English,PD,en,77,,0.0,F,,sample_13.wav,parkinsons,confident,voice,,,True,1,73-82,unknown
+336,rater_7,14,qpn_MNI0454_dpt_en_Batch2_1,dpt,individual,MNI0454,30.0,English,HC,en,0,0.0,15.0,F,,sample_14.wav,control,leaning,prosody,,,True,1,unknown,unknown
+337,rater_7,15,qpn_PD00653_read_en_Batch1_0,read,individual,PD00653,30.0,English,PD,en,77,,0.0,F,,sample_15.wav,parkinsons,leaning,voice,,,True,1,73-82,unknown
+338,rater_7,16,qpn_PD00267_repeat_4_en_Batch1_0,repeat,global,PD00267,2.76975,French,PD,en,80,56.0,0.0,M,,sample_16.wav,parkinsons,confident,voice,,,False,1,73-82,moderate
+339,rater_7,17,qpn_MNI0380_recall_la_en_Batch2_1,recall,global,MNI0380,30.0,English,PD,en,0,29.0,15.0,F,,sample_17.wav,control,confident,healthy,,,True,0,unknown,mild
+340,rater_7,18,qpn_PD01398_dpt_en_Batch1_1,dpt,global,PD01398,30.0,English,PD,en,61,31.0,15.0,F,,sample_18.wav,parkinsons,confident,prosody,,,True,1,53-62,mild
+341,rater_7,19,qpn_MNI0605_recall_la_fr_Batch2_4,recall,individual,MNI0605,30.0,French,HC,fr,0,0.0,60.0,M,,sample_19.wav,control,confident,voice,,,True,1,unknown,unknown
+342,rater_7,20,qpn_PD00952_repeat_4_en_Batch1_0,repeat,individual,PD00952,3.1595625,Other,HC,en,53,,0.0,M,,sample_20.wav,parkinsons,unsure,voice,,,False,0,53-62,unknown
+343,rater_7,21,qpn_PD01156_read_en_Batch1_2,read,global,PD01156,30.0,French,PD,en,82,47.0,30.0,F,,sample_21.wav,parkinsons,certain,prosody,,,False,1,73-82,moderate
+344,rater_7,22,qpn_PD00959_read_fr_Batch2_1,read,global,PD00959,30.0,French,PD,fr,0,51.0,15.0,F,,sample_22.wav,control,leaning,prosody,,,True,0,unknown,moderate
+345,rater_7,23,qpn_MNI0399_recall_la_fr_Batch2_1,recall,individual,MNI0399,30.0,French,PD,fr,0,64.0,15.0,M,,sample_23.wav,parkinsons,unsure,voice,,,True,1,unknown,severe
+346,rater_7,24,qpn_PD01182_read_fr_Batch1_1,read,individual,PD01182,30.0,French,HC,fr,82,12.0,15.0,M,,sample_24.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+347,rater_7,25,qpn_MNI0249_read_fr_Batch2_2,read,global,MNI0249,17.1556875,French,PD,fr,0,50.0,30.0,M,,sample_25.wav,parkinsons,confident,voice,,,True,1,unknown,moderate
+348,rater_7,26,qpn_PD01289_dpt_fr_Batch1_4,dpt,individual,PD01289,30.0,French,HC,fr,62,,60.0,F,,sample_26.wav,control,leaning,prosody,,,True,1,53-62,unknown
+349,rater_7,27,qpn_PD00119_dpt_en_Batch1_5,dpt,global,PD00119,30.0,English,PD,en,66,39.0,75.0,M,,sample_27.wav,parkinsons,leaning,prosody,,,True,1,63-72,moderate
+350,rater_7,28,qpn_PD00509_a3_Batch1_0,vowel_repeat,individual,PD00509,18.25,English,PD,other,77,39.0,0.0,M,,sample_28.wav,parkinsons,confident,voice,,,False,1,73-82,moderate
+351,rater_7,29,qpn_PD01383_dpt_fr_Batch2_1,dpt,global,PD01383,19.0709375,French,HC,fr,0,0.0,15.0,M,,sample_29.wav,control,confident,healthy,,,True,1,unknown,unknown
+352,rater_7,30,qpn_PD01182_dpt_fr_Batch1_6,dpt,individual,PD01182,30.0,French,HC,fr,82,12.0,90.0,M,,sample_30.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+353,rater_7,31,qpn_PD01270_recall_la_fr_Batch1_3,recall,global,PD01270,30.0,French,PD,fr,70,7.0,45.0,F,,sample_31.wav,control,leaning,voice,,,True,0,63-72,mild
+354,rater_7,32,qpn_PD01156_a2_Batch1_0,vowel_repeat,global,PD01156,12.124125,French,PD,other,82,47.0,0.0,F,,sample_32.wav,parkinsons,certain,voice,,,False,1,73-82,moderate
+355,rater_7,33,qpn_PD00267_dpt_fr_Batch1_2,dpt,individual,PD00267,30.0,French,PD,fr,80,56.0,30.0,M,,sample_33.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+356,rater_7,34,qpn_MNI0286_recall_childhood_en_Batch2_1,recall,individual,MNI0286,30.0,English,PD,en,0,0.0,15.0,M,,sample_34.wav,control,confident,prosody,,,True,0,unknown,unknown
+357,rater_7,35,qpn_PD01383_a2_Batch2_1,vowel_repeat,global,PD01383,17.036499999999997,French,HC,other,0,0.0,15.0,M,,sample_35.wav,control,confident,voice,,,False,1,unknown,unknown
+358,rater_7,36,qpn_MNI0381_read_fr_Batch2_1,read,individual,MNI0381,30.0,French,HC,fr,0,0.0,15.0,F,,sample_36.wav,control,confident,healthy,,,True,1,unknown,unknown
+359,rater_7,37,qpn_PD00653_recall_la_en_Batch1_0,recall,individual,PD00653,30.0,English,PD,en,77,,0.0,F,,sample_37.wav,parkinsons,confident,voice,,,True,1,73-82,unknown
+360,rater_7,38,qpn_MNI0421_recall_childhood_en_Batch2_3,recall,global,MNI0421,15.950125,Other,HC,en,0,0.0,45.0,M,,sample_38.wav,control,confident,voice,,,False,1,unknown,unknown
+361,rater_7,39,qpn_PD01318_dpt_fr_Batch1_5,dpt,global,PD01318,29.125874999999997,French,HC,fr,68,,75.0,F,,sample_39.wav,control,confident,voice,,,True,1,63-72,unknown
+362,rater_7,40,qpn_PD01133_read_fr_Batch1_2,read,individual,PD01133,30.0,English,PD,fr,63,43.0,30.0,M,,sample_40.wav,parkinsons,confident,voice,,,False,1,63-72,moderate
+363,rater_7,41,qpn_MNI0420_read_en_Batch2_0,read,global,MNI0420,30.0,English,HC,en,0,0.0,0.0,F,,sample_41.wav,control,confident,healthy,,,True,1,unknown,unknown
+364,rater_7,42,qpn_MNI0438_read_en_Batch2_0,read,individual,MNI0438,30.0,English,HC,en,0,0.0,0.0,M,,sample_42.wav,control,confident,prosody,,,True,1,unknown,unknown
+365,rater_7,43,qpn_MNI0419_recall_la_en_Batch2_4,recall,individual,MNI0419,30.0,English,HC,en,0,0.0,60.0,F,,sample_43.wav,control,confident,prosody,,,True,1,unknown,unknown
+366,rater_7,44,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,,sample_44.wav,control,confident,voice,,,False,0,53-62,unknown
+367,rater_7,45,qpn_PD01270_repeat_4_en_Batch1_0,repeat,global,PD01270,4.5254375,French,PD,en,70,7.0,0.0,F,,sample_45.wav,parkinsons,unsure,prosody,,,False,1,63-72,mild
+368,rater_7,46,qpn_PD01130_repeat_4_fr_Batch1_0,repeat,global,PD01130,3.3280625,English,HC,fr,65,,0.0,F,,sample_46.wav,parkinsons,unsure,voice,,,False,0,63-72,unknown
+369,rater_7,47,qpn_PD01268_read_fr_Batch1_1,read,global,PD01268,27.812125,French,HC,fr,63,,15.0,F,,sample_47.wav,control,leaning,prosody,,,True,1,63-72,unknown
+370,rater_7,48,qpn_PD00509_read_en_Batch1_2,read,global,PD00509,30.0,English,PD,en,77,39.0,30.0,M,,sample_48.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+371,rater_7,49,qpn_MNI0417_a1_Batch2_0,vowel_repeat,individual,MNI0417,15.657875,English,HC,other,0,0.0,0.0,F,,sample_49.wav,parkinsons,confident,voice,,,False,0,unknown,unknown
+372,rater_7,50,qpn_PD00653_read_fr_Batch1_1,read,individual,PD00653,30.0,English,PD,fr,77,,15.0,F,,sample_50.wav,parkinsons,confident,voice,,,False,1,73-82,unknown
+373,rater_7,51,qpn_MNI0414_dpt_en_Batch2_7,dpt,individual,MNI0414,30.0,French,HC,en,0,0.0,105.0,M,,sample_51.wav,control,confident,prosody,,,False,1,unknown,unknown
+374,rater_7,52,qpn_PD01387_dpt_fr_Batch1_0,dpt,global,PD01387,30.0,French,PD,fr,61,,0.0,F,,sample_52.wav,parkinsons,leaning,voice,,,True,1,53-62,unknown
+375,rater_7,53,qpn_PD01398_dpt_en_Batch1_0,dpt,individual,PD01398,30.0,English,PD,en,61,31.0,0.0,F,,sample_53.wav,parkinsons,confident,voice,,,True,1,53-62,mild
+376,rater_7,54,qpn_PD01289_recall_la_fr_Batch1_2,recall,global,PD01289,30.0,French,HC,fr,62,,30.0,F,,sample_54.wav,control,confident,healthy,,,True,1,53-62,unknown
+377,rater_7,55,qpn_PD01071_recall_childhood_en_Batch1_2,recall,global,PD01071,28.8305,English,HC,en,82,26.0,30.0,F,,sample_55.wav,parkinsons,confident,voice,,,True,0,73-82,mild
+378,rater_7,56,qpn_PD01067_read_en_Batch1_1,read,individual,PD01067,30.0,English,HC,en,67,,15.0,F,,sample_56.wav,control,confident,healthy,,,True,1,63-72,unknown
+379,rater_7,57,qpn_MNI0605_recall_la_fr_Batch2_10,recall,global,MNI0605,24.09687500000001,French,HC,fr,0,0.0,150.0,M,,sample_57.wav,control,confident,healthy,,,True,1,unknown,unknown
+380,rater_7,58,qpn_PD00267_dpt_fr_Batch1_1,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,15.0,M,,sample_58.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+381,rater_7,59,qpn_MNI0381_repeat_2_fr_Batch2_0,repeat,individual,MNI0381,2.711375,French,HC,fr,0,0.0,0.0,F,,sample_59.wav,control,unsure,voice,,,True,1,unknown,unknown
+382,rater_7,60,qpn_MNI0415_repeat_4_fr_Batch2_0,repeat,individual,MNI0415,3.3803125,French,PD,fr,0,40.0,0.0,M,,sample_60.wav,control,confident,prosody,,,True,0,unknown,moderate
+383,rater_7,61,qpn_MNI0438_a3_Batch2_0,vowel_repeat,individual,MNI0438,25.6643125,English,HC,other,0,0.0,0.0,M,,sample_61.wav,parkinsons,confident,voice,,,False,0,unknown,unknown
+384,rater_7,62,qpn_PD01130_dpt_en_Batch1_9,dpt,global,PD01130,30.0,English,HC,en,65,,135.0,F,,sample_62.wav,control,confident,healthy,,,True,1,63-72,unknown
+385,rater_7,63,qpn_PD01314_repeat_1_fr_Batch1_0,repeat,global,PD01314,1.84425,Other,HC,fr,55,,0.0,M,,sample_63.wav,parkinsons,unsure,voice,,,False,0,53-62,unknown
+386,rater_8,0,qpn_MNI0573_dpt_fr_Batch2_0,dpt,individual,MNI0573,30.0,French,HC,fr,0,0.0,0.0,F,,sample_0.wav,parkinsons,leaning,prosody,,,True,0,unknown,unknown
+387,rater_8,1,qpn_PD01071_recall_childhood_en_Batch1_2,recall,global,PD01071,28.8305,English,HC,en,82,26.0,30.0,F,,sample_1.wav,parkinsons,confident,voice,,,True,0,73-82,mild
+388,rater_8,2,qpn_PD01156_read_en_Batch1_2,read,global,PD01156,30.0,French,PD,en,82,47.0,30.0,F,,sample_2.wav,parkinsons,confident,prosody,,,False,1,73-82,moderate
+389,rater_8,3,qpn_PD01133_a1_Batch1_0,vowel_repeat,individual,PD01133,8.7934375,English,PD,other,63,43.0,0.0,M,,sample_3.wav,parkinsons,confident,voice,,,False,1,63-72,moderate
+390,rater_8,4,qpn_PD01314_read_fr_Batch1_4,read,individual,PD01314,20.621187500000005,Other,HC,fr,55,,60.0,M,,sample_4.wav,control,confident,healthy,,,False,1,53-62,unknown
+391,rater_8,5,qpn_MNI0421_recall_childhood_en_Batch2_3,recall,global,MNI0421,15.950125,Other,HC,en,0,0.0,45.0,M,,sample_5.wav,control,leaning,healthy,,,False,1,unknown,unknown
+392,rater_8,6,qpn_PD01318_dpt_fr_Batch1_5,dpt,global,PD01318,29.125874999999997,French,HC,fr,68,,75.0,F,,sample_6.wav,control,confident,healthy,,,True,1,63-72,unknown
+393,rater_8,7,qpn_MNI0415_dpt_fr_Batch2_1,dpt,individual,MNI0415,30.0,French,PD,fr,0,40.0,15.0,M,,sample_7.wav,control,confident,healthy,,,True,0,unknown,moderate
+394,rater_8,8,qpn_PD01022_repeat_1_fr_Batch2_0,repeat,individual,PD01022,2.1669375,French,PD,fr,0,63.0,0.0,F,,sample_8.wav,control,confident,healthy,,,True,0,unknown,severe
+395,rater_8,9,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,,sample_9.wav,parkinsons,leaning,voice,,,False,1,53-62,unknown
+396,rater_8,10,qpn_PD01314_repeat_1_fr_Batch1_0,repeat,global,PD01314,1.84425,Other,HC,fr,55,,0.0,M,,sample_10.wav,parkinsons,unsure,prosody,,,False,0,53-62,unknown
+397,rater_8,11,qpn_PD01289_repeat_1_en_Batch1_0,repeat,individual,PD01289,1.8149375,French,HC,en,62,,0.0,F,,sample_11.wav,parkinsons,unsure,other,"voice quality, too short too be sure",,False,0,53-62,unknown
+398,rater_8,12,qpn_MNI0414_read_en_Batch2_3,read,global,MNI0414,19.318937500000004,French,HC,en,0,0.0,45.0,M,,sample_12.wav,parkinsons,leaning,prosody,,,False,0,unknown,unknown
+399,rater_8,13,qpn_MNI0380_a1_Batch2_0,vowel_repeat,individual,MNI0380,24.340375,English,PD,other,0,29.0,0.0,F,,sample_13.wav,control,confident,healthy,,,False,0,unknown,mild
+400,rater_8,14,qpn_MNI0379_recall_childhood_en_Batch2_0,recall,individual,MNI0379,30.0,English,PD,en,0,87.0,0.0,F,,sample_14.wav,parkinsons,leaning,voice,,,True,1,unknown,severe
+401,rater_8,15,qpn_PD01156_a2_Batch1_0,vowel_repeat,global,PD01156,12.124125,French,PD,other,82,47.0,0.0,F,,sample_15.wav,parkinsons,certain,voice,,,False,1,73-82,moderate
+402,rater_8,16,qpn_PD01268_read_fr_Batch1_1,read,global,PD01268,27.812125,French,HC,fr,63,,15.0,F,,sample_16.wav,control,leaning,healthy,,,True,1,63-72,unknown
+403,rater_8,17,qpn_PD01022_dpt_en_Batch2_1,dpt,individual,PD01022,30.0,French,PD,en,0,63.0,15.0,F,,sample_17.wav,parkinsons,leaning,prosody,,,False,1,unknown,severe
+404,rater_8,18,qpn_PD01130_read_fr_Batch1_0,read,individual,PD01130,30.0,English,HC,fr,65,,0.0,F,,sample_18.wav,control,leaning,healthy,,,False,1,63-72,unknown
+405,rater_8,19,qpn_MNI0286_repeat_2_en_Batch2_0,repeat,individual,MNI0286,8.8558125,English,PD,en,0,0.0,0.0,M,,sample_19.wav,parkinsons,confident,voice,,,True,1,unknown,unknown
+406,rater_8,20,qpn_PD01067_a1_Batch1_0,vowel_repeat,global,PD01067,6.774,English,HC,other,67,,0.0,F,,sample_20.wav,parkinsons,leaning,voice,,,False,0,63-72,unknown
+407,rater_8,21,qpn_PD01022_dpt_fr_Batch2_0,dpt,individual,PD01022,30.0,French,PD,fr,0,63.0,0.0,F,,sample_21.wav,parkinsons,leaning,prosody,,,True,1,unknown,severe
+408,rater_8,22,qpn_PD01383_dpt_fr_Batch2_1,dpt,global,PD01383,19.0709375,French,HC,fr,0,0.0,15.0,M,,sample_22.wav,control,confident,healthy,,,True,1,unknown,unknown
+409,rater_8,23,qpn_MNI0301_recall_childhood_fr_Batch2_3,recall,individual,MNI0301,30.0,French,HC,fr,0,0.0,45.0,F,,sample_23.wav,control,confident,healthy,,,True,1,unknown,unknown
+410,rater_8,24,qpn_MNI0454_recall_la_en_Batch2_12,recall,individual,MNI0454,30.0,English,HC,en,0,0.0,180.0,F,,sample_24.wav,parkinsons,leaning,voice,,,True,0,unknown,unknown
+411,rater_8,25,qpn_MNI0605_recall_childhood_fr_Batch2_0,recall,individual,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,,sample_25.wav,control,leaning,healthy,,,True,1,unknown,unknown
+412,rater_8,26,qpn_PD01289_recall_la_fr_Batch1_2,recall,global,PD01289,30.0,French,HC,fr,62,,30.0,F,,sample_26.wav,parkinsons,confident,voice,,,True,0,53-62,unknown
+413,rater_8,27,qpn_PD00952_read_en_Batch1_1,read,individual,PD00952,30.0,Other,HC,en,53,,15.0,M,,sample_27.wav,control,confident,healthy,,,False,1,53-62,unknown
+414,rater_8,28,qpn_MNI0415_recall_la_en_Batch2_2,recall,individual,MNI0415,30.0,French,PD,en,0,40.0,30.0,M,,sample_28.wav,parkinsons,leaning,prosody,,,False,1,unknown,moderate
+415,rater_8,29,qpn_PD01130_dpt_en_Batch1_9,dpt,global,PD01130,30.0,English,HC,en,65,,135.0,F,,sample_29.wav,parkinsons,leaning,voice,,,True,0,63-72,unknown
+416,rater_8,30,qpn_MNI0414_recall_la_en_Batch2_5,recall,individual,MNI0414,30.0,French,HC,en,0,0.0,75.0,M,,sample_30.wav,control,confident,healthy,,,False,1,unknown,unknown
+417,rater_8,32,qpn_MNI0399_recall_childhood_fr_Batch2_0,recall,individual,MNI0399,30.0,French,PD,fr,0,64.0,0.0,M,,sample_32.wav,parkinsons,confident,voice,,,True,1,unknown,severe
+418,rater_8,33,qpn_MNI0420_read_en_Batch2_0,read,global,MNI0420,30.0,English,HC,en,0,0.0,0.0,F,,sample_33.wav,parkinsons,leaning,voice,,,True,0,unknown,unknown
+419,rater_8,34,qpn_PD01067_read_en_Batch1_0,read,individual,PD01067,30.0,English,HC,en,67,,0.0,F,,sample_34.wav,control,confident,healthy,,,True,1,63-72,unknown
+420,rater_8,35,qpn_PD01270_recall_la_fr_Batch1_4,recall,individual,PD01270,30.0,French,PD,fr,70,7.0,60.0,F,,sample_35.wav,parkinsons,confident,voice,,,True,1,63-72,mild
+421,rater_8,36,qpn_PD01383_a2_Batch2_1,vowel_repeat,global,PD01383,17.036499999999997,French,HC,other,0,0.0,15.0,M,,sample_36.wav,parkinsons,confident,voice,,,False,0,unknown,unknown
+422,rater_8,37,qpn_PD01133_dpt_en_Batch1_3,dpt,individual,PD01133,30.0,English,PD,en,63,43.0,45.0,M,,sample_37.wav,parkinsons,confident,voice,,,True,1,63-72,moderate
+423,rater_8,38,qpn_MNI0420_a3_Batch2_0,vowel_repeat,individual,MNI0420,19.84,English,HC,other,0,0.0,0.0,F,,sample_38.wav,parkinsons,leaning,prosody,,,False,0,unknown,unknown
+424,rater_8,39,qpn_MNI0380_recall_la_en_Batch2_1,recall,global,MNI0380,30.0,English,PD,en,0,29.0,15.0,F,,sample_39.wav,control,confident,healthy,,,True,0,unknown,mild
+425,rater_8,40,qpn_MNI0286_read_en_Batch2_3,read,individual,MNI0286,26.209562500000004,English,PD,en,0,0.0,45.0,M,,sample_40.wav,parkinsons,confident,prosody,,,True,1,unknown,unknown
+426,rater_8,41,qpn_PD00959_read_fr_Batch2_1,read,global,PD00959,30.0,French,PD,fr,0,51.0,15.0,F,,sample_41.wav,parkinsons,confident,voice,,,True,1,unknown,moderate
+427,rater_8,42,qpn_PD00653_read_fr_Batch1_2,read,individual,PD00653,29.905875,English,PD,fr,77,,30.0,F,,sample_42.wav,parkinsons,certain,voice,,,False,1,73-82,unknown
+428,rater_8,43,qpn_PD01270_recall_la_fr_Batch1_3,recall,global,PD01270,30.0,French,PD,fr,70,7.0,45.0,F,,sample_43.wav,parkinsons,leaning,prosody,,,True,1,63-72,mild
+429,rater_8,44,qpn_PD00267_dpt_fr_Batch1_1,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,15.0,M,,sample_44.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+430,rater_8,45,qpn_PD01270_repeat_4_en_Batch1_0,repeat,global,PD01270,4.5254375,French,PD,en,70,7.0,0.0,F,,sample_45.wav,parkinsons,unsure,other,loe confidence due to too short sample,,False,1,63-72,mild
+431,rater_8,46,qpn_PD00267_recall_la_fr_Batch1_0,recall,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,,sample_46.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+432,rater_8,47,qpn_PD01387_dpt_fr_Batch1_0,dpt,global,PD01387,30.0,French,PD,fr,61,,0.0,F,,sample_47.wav,parkinsons,leaning,voice,,,True,1,53-62,unknown
+433,rater_8,48,qpn_MNI0249_read_fr_Batch2_2,read,global,MNI0249,17.1556875,French,PD,fr,0,50.0,30.0,M,,sample_48.wav,parkinsons,confident,voice,,,True,1,unknown,moderate
+434,rater_8,49,qpn_PD00509_read_en_Batch1_2,read,global,PD00509,30.0,English,PD,en,77,39.0,30.0,M,,sample_49.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+435,rater_8,50,qpn_PD01398_dpt_en_Batch1_1,dpt,global,PD01398,30.0,English,PD,en,61,31.0,15.0,F,,sample_50.wav,parkinsons,confident,voice,,,True,1,53-62,mild
+436,rater_8,51,qpn_MNI0438_dpt_en_Batch2_5,dpt,global,MNI0438,30.0,English,HC,en,0,0.0,75.0,M,,sample_51.wav,parkinsons,unsure,voice,,,True,0,unknown,unknown
+437,rater_8,52,qpn_PD01182_dpt_fr_Batch1_1,dpt,individual,PD01182,30.0,French,HC,fr,82,12.0,15.0,M,,sample_52.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+438,rater_8,53,qpn_MNI0605_recall_la_fr_Batch2_10,recall,global,MNI0605,24.09687500000001,French,HC,fr,0,0.0,150.0,M,,sample_53.wav,parkinsons,confident,voice,,,True,0,unknown,unknown
+439,rater_8,54,qpn_MNI0460_a1_Batch2_0,vowel_repeat,individual,MNI0460,15.5439375,English,HC,other,0,0.0,0.0,M,,sample_54.wav,parkinsons,confident,voice,,,False,0,unknown,unknown
+440,rater_8,55,qpn_MNI0605_read_fr_Batch2_0,read,global,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,,sample_55.wav,parkinsons,unsure,voice,,,True,0,unknown,unknown
+441,rater_8,56,qpn_PD01133_recall_childhood_en_Batch1_0,recall,global,PD01133,30.0,English,PD,en,63,43.0,0.0,M,,sample_56.wav,parkinsons,confident,voice,,,True,1,63-72,moderate
+442,rater_8,57,qpn_PD01130_repeat_4_fr_Batch1_0,repeat,global,PD01130,3.3280625,English,HC,fr,65,,0.0,F,,sample_57.wav,parkinsons,leaning,voice,,,False,0,63-72,unknown
+443,rater_8,58,qpn_PD01273_repeat_4_en_Batch1_0,repeat,individual,PD01273,3.6855,French,HC,en,61,,0.0,M,,sample_58.wav,parkinsons,unsure,other,voice quiality. sample too short for confidence,,False,0,53-62,unknown
+444,rater_8,59,qpn_PD00267_repeat_4_en_Batch1_0,repeat,global,PD00267,2.76975,French,PD,en,80,56.0,0.0,M,,sample_59.wav,parkinsons,leaning,voice,,,False,1,73-82,moderate
+445,rater_8,60,qpn_MNI0438_dpt_en_Batch2_6,dpt,individual,MNI0438,25.3785625,English,HC,en,0,0.0,90.0,M,,sample_60.wav,control,leaning,healthy,,,True,1,unknown,unknown
+446,rater_8,61,qpn_PD00653_read_en_Batch1_1,read,individual,PD00653,30.0,English,PD,en,77,,15.0,F,,sample_61.wav,parkinsons,leaning,voice,,,True,1,73-82,unknown
+447,rater_8,62,qpn_PD01071_dpt_en_Batch1_5,dpt,individual,PD01071,30.0,English,HC,en,82,26.0,75.0,F,,sample_62.wav,parkinsons,certain,voice,,,True,0,73-82,mild
+448,rater_8,63,qpn_PD00119_dpt_en_Batch1_5,dpt,global,PD00119,30.0,English,PD,en,66,39.0,75.0,M,,sample_63.wav,parkinsons,leaning,voice,,,True,1,63-72,moderate
+449,rater_9,0,qpn_PD01383_read_fr_Batch2_1,read,individual,PD01383,28.835812500000003,French,HC,fr,0,0.0,15.0,M,,sample_0.wav,control,leaning,prosody,,,True,1,unknown,unknown
+450,rater_9,1,qpn_MNI0605_read_fr_Batch2_0,read,global,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,,sample_1.wav,control,confident,healthy,,,True,1,unknown,unknown
+451,rater_9,2,qpn_MNI0379_recall_la_en_Batch2_3,recall,individual,MNI0379,25.74225,English,PD,en,0,87.0,45.0,F,,sample_2.wav,parkinsons,leaning,voice,,,True,1,unknown,severe
+452,rater_9,3,qpn_PD01398_dpt_en_Batch1_1,dpt,global,PD01398,30.0,English,PD,en,61,31.0,15.0,F,,sample_3.wav,parkinsons,certain,prosody,,,True,1,53-62,mild
+453,rater_9,4,qpn_PD00959_read_fr_Batch2_1,read,global,PD00959,30.0,French,PD,fr,0,51.0,15.0,F,,sample_4.wav,parkinsons,leaning,prosody,,,True,1,unknown,moderate
+454,rater_9,5,qpn_PD01314_read_en_Batch1_4,read,individual,PD01314,15.581500000000004,Other,HC,en,55,,60.0,M,,sample_5.wav,control,confident,healthy,,,False,1,53-62,unknown
+455,rater_9,6,qpn_PD01071_recall_childhood_en_Batch1_2,recall,global,PD01071,28.8305,English,HC,en,82,26.0,30.0,F,,sample_6.wav,parkinsons,confident,other,prosody + voice,,True,0,73-82,mild
+456,rater_9,7,qpn_PD00119_recall_la_en_Batch1_1,recall,individual,PD00119,30.0,English,PD,en,66,39.0,15.0,M,,sample_7.wav,control,certain,healthy,,,True,0,63-72,moderate
+457,rater_9,8,qpn_MNI0415_repeat_2_fr_Batch2_0,repeat,individual,MNI0415,2.2406875,French,PD,fr,0,40.0,0.0,M,,sample_8.wav,control,certain,healthy,,,True,0,unknown,moderate
+458,rater_9,9,qpn_PD00396_dpt_fr_Batch1_0,dpt,individual,PD00396,30.0,French,PD,fr,80,41.0,0.0,M,,sample_9.wav,parkinsons,confident,other,voice + prosody,,True,1,73-82,moderate
+459,rater_9,10,qpn_PD01182_repeat_2_fr_Batch1_0,repeat,individual,PD01182,1.9246875,French,HC,fr,82,12.0,0.0,M,,sample_10.wav,parkinsons,leaning,voice,,,True,0,73-82,mild
+460,rater_9,11,qpn_MNI0249_read_fr_Batch2_2,read,global,MNI0249,17.1556875,French,PD,fr,0,50.0,30.0,M,,sample_11.wav,control,confident,healthy,,,True,0,unknown,moderate
+461,rater_9,12,qpn_PD01387_read_en_Batch1_2,read,individual,PD01387,30.0,French,PD,en,61,,30.0,F,,sample_12.wav,parkinsons,certain,other,voice + prosody ( more difficult to assess fluency due to second language factors),,False,1,53-62,unknown
+462,rater_9,13,qpn_PD00119_dpt_en_Batch1_2,dpt,individual,PD00119,30.0,English,PD,en,66,39.0,30.0,M,,sample_13.wav,control,confident,healthy,,,True,0,63-72,moderate
+463,rater_9,14,qpn_MNI0419_repeat_1_en_Batch2_0,repeat,individual,MNI0419,2.2396875,English,HC,en,0,0.0,0.0,F,,sample_14.wav,parkinsons,unsure,prosody,,,True,0,unknown,unknown
+464,rater_9,15,qpn_PD01387_dpt_fr_Batch1_0,dpt,global,PD01387,30.0,French,PD,fr,61,,0.0,F,,sample_15.wav,parkinsons,leaning,other,language,,True,1,53-62,unknown
+465,rater_9,16,qpn_PD01133_read_fr_Batch1_1,read,individual,PD01133,30.0,English,PD,fr,63,43.0,15.0,M,,sample_16.wav,parkinsons,confident,other,prosody (difficult to assess fluency with second language factors),,False,1,63-72,moderate
+466,rater_9,17,qpn_PD00119_dpt_en_Batch1_5,dpt,global,PD00119,30.0,English,PD,en,66,39.0,75.0,M,,sample_17.wav,control,certain,healthy,,,True,0,63-72,moderate
+467,rater_9,18,qpn_PD01270_recall_la_fr_Batch1_3,recall,global,PD01270,30.0,French,PD,fr,70,7.0,45.0,F,,sample_18.wav,control,confident,healthy,,,True,0,63-72,mild
+468,rater_9,19,qpn_MNI0438_dpt_en_Batch2_5,dpt,global,MNI0438,30.0,English,HC,en,0,0.0,75.0,M,,sample_19.wav,parkinsons,unsure,language,,,True,0,unknown,unknown
+469,rater_9,20,qpn_PD01383_recall_la_fr_Batch2_2,recall,individual,PD01383,30.0,French,HC,fr,0,0.0,30.0,M,,sample_20.wav,control,confident,healthy,,,True,1,unknown,unknown
+470,rater_9,21,qpn_PD01156_dpt_fr_Batch1_4,dpt,individual,PD01156,18.144000000000005,French,PD,fr,82,47.0,60.0,F,,sample_21.wav,parkinsons,certain,other,"voice, prosody, language",,True,1,73-82,moderate
+471,rater_9,22,qpn_PD00267_recall_la_fr_Batch1_0,recall,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,,sample_22.wav,parkinsons,unsure,language,,,True,1,73-82,moderate
+472,rater_9,23,qpn_PD01268_read_fr_Batch1_1,read,global,PD01268,27.812125,French,HC,fr,63,,15.0,F,,sample_23.wav,control,certain,healthy,,,True,1,63-72,unknown
+473,rater_9,24,qpn_MNI0414_read_en_Batch2_3,read,global,MNI0414,19.318937500000004,French,HC,en,0,0.0,45.0,M,,sample_24.wav,control,confident,healthy,,,False,1,unknown,unknown
+474,rater_9,25,qpn_PD00509_read_en_Batch1_0,read,individual,PD00509,30.0,English,PD,en,77,39.0,0.0,M,,sample_25.wav,parkinsons,certain,other,voice and prosody,,True,1,73-82,moderate
+475,rater_9,26,qpn_PD00267_dpt_fr_Batch1_1,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,15.0,M,,sample_26.wav,parkinsons,confident,other,"voice, prosody",,True,1,73-82,moderate
+476,rater_9,27,qpn_PD01314_repeat_1_fr_Batch1_0,repeat,global,PD01314,1.84425,Other,HC,fr,55,,0.0,M,,sample_27.wav,control,leaning,healthy,,,False,1,53-62,unknown
+477,rater_9,28,qpn_MNI0420_read_en_Batch2_0,read,global,MNI0420,30.0,English,HC,en,0,0.0,0.0,F,,sample_28.wav,parkinsons,leaning,prosody,,,True,0,unknown,unknown
+478,rater_9,29,qpn_PD01156_read_en_Batch1_2,read,global,PD01156,30.0,French,PD,en,82,47.0,30.0,F,,sample_29.wav,parkinsons,confident,other,prosody (difficult to assess d/t 2nd language),,False,1,73-82,moderate
+479,rater_9,30,qpn_PD01289_a2_Batch1_0,vowel_repeat,individual,PD01289,28.2518125,French,HC,other,62,,0.0,F,,sample_30.wav,parkinsons,confident,other,voice quality (tremor iunsure about good phonation time),,False,0,53-62,unknown
+480,rater_9,31,qpn_MNI0380_recall_la_en_Batch2_1,recall,global,MNI0380,30.0,English,PD,en,0,29.0,15.0,F,,sample_31.wav,control,confident,other,typical (?but some hypernasality),,True,0,unknown,mild
+481,rater_9,32,qpn_MNI0419_recall_la_en_Batch2_6,recall,individual,MNI0419,30.0,English,HC,en,0,0.0,90.0,F,,sample_32.wav,control,leaning,voice,,,True,1,unknown,unknown
+482,rater_9,33,qpn_PD01318_dpt_fr_Batch1_5,dpt,global,PD01318,29.125874999999997,French,HC,fr,68,,75.0,F,,sample_33.wav,parkinsons,unsure,other,voice + prosody + language,,True,0,63-72,unknown
+483,rater_9,34,qpn_PD00509_read_en_Batch1_2,read,global,PD00509,30.0,English,PD,en,77,39.0,30.0,M,,sample_34.wav,parkinsons,confident,other,voice + prosody,,True,1,73-82,moderate
+484,rater_9,35,qpn_MNI0415_recall_childhood_fr_Batch2_1,recall,individual,MNI0415,30.0,French,PD,fr,0,40.0,15.0,M,,sample_35.wav,parkinsons,leaning,prosody,,,True,1,unknown,moderate
+485,rater_9,36,qpn_PD01383_a2_Batch2_1,vowel_repeat,global,PD01383,17.036499999999997,French,HC,other,0,0.0,15.0,M,,sample_36.wav,control,confident,voice,,,False,1,unknown,unknown
+486,rater_9,37,qpn_PD00119_a2_Batch1_0,vowel_repeat,individual,PD00119,15.5545625,English,PD,other,66,39.0,0.0,M,,sample_37.wav,control,certain,healthy,,,False,0,63-72,moderate
+487,rater_9,38,qpn_PD01130_repeat_4_fr_Batch1_0,repeat,global,PD01130,3.3280625,English,HC,fr,65,,0.0,F,,sample_38.wav,control,confident,healthy,,,False,1,63-72,unknown
+488,rater_9,39,qpn_MNI0605_recall_la_fr_Batch2_10,recall,global,MNI0605,24.09687500000001,French,HC,fr,0,0.0,150.0,M,,sample_39.wav,control,certain,healthy,,,True,1,unknown,unknown
+489,rater_9,40,qpn_PD01270_repeat_4_en_Batch1_0,repeat,global,PD01270,4.5254375,French,PD,en,70,7.0,0.0,F,,sample_40.wav,parkinsons,leaning,language,,,False,1,63-72,mild
+490,rater_9,41,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,,sample_41.wav,parkinsons,leaning,voice,,,False,1,53-62,unknown
+491,rater_9,42,qpn_PD00653_a2_Batch1_0,vowel_repeat,individual,PD00653,18.19375,English,PD,other,77,,0.0,F,,sample_42.wav,parkinsons,certain,voice,,,False,1,73-82,unknown
+492,rater_9,43,qpn_PD01383_dpt_fr_Batch2_1,dpt,global,PD01383,19.0709375,French,HC,fr,0,0.0,15.0,M,,sample_43.wav,control,certain,healthy,,,True,1,unknown,unknown
+493,rater_9,44,qpn_PD00267_repeat_4_en_Batch1_0,repeat,global,PD00267,2.76975,French,PD,en,80,56.0,0.0,M,,sample_44.wav,control,,voice,,,False,0,73-82,moderate
+494,rater_9,45,qpn_MNI0301_recall_childhood_fr_Batch2_9,recall,individual,MNI0301,28.97425000000001,French,HC,fr,0,0.0,135.0,F,,sample_45.wav,parkinsons,leaning,other,language  (word-finding/hesitations),,True,0,unknown,unknown
+495,rater_9,46,qpn_PD01268_read_fr_Batch1_0,read,individual,PD01268,30.0,French,HC,fr,63,,0.0,F,,sample_46.wav,parkinsons,leaning,prosody,,,True,0,63-72,unknown
+496,rater_9,47,qpn_PD00952_a3_Batch1_0,vowel_repeat,individual,PD00952,16.1465,Other,HC,other,53,,0.0,M,,sample_47.wav,parkinsons,leaning,voice,,,False,0,53-62,unknown
+497,rater_9,48,qpn_PD01133_recall_childhood_en_Batch1_0,recall,global,PD01133,30.0,English,PD,en,63,43.0,0.0,M,,sample_48.wav,parkinsons,confident,other,voice and prosody,,True,1,63-72,moderate
+498,rater_9,49,qpn_PD01318_dpt_fr_Batch1_1,dpt,individual,PD01318,30.0,French,HC,fr,68,,15.0,F,,sample_49.wav,parkinsons,leaning,prosody,,,True,0,63-72,unknown
+499,rater_9,50,qpn_MNI0421_recall_childhood_en_Batch2_3,recall,global,MNI0421,15.950125,Other,HC,en,0,0.0,45.0,M,,sample_50.wav,control,confident,healthy,,,False,1,unknown,unknown
+500,rater_9,51,qpn_PD01182_dpt_fr_Batch1_7,dpt,individual,PD01182,30.0,French,HC,fr,82,12.0,105.0,M,,sample_51.wav,parkinsons,confident,voice,,,True,0,73-82,mild
+501,rater_9,52,qpn_PD01156_a2_Batch1_0,vowel_repeat,global,PD01156,12.124125,French,PD,other,82,47.0,0.0,F,,sample_52.wav,parkinsons,certain,voice,,,False,1,73-82,moderate
+502,rater_9,53,qpn_PD01067_a1_Batch1_0,vowel_repeat,global,PD01067,6.774,English,HC,other,67,,0.0,F,,sample_53.wav,parkinsons,certain,voice,,,False,0,63-72,unknown
+503,rater_9,54,qpn_PD01156_recall_la_fr_Batch1_3,recall,individual,PD01156,30.0,French,PD,fr,82,47.0,45.0,F,,sample_54.wav,parkinsons,certain,language,,,True,1,73-82,moderate
+504,rater_9,55,qpn_PD01130_dpt_en_Batch1_9,dpt,global,PD01130,30.0,English,HC,en,65,,135.0,F,,sample_55.wav,control,confident,healthy,,,True,1,63-72,unknown
+505,rater_9,56,qpn_MNI0414_recall_childhood_en_Batch2_11,recall,individual,MNI0414,30.0,French,HC,en,0,0.0,165.0,M,,sample_56.wav,parkinsons,leaning,other,prosody and language,,False,0,unknown,unknown
+506,rater_9,57,qpn_PD01022_repeat_1_en_Batch2_0,repeat,individual,PD01022,1.9886875,French,PD,en,0,63.0,0.0,F,,sample_57.wav,control,unsure,healthy,,,False,0,unknown,severe
+507,rater_9,58,qpn_PD01693_read_fr_Batch2_0,read,individual,PD01693,30.0,French,PD,fr,0,36.0,0.0,F,,sample_58.wav,control,confident,healthy,,,True,0,unknown,moderate
+508,rater_9,59,qpn_MNI0379_dpt_en_Batch2_0,dpt,individual,MNI0379,28.755,English,PD,en,0,87.0,0.0,F,,sample_59.wav,parkinsons,confident,other,language + prosody,,True,1,unknown,severe
+509,rater_9,60,qpn_PD01130_read_en_Batch1_1,read,individual,PD01130,30.0,English,HC,en,65,,15.0,F,,sample_60.wav,control,confident,healthy,,,True,1,63-72,unknown
+510,rater_9,61,qpn_MNI0414_dpt_en_Batch2_1,dpt,individual,MNI0414,30.0,French,HC,en,0,0.0,15.0,M,,sample_61.wav,parkinsons,leaning,other,prosody + language,,False,0,unknown,unknown
+511,rater_9,62,qpn_PD01289_recall_la_fr_Batch1_2,recall,global,PD01289,30.0,French,HC,fr,62,,30.0,F,,sample_62.wav,parkinsons,unsure,other,prosody + voice,,True,0,53-62,unknown
+512,rater_9,63,qpn_PD01071_dpt_en_Batch1_7,dpt,individual,PD01071,18.864875,English,HC,en,82,26.0,105.0,F,,sample_63.wav,parkinsons,certain,other,voice + prosody,,True,0,73-82,mild
+513,rater_10,0,qpn_PD00396_dpt_fr_Batch1_3,dpt,individual,PD00396,25.333187499999998,French,PD,fr,80,41.0,45.0,M,,sample_0.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+514,rater_10,1,qpn_MNI0380_recall_childhood_en_Batch2_11,recall,individual,MNI0380,19.466375,English,PD,en,0,29.0,165.0,F,,sample_1.wav,control,confident,healthy,,,True,0,unknown,mild
+515,rater_10,2,qpn_PD00959_read_fr_Batch2_1,read,global,PD00959,30.0,French,PD,fr,0,51.0,15.0,F,,sample_2.wav,control,leaning,healthy,,,True,0,unknown,moderate
+516,rater_10,3,qpn_PD01387_dpt_fr_Batch1_0,dpt,global,PD01387,30.0,French,PD,fr,61,,0.0,F,,sample_3.wav,parkinsons,unsure,voice,,,True,1,53-62,unknown
+517,rater_10,4,qpn_MNI0454_a3_Batch2_0,vowel_repeat,individual,MNI0454,15.17575,English,HC,other,0,0.0,0.0,F,,sample_4.wav,control,unsure,voice,,,False,1,unknown,unknown
+518,rater_10,5,qpn_PD00119_dpt_en_Batch1_5,dpt,global,PD00119,30.0,English,PD,en,66,39.0,75.0,M,,sample_5.wav,parkinsons,confident,prosody,,,True,1,63-72,moderate
+519,rater_10,6,qpn_PD01693_read_fr_Batch2_2,read,individual,PD01693,15.811,French,PD,fr,0,36.0,30.0,F,,sample_6.wav,control,certain,healthy,,,True,0,unknown,moderate
+520,rater_10,7,qpn_MNI0605_repeat_1_fr_Batch2_0,repeat,individual,MNI0605,2.928125,French,HC,fr,0,0.0,0.0,M,,sample_7.wav,control,confident,healthy,,,True,1,unknown,unknown
+521,rater_10,8,qpn_MNI0249_read_fr_Batch2_2,read,global,MNI0249,17.1556875,French,PD,fr,0,50.0,30.0,M,,sample_8.wav,parkinsons,leaning,prosody,,,True,1,unknown,moderate
+522,rater_10,9,qpn_PD01318_repeat_1_fr_Batch1_0,repeat,individual,PD01318,1.7793125,French,HC,fr,68,,0.0,F,,sample_9.wav,control,leaning,healthy,,,True,1,63-72,unknown
+523,rater_10,10,qpn_MNI0380_recall_la_en_Batch2_1,recall,global,MNI0380,30.0,English,PD,en,0,29.0,15.0,F,,sample_10.wav,control,certain,healthy,,,True,0,unknown,mild
+524,rater_10,11,qpn_MNI0421_recall_childhood_en_Batch2_3,recall,global,MNI0421,15.950125,Other,HC,en,0,0.0,45.0,M,,sample_11.wav,parkinsons,unsure,prosody,,,False,0,unknown,unknown
+525,rater_10,12,qpn_MNI0573_recall_la_fr_Batch2_0,recall,individual,MNI0573,30.0,French,HC,fr,0,0.0,0.0,F,,sample_12.wav,parkinsons,unsure,voice,,,True,0,unknown,unknown
+526,rater_10,13,qpn_PD01268_read_fr_Batch1_1,read,global,PD01268,27.812125,French,HC,fr,63,,15.0,F,,sample_13.wav,control,leaning,healthy,,,True,1,63-72,unknown
+527,rater_10,14,qpn_MNI0420_read_en_Batch2_0,read,global,MNI0420,30.0,English,HC,en,0,0.0,0.0,F,,sample_14.wav,control,certain,healthy,,,True,1,unknown,unknown
+528,rater_10,15,qpn_PD00267_dpt_fr_Batch1_1,dpt,global,PD00267,30.0,French,PD,fr,80,56.0,15.0,M,,sample_15.wav,parkinsons,confident,voice,,,True,1,73-82,moderate
+529,rater_10,16,qpn_PD01182_read_fr_Batch1_2,read,individual,PD01182,17.464937499999998,French,HC,fr,82,12.0,30.0,M,,sample_16.wav,control,unsure,healthy,,,True,1,73-82,mild
+530,rater_10,17,qpn_MNI0605_recall_la_fr_Batch2_10,recall,global,MNI0605,24.09687500000001,French,HC,fr,0,0.0,150.0,M,,sample_17.wav,parkinsons,unsure,prosody,,,True,0,unknown,unknown
+531,rater_10,18,qpn_MNI0421_recall_childhood_en_Batch2_1,recall,individual,MNI0421,30.0,Other,HC,en,0,0.0,15.0,M,,sample_18.wav,control,,language,,,False,1,unknown,unknown
+532,rater_10,19,qpn_PD01067_a1_Batch1_0,vowel_repeat,global,PD01067,6.774,English,HC,other,67,,0.0,F,,sample_19.wav,control,leaning,healthy,,,False,1,63-72,unknown
+533,rater_10,20,qpn_PD01133_dpt_en_Batch1_6,dpt,individual,PD01133,23.6779375,English,PD,en,63,43.0,90.0,M,,sample_20.wav,parkinsons,certain,prosody,,,True,1,63-72,moderate
+534,rater_10,21,qpn_PD00959_a3_Batch2_0,vowel_repeat,individual,PD00959,8.559875,French,PD,other,0,51.0,0.0,F,,sample_21.wav,parkinsons,unsure,voice,,,False,1,unknown,moderate
+535,rater_10,22,qpn_PD01318_dpt_fr_Batch1_5,dpt,global,PD01318,29.125874999999997,French,HC,fr,68,,75.0,F,,sample_22.wav,parkinsons,confident,prosody,,,True,0,63-72,unknown
+536,rater_10,23,qpn_PD01022_read_en_Batch2_3,read,individual,PD01022,30.0,French,PD,en,0,63.0,45.0,F,,sample_23.wav,parkinsons,leaning,prosody,,,False,1,unknown,severe
+537,rater_10,24,qpn_PD01156_dpt_fr_Batch1_2,dpt,individual,PD01156,30.0,French,PD,fr,82,47.0,30.0,F,,sample_24.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+538,rater_10,25,qpn_MNI0380_dpt_en_Batch2_2,dpt,individual,MNI0380,30.0,English,PD,en,0,29.0,30.0,F,,sample_25.wav,control,certain,healthy,,,True,0,unknown,mild
+539,rater_10,26,qpn_PD01130_repeat_4_fr_Batch1_0,repeat,global,PD01130,3.3280625,English,HC,fr,65,,0.0,F,,sample_26.wav,parkinsons,leaning,voice,,,False,0,63-72,unknown
+540,rater_10,27,qpn_MNI0417_read_en_Batch2_1,read,individual,MNI0417,30.0,English,HC,en,0,0.0,15.0,F,,sample_27.wav,parkinsons,leaning,voice,,,True,0,unknown,unknown
+541,rater_10,28,qpn_MNI0438_dpt_en_Batch2_5,dpt,global,MNI0438,30.0,English,HC,en,0,0.0,75.0,M,,sample_28.wav,parkinsons,leaning,prosody,,,True,0,unknown,unknown
+542,rater_10,29,qpn_MNI0605_read_fr_Batch2_0,read,global,MNI0605,30.0,French,HC,fr,0,0.0,0.0,M,,sample_29.wav,control,unsure,healthy,,,True,1,unknown,unknown
+543,rater_10,30,qpn_PD00267_recall_la_fr_Batch1_0,recall,global,PD00267,30.0,French,PD,fr,80,56.0,0.0,M,,sample_30.wav,parkinsons,leaning,voice,,,True,1,73-82,moderate
+544,rater_10,31,qpn_PD01156_a2_Batch1_0,vowel_repeat,global,PD01156,12.124125,French,PD,other,82,47.0,0.0,F,,sample_31.wav,parkinsons,confident,voice,,,False,1,73-82,moderate
+545,rater_10,32,qpn_MNI0399_recall_childhood_fr_Batch2_1,recall,individual,MNI0399,30.0,French,PD,fr,0,64.0,15.0,M,,sample_32.wav,control,unsure,voice,,,True,0,unknown,severe
+546,rater_10,33,qpn_PD01270_repeat_4_en_Batch1_0,repeat,global,PD01270,4.5254375,French,PD,en,70,7.0,0.0,F,,sample_33.wav,parkinsons,unsure,prosody,,,False,1,63-72,mild
+547,rater_10,34,qpn_PD01133_recall_childhood_en_Batch1_0,recall,global,PD01133,30.0,English,PD,en,63,43.0,0.0,M,,sample_34.wav,parkinsons,confident,prosody,,,True,1,63-72,moderate
+548,rater_10,35,qpn_MNI0286_read_en_Batch2_1,read,individual,MNI0286,30.0,English,PD,en,0,0.0,15.0,M,,sample_35.wav,parkinsons,confident,prosody,,,True,1,unknown,unknown
+549,rater_10,36,qpn_PD01314_a1_Batch1_0,vowel_repeat,individual,PD01314,16.536125,Other,HC,other,55,,0.0,M,,sample_36.wav,control,leaning,voice,,,False,1,53-62,unknown
+550,rater_10,37,qpn_MNI0573_dpt_fr_Batch2_4,dpt,individual,MNI0573,18.71875,French,HC,fr,0,0.0,60.0,F,,sample_37.wav,parkinsons,leaning,prosody,,,True,0,unknown,unknown
+551,rater_10,38,qpn_PD01314_dpt_en_Batch1_1,dpt,individual,PD01314,30.0,Other,HC,en,55,,15.0,M,,sample_38.wav,control,leaning,healthy,,,False,1,53-62,unknown
+552,rater_10,39,qpn_PD01273_dpt_fr_Batch1_3,dpt,individual,PD01273,19.547375,French,HC,fr,61,,45.0,M,,sample_39.wav,parkinsons,unsure,prosody,,,True,0,53-62,unknown
+553,rater_10,40,qpn_MNI0381_read_fr_Batch2_2,read,individual,MNI0381,18.0126875,French,HC,fr,0,0.0,30.0,F,,sample_40.wav,control,unsure,healthy,,,True,1,unknown,unknown
+554,rater_10,41,qpn_PD01156_read_en_Batch1_2,read,global,PD01156,30.0,French,PD,en,82,47.0,30.0,F,,sample_41.wav,parkinsons,leaning,prosody,,,False,1,73-82,moderate
+555,rater_10,42,qpn_PD01383_dpt_fr_Batch2_1,dpt,global,PD01383,19.0709375,French,HC,fr,0,0.0,15.0,M,,sample_42.wav,control,certain,healthy,,,True,1,unknown,unknown
+556,rater_10,43,qpn_MNI0399_a1_Batch2_0,vowel_repeat,individual,MNI0399,19.1254375,French,PD,other,0,64.0,0.0,M,,sample_43.wav,parkinsons,certain,voice,,,False,1,unknown,severe
+557,rater_10,44,qpn_PD00509_read_en_Batch1_2,read,global,PD00509,30.0,English,PD,en,77,39.0,30.0,M,,sample_44.wav,parkinsons,confident,prosody,,,True,1,73-82,moderate
+558,rater_10,45,qpn_PD01130_dpt_en_Batch1_9,dpt,global,PD01130,30.0,English,HC,en,65,,135.0,F,,sample_45.wav,control,certain,healthy,,,True,1,63-72,unknown
+559,rater_10,46,qpn_PD01270_recall_la_fr_Batch1_3,recall,global,PD01270,30.0,French,PD,fr,70,7.0,45.0,F,,sample_46.wav,parkinsons,unsure,voice,,,True,1,63-72,mild
+560,rater_10,47,qpn_MNI0380_repeat_3_en_Batch2_0,repeat,individual,MNI0380,8.568375,English,PD,en,0,29.0,0.0,F,,sample_47.wav,control,certain,healthy,,,True,0,unknown,mild
+561,rater_10,48,qpn_PD01289_recall_la_fr_Batch1_2,recall,global,PD01289,30.0,French,HC,fr,62,,30.0,F,,sample_48.wav,parkinsons,certain,prosody,,,True,0,53-62,unknown
+562,rater_10,49,qpn_PD01065_recall_la_en_Batch1_1,recall,individual,PD01065,30.0,French,PD,en,62,,15.0,M,,sample_49.wav,control,confident,healthy,,,False,0,53-62,unknown
+563,rater_10,50,qpn_PD01065_a3_Batch1_0,vowel_repeat,global,PD01065,19.112,French,PD,other,62,,0.0,M,,sample_50.wav,control,unsure,voice,,,False,0,53-62,unknown
+564,rater_10,51,qpn_PD00959_recall_la_fr_Batch2_7,recall,individual,PD00959,30.0,French,PD,fr,0,51.0,105.0,F,,sample_51.wav,parkinsons,leaning,prosody,,,True,1,unknown,moderate
+565,rater_10,52,qpn_PD01383_recall_la_fr_Batch2_0,recall,individual,PD01383,30.0,French,HC,fr,0,0.0,0.0,M,,sample_52.wav,control,unsure,healthy,,,True,1,unknown,unknown
+566,rater_10,53,qpn_PD01314_repeat_1_fr_Batch1_0,repeat,global,PD01314,1.84425,Other,HC,fr,55,,0.0,M,,sample_53.wav,parkinsons,unsure,voice,,,False,0,53-62,unknown
+567,rater_10,54,qpn_PD01398_dpt_en_Batch1_1,dpt,global,PD01398,30.0,English,PD,en,61,31.0,15.0,F,,sample_54.wav,parkinsons,leaning,prosody,,,True,1,53-62,mild
+568,rater_10,55,qpn_PD01071_recall_childhood_en_Batch1_2,recall,global,PD01071,28.8305,English,HC,en,82,26.0,30.0,F,,sample_55.wav,parkinsons,certain,prosody,,,True,0,73-82,mild
+569,rater_10,56,qpn_MNI0460_read_en_Batch2_1,read,individual,MNI0460,30.0,English,HC,en,0,0.0,15.0,M,,sample_56.wav,control,certain,healthy,,,True,1,unknown,unknown
+570,rater_10,57,qpn_PD00267_repeat_4_en_Batch1_0,repeat,global,PD00267,2.76975,French,PD,en,80,56.0,0.0,M,,sample_57.wav,parkinsons,leaning,prosody,,,False,1,73-82,moderate
+571,rater_10,58,qpn_MNI0414_read_en_Batch2_3,read,global,MNI0414,19.318937500000004,French,HC,en,0,0.0,45.0,M,,sample_58.wav,control,certain,healthy,,,False,1,unknown,unknown
+572,rater_10,59,qpn_MNI0454_recall_childhood_en_Batch2_5,recall,individual,MNI0454,30.0,English,HC,en,0,0.0,75.0,F,,sample_59.wav,parkinsons,unsure,voice,,,True,0,unknown,unknown
+573,rater_10,60,qpn_PD01383_a2_Batch2_1,vowel_repeat,global,PD01383,17.036499999999997,French,HC,other,0,0.0,15.0,M,,sample_60.wav,parkinsons,unsure,voice,,,False,0,unknown,unknown
+574,rater_10,61,qpn_MNI0399_read_fr_Batch2_1,read,individual,MNI0399,30.0,French,PD,fr,0,64.0,15.0,M,,sample_61.wav,control,unsure,prosody,,,True,0,unknown,severe
+575,rater_10,62,qpn_MNI0420_dpt_en_Batch2_0,dpt,individual,MNI0420,30.0,English,HC,en,0,0.0,0.0,F,,sample_62.wav,control,certain,healthy,,,True,1,unknown,unknown
+576,rater_10,63,qpn_PD00267_repeat_1_fr_Batch1_0,repeat,individual,PD00267,2.079125,French,PD,fr,80,56.0,0.0,M,,sample_63.wav,parkinsons,unsure,prosody,,,True,1,73-82,moderate

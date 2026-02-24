@@ -15,3 +15,6 @@ __pycache__
 **/run_scripts/
 
 manifest.json
+
+# Pretrained models
+**/pretrained/
