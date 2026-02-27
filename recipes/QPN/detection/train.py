@@ -63,7 +63,7 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         if isinstance(self.modules.compute_features, Whisper):
-            feats = self.modules.compute_features(wavs, lens, do_augment=(stage == sb.Stage.TRAIN))
+            feats = self.modules.compute_features(wavs, None, lens, do_augment=(stage == sb.Stage.TRAIN))
         else:
             feats = self.modules.compute_features(wavs, lens)
         # feats = self.modules.mean_var_norm(feats, lens)
