@@ -65,14 +65,14 @@ threshold: 0.5
 # For the pretrained_source, use the path to the model dir
 pretrained_source: !PLACEHOLDER
 freeze_pretrained: True
-feature_size: 1024
+feature_size: 768
 embedding_size: 1280
 dropout: 0.2
 out_neurons: 1
 
 # Dataloader options
 # Shuffling handled by sampler in train.py
-num_workers: 4
+num_workers: 8
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>

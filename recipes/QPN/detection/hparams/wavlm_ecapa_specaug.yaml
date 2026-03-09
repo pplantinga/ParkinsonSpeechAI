@@ -68,7 +68,7 @@ out_neurons: 1
 
 # Dataloader options
 # Shuffling handled by sampler in train.py
-num_workers: 4
+num_workers: 8
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>
@@ -91,15 +91,32 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.W
     freeze: !ref <freeze_pretrained>
     save_path: !ref <output_folder>/wavlm-large
 
-embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-    input_size: !ref <feature_size>
-    channels: [1024, 1024, 1024, 1024, 3072]
-    kernel_sizes: [5, 3, 3, 3, 1]
-    dilations: [1, 2, 3, 4, 1]
-    groups: [1, 1, 1, 1, 1]
-    attention_channels: 128
-    lin_neurons: !ref <embedding_size>
-    dropout: 0.2
+
+embedding_model: !new:torch.nn.Sequential
+    - !new:speechbrain.nnet.linear.Linear
+        input_size: !ref <feature_size>
+        n_neurons: !ref <embedding_size>
+    - !new:torch.nn.Dropout
+        p: !ref <dropout>
+    - !new:torch.nn.LeakyReLU
+    - !new:speechbrain.nnet.pooling.AttentionPooling
+        input_dim: !ref <embedding_size>
+    - !new:speechbrain.nnet.linear.Linear
+        input_size: !ref <embedding_size>
+        n_neurons: !ref <embedding_size>
+    - !new:torch.nn.Dropout
+        p: !ref <dropout>
+    - !new:torch.nn.LeakyReLU
+
+#embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
+#    input_size: !ref <feature_size>
+#    channels: [1024, 1024, 1024, 1024, 3072]
+#    kernel_sizes: [5, 3, 3, 3, 1]
+#    dilations: [1, 2, 3, 4, 1]
+#    groups: [1, 1, 1, 1, 1]
+#    attention_channels: 128
+#    lin_neurons: !ref <embedding_size>
+#    dropout: 0.2
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: !ref <embedding_size>

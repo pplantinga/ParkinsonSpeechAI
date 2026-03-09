@@ -7,42 +7,31 @@ import numpy as np
 import pathlib
 
 
-def prepare_neuro(
-    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size, transcript_folder=None
-):
-    assert os.path.exists(data_folder), "Data folder not found"
+def convert_to_python(obj):
+    """Recursively convert NumPy types to Python types for JSON serialization."""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_to_python(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_python(item) for item in obj]
+    else:
+        return obj
 
-    if os.path.exists(train_annotation):
-        return
+
+def prepare_neuro(
+    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size, keep_batch3=False):
+    assert os.path.exists(data_folder), "Data folder not found"
 
     path_type_dict = get_path_type_dicts(data_folder)
 
-    train_transcripts, valid_transcripts, test_transcripts, train_translations, manual = read_transcripts(transcript_folder)
-    create_json(train_annotation, path_type_dict["train"], chunk_size, train_transcripts, manual, train_translations, overlap=0)
-    create_json(test_annotation, path_type_dict["test"], chunk_size, test_transcripts, manual)
-    create_json(valid_annotation, path_type_dict["valid"], chunk_size, valid_transcripts, manual)
-
-
-def read_transcripts(transcript_dir):
-    """Read the transcripts from file."""
-    if transcript_dir is None:
-        return None, None, None, None, None
-
-    d = pathlib.Path(transcript_dir)
-    assert d.exists(), "Transcript dict must exist and hold train.json etc."
-    with open(d / "train.json") as f:
-        train_dict = json.load(f)
-    with open(d / "valid.json") as f:
-        valid_dict = json.load(f)
-    with open(d / "test.json") as f:
-        test_dict = json.load(f)
-    with open(d / "train_translation.json") as f:
-        train_translations = json.load(f)
-    with open(d / "manual.json") as f:
-        manual = json.load(f)
-
-    return train_dict, valid_dict, test_dict, train_translations, manual
-
+    create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=None, keep_batch3=keep_batch3)
+    create_json(test_annotation, path_type_dict["test"], chunk_size, keep_batch3=keep_batch3)
+    create_json(valid_annotation, path_type_dict["valid"], chunk_size, keep_batch3=keep_batch3)
 
 def get_path_type_dicts(data_folder):
     """
@@ -56,6 +45,7 @@ def get_path_type_dicts(data_folder):
     datasets = os.listdir(data_folder)
     batch1_excel_path = os.path.join(data_folder, "QPN_Batch1.xlsx")
     batch2_excel_path = os.path.join(data_folder, "QPN_Batch2.xlsx")
+    batch3_excel_path = os.path.join(data_folder, "QPN_Batch3.xlsx")
     path_type_dict = {}
 
     # Load the Excel files
@@ -63,6 +53,8 @@ def get_path_type_dicts(data_folder):
     batch1_sheet = batch1_workbook.active
     batch2_workbook = openpyxl.load_workbook(batch2_excel_path)
     batch2_sheet = batch2_workbook["Demographic"]
+    batch3_workbook = openpyxl.load_workbook(batch3_excel_path)
+    batch3_sheet = batch3_workbook.active
 
     for dataset in datasets:
         dataset_path = os.path.join(data_folder, dataset)
@@ -75,14 +67,17 @@ def get_path_type_dicts(data_folder):
 
         batch1_data_path = os.path.join(dataset_path, "Batch1")
         batch2_data_path = os.path.join(dataset_path, "Batch2")
+        batch3_data_path = os.path.join(dataset_path, "Batch3")
 
         batch1_files = glob.glob(batch1_data_path + "/*.wav")
         batch2_files = glob.glob(batch2_data_path + "/*.wav")
+        batch3_files = glob.glob(batch3_data_path + "/*.wav")
 
         batch1_patients = get_patient_traits(batch1_files, batch1_sheet, "Batch1")
         batch2_patients = get_patient_traits(batch2_files, batch2_sheet, "Batch2")
+        batch3_patients = get_patient_traits(batch3_files, batch3_sheet, "Batch3")
 
-        path_type_dict[dataset] = batch1_patients | batch2_patients
+        path_type_dict[dataset] = batch1_patients | batch2_patients | batch3_patients
 
     return path_type_dict
 
@@ -96,9 +91,8 @@ def get_patient_traits(files, sheet, batch):
         ptype = sheet.cell(row=row, column=2).value
         sex = sheet.cell(row=row, column=3).value
         l1 = sheet.cell(row=row, column=4).value
-        updrs = sheet.cell(row=row, column=5).value
 
-        if batch == "Batch1":
+        if batch == "Batch1" or batch == "Batch3":
             age = sheet.cell(row=row, column=6).value
         else:
             age = 0
@@ -113,15 +107,14 @@ def get_patient_traits(files, sheet, batch):
 
             # Refactor patient type
             if ptype == "CTRL" or ptype == "control":
-                ptype = "HC"
+                ptype = "Control"
             elif ptype == "PD" or ptype == "patient":
-                ptype = "PD"
+                ptype = "Disease"
             else:
                 print(f"Unknown key found: {ptype}")
                 continue
 
             # Refactor language
-            # TODO fix excel to have unified language identifiers
             if l1 == "FR" or "French" in l1 or "Fench" in l1:
                 l1 = "French"
             elif l1 == "EN" or "English" in l1:
@@ -129,15 +122,12 @@ def get_patient_traits(files, sheet, batch):
             else:
                 l1 = "Other"
 
-            # TODO Convert UPDRS score to category, waiting for answer from Jen-Kai on B1 scores
-
             # Save to dict
             patient_traits = {
                 "ptype": ptype,
                 "sex": sex,
                 "age": age,
                 "l1": l1,
-                "updrs": updrs,
             }
             patients[pid] = patient_traits
 
@@ -151,7 +141,7 @@ def get_patient_traits(files, sheet, batch):
     return updated_dict
 
 
-def create_json(json_file, path_type_dict, chunk_size, transcripts=None, manual=None, translations=None, overlap=None):
+def create_json(json_file, path_type_dict, chunk_size, overlap=None, keep_batch3=False):
     hop_size = chunk_size / 2 if overlap is None else chunk_size - overlap
     json_dict = {}
 
@@ -159,11 +149,11 @@ def create_json(json_file, path_type_dict, chunk_size, transcripts=None, manual=
         # Get info dict
         info_dict = path_type_dict[audiofile].copy()
 
-        # Skip condition
-        skip = False
-
         # Remove 'l1' files as they are duplicates
         if "l1" in audiofile:
+            continue
+
+        if !keep_batch3 and "Batch3" in audiofile:
             continue
 
         # Get utterance info from the file name
@@ -175,6 +165,8 @@ def create_json(json_file, path_type_dict, chunk_size, transcripts=None, manual=
         info_dict.update({"pid": items[1], "task": items[2], "lang": items[-1]})
 
         # Corrections
+        if info_dict["task"] not in ["a1", "a2", "a3", "a4", "vowel_repeat", "dpt", "recall", "repeat", "hbd", "read"]:
+            info_dict["task"] = items[3] # for some batch 3 files
         if info_dict["task"] in ["a1", "a2", "a3", "a4"]:
             info_dict["task"] = "vowel_repeat"
         if info_dict["lang"] not in ["en", "fr"]:
@@ -184,34 +176,17 @@ def create_json(json_file, path_type_dict, chunk_size, transcripts=None, manual=
         audioinfo = torchaudio.info(audiofile)
         duration = audioinfo.num_frames / audioinfo.sample_rate
 
-        if transcripts is not None:
-            transcript = transcripts[uttid] if uttid in transcripts else ""
-            json_dict[uttid] = {
-                "wav": audiofile, "info_dict": info_dict, "transcript": transcript
+        max_start = max(duration - hop_size, 1)
+        for i, start in enumerate(np.arange(0, max_start, hop_size)):
+            chunk_duration = min(chunk_size, duration - i * hop_size)
+            json_dict[f"{uttid}_{i}"] = {
+                "wav": audiofile,
+                "start": start,
+                "duration": chunk_duration,
+                "info_dict": info_dict,
             }
-            if translations is not None:
-                translation = translations[uttid] if uttid in translations else ""
-                json_dict[uttid]["translation"] = translation
-
-            # Manual transcription
-            patientid, langid = uttid.split("_")[1], uttid.split("_")[-2]
-            manual_id = patientid + "_" + langid
-            if manual is not None and manual_id in manual:
-                json_dict[uttid]["manual"] = manual[manual_id]
-            else:
-                json_dict[uttid]["manual"] = ""
-
-        else:
-            max_start = max(duration - hop_size, 1)
-            for i, start in enumerate(np.arange(0, max_start, hop_size)):
-                chunk_duration = min(chunk_size, duration - i * hop_size)
-                json_dict[f"{uttid}_{i}"] = {
-                    "wav": audiofile,
-                    "start": start,
-                    "duration": chunk_duration,
-                    "info_dict": info_dict,
-                }
 
     # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:
+        json_dict = convert_to_python(json_dict)
         json.dump(json_dict, json_f, indent=2)

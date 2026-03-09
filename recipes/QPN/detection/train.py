@@ -29,6 +29,7 @@ from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
 from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeightedRandomSampler
+
 from speechbrain.lobes.models.huggingface_transformers.whisper import Whisper
 
 from torch.utils.data import DataLoader
@@ -66,7 +67,6 @@ class ParkinsonBrain(sb.core.Brain):
             feats = self.modules.compute_features(wavs, None, lens, do_augment=(stage == sb.Stage.TRAIN))
         else:
             feats = self.modules.compute_features(wavs, lens)
-        # feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -169,6 +169,10 @@ class ParkinsonBrain(sb.core.Brain):
             if stage == sb.Stage.TEST:
                 with open(self.metrics_json, "w") as f:
                     json.dump(combined_avg, f)
+                    f.write("\nChunk stats: ")
+                    json.dump(chunk_stats, f)
+                    f.write("\nCombined stats: ")
+                    json.dump(metrics_comb_avg, f)
                 logger.info(f"Results stored {self.metrics_json}")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
@@ -299,8 +303,8 @@ def dataio_prep(hparams):
     # of the observed label a unique index (e.g, 'hc': 0, 'pd': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("PD", 1)
-    label_encoder.enforce_label("HC", 0)
+    label_encoder.enforce_label("Disease", 1)
+    label_encoder.enforce_label("Control", 0)
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -374,11 +378,11 @@ def dataio_prep(hparams):
         )
 
     # Remove keys from training data for e.g. training only on men
-    for key, values in hparams["train_keep_keys"].items():
+    for key, values in hparams.get("train_keep_keys", {}).items():
         datasets["train"] = datasets["train"].filtered_sorted(
             key_test={"info_dict": lambda x: x[key] in values},
         )
-    for key, values in hparams["test_keep_keys"].items():
+    for key, values in hparams.get("test_keep_keys", {}).items():
         for dataset in ["valid", "test"]:
             datasets[dataset] = datasets[dataset].filtered_sorted(
                 key_test={"info_dict": lambda x: x[key] in values},

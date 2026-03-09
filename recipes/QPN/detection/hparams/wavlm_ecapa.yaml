@@ -76,7 +76,7 @@ out_neurons: 1
 
 # Dataloader options
 # Shuffling handled by sampler in train.py
-num_workers: 4
+num_workers: 8
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>
