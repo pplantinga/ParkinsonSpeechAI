@@ -459,8 +459,8 @@ if __name__ == "__main__":
 
     study = optuna.create_study(
         sampler=optuna.samplers.GridSampler(search_space),
-        storage="sqlite:///qpn_wav2aug_optuna_study.db",
-        study_name="qpn_wav2aug_tuning",
+        storage="sqlite:///wavlm_no_aug.db", # replace these 
+        study_name="wavlm_no_aug",
         load_if_exists=True,
         direction="maximize",
     )
