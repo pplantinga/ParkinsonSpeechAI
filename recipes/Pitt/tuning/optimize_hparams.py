@@ -43,6 +43,8 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
+        if self.hparams.whisper_layer != None:
+            feats = feats[self.hparams.whisper_layer]
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -115,7 +117,10 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            lr = self.lr_scheduler.get_last_lr()
+            if hasattr(self.hparams, "lr_scheduler"):
+               lr = self.lr_scheduler.get_last_lr()
+            else:
+               lr = self.optimizer.param_groups[0]["lr"]
 
             self.hparams.train_logger.log_stats(
                 stats_meta={"epoch": epoch, "lr": lr},
@@ -126,11 +131,10 @@ class AlzheimerBrain(sb.core.Brain):
             if self.checkpointer is not None:
                 self.checkpointer.save_and_keep_only(
                     meta=stage_stats,
-                    max_keys=["chunk_F-score"],
+                    max_keys=["comb_avg_F-score"],
                     min_keys=["loss"],
                 )
 
-            print(stage_stats)
             self.last_valid_stats = stage_stats
 
         if stage == sb.Stage.TEST:
@@ -161,11 +165,12 @@ class AlzheimerBrain(sb.core.Brain):
             if self.checkpointer is not None:
                 self.checkpointer.add_recoverable("optimizer", self.optimizer)
 
-            self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
+            if hasattr(self.hparams, "lr_scheduler"):
+                self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
 
     def on_fit_batch_end(self, batch, outputs, loss, should_step):
         """Update scheduler if an update was made."""
-        if should_step:
+        if should_step and hasattr(self.hparams, "lr_scheduler"):
             self.lr_scheduler.step()
 
     def combine_chunks(self, how="avg"):
@@ -247,16 +252,16 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     )
 
     # Dataset prep
-    from prepare_pitt import prepare_pitt
+    from prepare_pitt_tune import prepare_pitt
 
     sb.utils.distributed.run_on_main(
         prepare_pitt,
         kwargs={
             "data_folder": hparams["data_folder"],
             "train_annotation": hparams["train_annotation"],
-            "test_annotation": hparams["test_annotation"],
             "valid_annotation": hparams["valid_annotation"],
             "chunk_size": hparams["chunk_size"],
+            "split": hparams["split"],
         },
     )
 
@@ -266,13 +271,11 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     datasets = dataio_prep(hparams)
 
     # Brain class initialization
-    checkpointer = hparams.get("checkpointer", None)
     alzheimer_brain = AlzheimerBrain(
         modules=hparams["modules"],
         opt_class=hparams["opt_class"],
         hparams=hparams,
         run_opts=run_opts,
-        checkpointer=checkpointer,
     )
 
     alzheimer_brain.last_valid_stats = None
@@ -286,7 +289,7 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
         valid_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
-    return alzheimer_brain.last_valid_stats["chunk_F-score"]
+    return alzheimer_brain.last_valid_stats["comb_avg_F-score"]
 
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -295,8 +298,8 @@ def dataio_prep(hparams):
     # of the observed label a unique index (e.g, 'hc': 0, 'ad': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("AD", 1)
-    label_encoder.enforce_label("HC", 0)
+    label_encoder.enforce_label("Disease", 1)
+    label_encoder.enforce_label("Control", 0)
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -327,7 +330,6 @@ def dataio_prep(hparams):
     train_info = {
         "train": hparams["train_annotation"],
         "valid": hparams["valid_annotation"],
-        "test": hparams["test_annotation"],
     }
 
     for dataset in train_info:
@@ -344,40 +346,36 @@ if __name__ == "__main__":
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
     def objective(trial):
-        trial_overrides = overrides + (
-            f"\ntrial: {trial.number}"
-            f"\nepochs: {trial.suggest_float('epochs', 15, 50, step=1)}"
-            f"\nlr: {trial.suggest_float('lr', 1e-5, 1e-3, log=True)}"
-            f"\nbase_lr: {trial.suggest_float('base_lr', 1e-7, 1e-4, log=True)}"
-            f"\nchunk_size: {trial.suggest_int('chunk_size', 15, 60, step=1)}"
-            f"\nembedding_size: {trial.suggest_int('embedding_size', 512, 1280, step=32)}"
-            f"\ndropout: {trial.suggest_float('dropout', 0.1, 0.5, step=0.1)}"
-            f"\nsnr_low: {trial.suggest_float('snr_low', 0.0, 15.0, step=1.0)}"
-            f"\nsnr_delta: {trial.suggest_float('snr_delta', 5.0, 20.0, step=1.0)}"
-            f"\ndrop_freq_low: {trial.suggest_float('drop_freq_low', 0.0, 0.3, step=0.01)}"
-            f"\ndrop_freq_high: {trial.suggest_float('drop_freq_high', 0.7, 1.0, step=0.01)}"
-            f"\ndrop_freq_count_low: {trial.suggest_categorical('drop_freq_count_low', [1, 2, 3])}"
-            f"\ndrop_freq_count_delta: {trial.suggest_categorical('drop_freq_count_delta', [0, 1, 2, 3, 4, 5, 6])}"
-            f"\ndrop_freq_width: {trial.suggest_float('drop_freq_width', 0.01, 0.15, step=0.01)}"
-            f"\nmin_augmentations: {trial.suggest_categorical('min_augmentations', [0, 1, 2])}"
-            f"\naugment_prob: {trial.suggest_float('augment_prob', 0.5, 1.0, step=0.1)}"
-            f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}")
+        scores = []
+        for i in range(2):
+            trial_overrides = overrides + (
+                f"\ntrial: {trial.number}"
+                f"\nepochs: {trial.suggest_float('epochs', 15, 60, step=5)}"
+                f"\nlr: {trial.suggest_float('lr', 1e-5, 5e-4, log=True)}"
+                f"\nchunk_size: {trial.suggest_int('chunk_size', 10, 60, step=5)}"
+                f"\nembedding_size: {trial.suggest_int('embedding_size', 512, 1280, step=64)}"
+                f"\ndropout: {trial.suggest_float('dropout', 0.0, 0.4)}"
+                f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}"
+                f"\nwhisper_layer: {trial.suggest_int('whisper_layer', 3, 12)}"
+                f"\nnorm_type: {trial.suggest_categorical('norm_type', ['sentence', 'batch'])}"
+                f"\nsplit: {i}")
 
-        with open(hparams_file) as fin:
-            hparams = load_hyperpyyaml(fin, trial_overrides)
+            with open(hparams_file) as fin:
+                hparams = load_hyperpyyaml(fin, trial_overrides)
 
-        sb.utils.distributed.ddp_init_group(run_opts)
+            sb.utils.distributed.ddp_init_group(run_opts)
 
-        score = train_and_evaluate(hparams, run_opts, hparams_file, trial_overrides)
-        return score
+            score = train_and_evaluate(hparams, run_opts, hparams_file, trial_overrides)
+            scores.append(score)
 
+        return sum(scores) / len(scores)
     study = optuna.create_study(
         storage="sqlite:///pitt_optuna_study.db",
         study_name="pitt_tuning",
         load_if_exists=True,
         direction="maximize",
     )
-    study.optimize(objective, n_trials=1000)
+    study.optimize(objective, n_trials=200)
 
     print('Best trial:')
     trial = study.best_trial
