@@ -8,10 +8,14 @@ seed: 2028
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
+# These will be overriden
+trial: 1
+split: 1
+
 # Save folders and paths
 experiment_name: whisper_small_linear 
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
-output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
+output_folder: !ref <storage_folder>/<experiment_name>/trial_<trial>_split_<split>
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
@@ -21,11 +25,11 @@ encoded_labels: !ref <save_folder>/label_encoder.txt
 data_folder: !PLACEHOLDER
 noise_folder: !ref <data_folder>/noise
 rir_folder: !ref <data_folder>/rir
-train_annotation: !ref <storage_folder>/train.json
-valid_annotation: !ref <storage_folder>/valid.json
-test_annotation: !ref <storage_folder>/test.json
-noise_annotation: !ref <save_folder>/noise.csv
-rir_annotation: !ref <save_folder>/rir.csv
+train_annotation: !ref <output_folder>/train.json
+valid_annotation: !ref <output_folder>/valid.json
+test_annotation: !ref <output_folder>/test.json
+noise_annotation: !ref <output_folder>/noise.csv
+rir_annotation: !ref <output_folder>/rir.csv
 valid_metrics_json: !ref <output_folder>/valid_metrics.json
 test_metrics_json: !ref <output_folder>/test_metrics.json
 
@@ -34,15 +38,11 @@ ckpt_interval_minutes: 15 # save checkpoint every N min
 
 # Training parameters
 epochs: 20
-warmup_epochs: 2
 samples_per_epoch: 1024
 total_batch_size: 32
 batch_size: 4
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
 lr: 0.0001
-base_lr: 0.000001
-max_lr: !ref <lr>
-step_size: 50
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 loss: bce
@@ -132,7 +132,7 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper
     source: !ref <pretrained_source>
     encoder_only: True
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <output_folder>/whisper
+    save_path: !ref <save_folder>/whisper
     augmenter: !ref <fea_augment>
 
 embedding_model: !new:torch.nn.Sequential
@@ -184,10 +184,6 @@ opt_class: !name:torch.optim.AdamW
     lr: !ref <lr>
     weight_decay: !ref <weight_decay>
 
-lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
-    num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
-    num_training_steps: !ref <epochs> * <samples_per_epoch> // <total_batch_size>
-
 # Logging + checkpoints
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
@@ -195,7 +191,6 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Error computation
 error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
     positive_label: 1
-error_metric: chunk_F-score
 
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     checkpoints_dir: !ref <save_folder>

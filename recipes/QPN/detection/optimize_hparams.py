@@ -1,36 +1,28 @@
 # !/usr/bin/python3
-"""Recipe for training a detector on the McGill Neuro Parkinson's dataset.
+"""Recipe for optimizing a detector on the Quebec Parkinson's Network speech dataset.
 We employ an encoder followed by a classifier.
 
 To run this recipe, use the following command:
-> python train_ecapa_tdnn.py {hyperparameter_file}
+> python optimize_hparams.py {hyperparameter_file} {overrides}
 
-Using your own hyperparameter file or one of the following:
-    hparams/wavlm_ecapa.yaml (for wavlm + ecapa)
+Hyperparameters that are being tuned are defined in the objective function.
 
 Author
-    * Briac Cordelle 2024
-    * Peter Plantinga 2024
+    * Briac Cordelle 2026
 """
 
-import os
-import random
 import sys
-import csv
 import json
-import logging
 import pprint
 import tempfile
-import collections
 
 import torch
 import torchaudio
 from hyperpyyaml import load_hyperpyyaml
 
 import speechbrain as sb
+import optuna
 from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeightedRandomSampler
-
-from speechbrain.lobes.models.huggingface_transformers.whisper import Whisper
 
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
@@ -47,7 +39,6 @@ smile = opensmile.Smile(
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
-
     def compute_forward(self, batch, stage):
         """
         Computation pipeline based on a encoder + speaker classifier for parkinson's detection.
@@ -141,10 +132,9 @@ class ParkinsonBrain(sb.core.Brain):
             # Combine chunks using two strategies
             combined_avg = self.combine_chunks(how="avg")
 
-            # Generate overall metrics, using stored threshold for test set
-            avg_threshold = None if stage == sb.Stage.VALID else self.avg_threshold
+            # Generate overall metrics
             metrics_comb_avg = self.metrics_by_category(
-                combined_avg, target_category=None, threshold=avg_threshold
+                combined_avg, target_category=None
             )
 
             # Log overall metrics
@@ -169,10 +159,6 @@ class ParkinsonBrain(sb.core.Brain):
             if stage == sb.Stage.TEST:
                 with open(self.metrics_json, "w") as f:
                     json.dump(combined_avg, f)
-                    f.write("\nChunk stats: ")
-                    json.dump(chunk_stats, f)
-                    f.write("\nCombined stats: ")
-                    json.dump(metrics_comb_avg, f)
                 logger.info(f"Results stored {self.metrics_json}")
 
         # Perform end-of-iteration things, like annealing, logging, etc.
@@ -187,11 +173,15 @@ class ParkinsonBrain(sb.core.Brain):
                 train_stats=self.train_stats,
                 valid_stats=stage_stats,
             )
-            self.checkpointer.save_and_keep_only(
-                meta=stage_stats,
-                max_keys=[self.hparams.error_metric],
-                min_keys=["loss"],
-            )
+
+            if self.checkpointer is not None:
+                self.checkpointer.save_and_keep_only(
+                    meta=stage_stats,
+                    max_keys=["comb_avg_F-score"],
+                    min_keys=["loss"],
+                )
+
+            self.last_valid_stats = stage_stats
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -300,6 +290,62 @@ class ParkinsonBrain(sb.core.Brain):
         return summary
 
 
+def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
+    """Train the model and evaluate on validation set, return F-score"""
+    # Create experiment directory
+    sb.core.create_experiment_directory(
+        experiment_directory=hparams["output_folder"],
+        hyperparams_to_save=hparams_file,
+        overrides=overrides,
+    )
+
+    # Dataset prep
+    from prepare_neuro_tune import prepare_neuro
+
+    sb.utils.distributed.run_on_main(
+        prepare_neuro,
+        kwargs={
+            "data_folder": hparams["data_folder"],
+            "train_annotation": hparams["train_annotation"],
+            "valid_annotation": hparams["valid_annotation"],
+            "chunk_size": hparams["chunk_size"],
+            "split": hparams["split"],
+        },
+    )
+
+    sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
+
+    # Dataset IO prep: creating Dataset objects and proper encodings for phones
+    datasets = dataio_prep(hparams)
+
+    # Brain class initialization
+    parkinson_brain = ParkinsonBrain(
+        modules=hparams["modules"],
+        opt_class=hparams["opt_class"],
+        hparams=hparams,
+        run_opts=run_opts,
+    )
+
+    parkinson_brain.last_valid_stats = None
+
+    # Training
+    parkinson_brain.fit(
+        parkinson_brain.hparams.epoch_counter,
+        train_set=datasets["train"],
+        valid_set=None,
+        train_loader_kwargs=hparams["train_dataloader_options"],
+    )
+
+    # Evaluate on validation set at the end only to save time
+    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
+    parkinson_brain.evaluate(
+        test_set=datasets["valid"],
+        test_loader_kwargs=hparams["valid_dataloader_options"],
+    )
+
+    return parkinson_brain.last_valid_stats["comb_avg_F-score"]
+
+
 def dataio_prep(hparams):
     """Creates the datasets and their data processing pipelines."""
 
@@ -309,22 +355,6 @@ def dataio_prep(hparams):
     label_encoder.expect_len(2)
     label_encoder.enforce_label("Disease", 1)
     label_encoder.enforce_label("Control", 0)
-
-    # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "start")
-    @sb.utils.data_pipeline.provides("sig")
-    def opensmile_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
-            wav,
-            num_frames=int(duration * hparams["sample_rate"]),
-            frame_offset=int(start * hparams["sample_rate"]),
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-            torchaudio.save(f.name, sig, fs)
-            feats = smile.process_file(f.name)
-
-        return torch.tensor(feats.to_numpy())
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -352,15 +382,12 @@ def dataio_prep(hparams):
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
 
-        # Weight PD less since there's more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
-        #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
+        # Weight pd and hc differently
+        weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
         yield weight
 
         # Balance on ptype and sex
         balance = info_dict["ptype"] + "_" + info_dict["sex"]
-        #balance += "_FR" if info_dict["lang"] == "fr" else "_EN/O"
         yield balance
 
     # Define datasets. We also connect the dataset with the data processing
@@ -369,7 +396,6 @@ def dataio_prep(hparams):
     train_info = {
         "train": hparams["train_annotation"],
         "valid": hparams["valid_annotation"],
-        "test": hparams["test_annotation"],
     }
 
     out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "weight", "to_balance"]
@@ -377,17 +403,16 @@ def dataio_prep(hparams):
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
-            #dynamic_items=[opensmile_pipeline, label_pipeline],
             output_keys=out_keys,
         )
 
     # Remove keys from training data for e.g. training only on men
-    for key, values in hparams.get("train_keep_keys", {}).items():
+    for key, values in hparams["train_keep_keys"].items():
         datasets["train"] = datasets["train"].filtered_sorted(
             key_test={"info_dict": lambda x: x[key] in values},
         )
-    for key, values in hparams.get("test_keep_keys", {}).items():
-        for dataset in ["valid", "test"]:
+    for key, values in hparams["test_keep_keys"].items():
+        for dataset in ["valid"]:
             datasets[dataset] = datasets[dataset].filtered_sorted(
                 key_test={"info_dict": lambda x: x[key] in values},
             )
@@ -398,87 +423,53 @@ def dataio_prep(hparams):
         num_samples=hparams["samples_per_epoch"],
         replacement=True,
     )
-    #hparams["train_dataloader_options"]["sampler"] = ReproducibleWeightedRandomSampler(
-    #    weights=[d["weight"] for d in datasets["train"]],
-    #    num_samples=hparams["samples_per_epoch"],
-    #    replacement=True,
-    #    seed=hparams["seed"],
-    #)
 
     return datasets
 
 
 if __name__ == "__main__":
-    torch.backends.cudnn.benchmark = True
 
-    # CLI:
     hparams_file, run_opts, overrides = sb.parse_arguments(sys.argv[1:])
 
-    # create ddp_group
-    sb.utils.distributed.ddp_init_group(run_opts)
+    search_space = {
+        "lr": [3e-4, 1e-3, 3e-3],
+        "weight_decay": [1e-6, 1e-5, 1e-4],
+    }
 
-    # Load hyperparameters file with command-line overrides
-    with open(hparams_file) as fin:
-        hparams = load_hyperpyyaml(fin, overrides)
+    def objective(trial):
+        scores = []
 
-    # Dataset prep (parsing KCL MDVR and annotation into json files)
-    from prepare_neuro import prepare_neuro
+        trial_overrides = overrides + (
+                f"\ntrial: {trial.number}"
+                f"\nlr: {trial.suggest_float('lr', 1e-5, 5e-4, log=True)}"
+                f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}")
+        
+        for i in range(2):
+            trial_overrides += f"\nsplit: {i}"
 
-    sb.utils.distributed.run_on_main(
-        prepare_neuro,
-        kwargs={
-            "data_folder": hparams["data_folder"],
-            "train_annotation": hparams["train_annotation"],
-            "test_annotation": hparams["test_annotation"],
-            "valid_annotation": hparams["valid_annotation"],
-            "chunk_size": hparams["chunk_size"],
-        },
-    )
-    if "prepare_noise_data" in hparams:
-        sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
-    # sb.utils.distributed.run_on_main(hparams["prepare_rir_data"])
+            with open(hparams_file) as fin:
+                hparams = load_hyperpyyaml(fin, trial_overrides)
 
-    # Dataset IO prep: creating Dataset objects and proper encodings for phones
-    datasets = dataio_prep(hparams)
+            sb.utils.distributed.ddp_init_group(run_opts)
 
-    # Create experiment directory
-    sb.core.create_experiment_directory(
-        experiment_directory=hparams["output_folder"],
-        hyperparams_to_save=hparams_file,
-        overrides=overrides,
-    )
+            score = train_and_evaluate(hparams, run_opts, hparams_file, trial_overrides)
+            scores.append(score)
 
-    # Brain class initialization
-    parkinson_brain = ParkinsonBrain(
-        modules=hparams["modules"],
-        opt_class=hparams["opt_class"],
-        hparams=hparams,
-        run_opts=run_opts,
-        checkpointer=hparams["checkpointer"],
+        return sum(scores) / len(scores)
+
+    study = optuna.create_study(
+        sampler=optuna.samplers.GridSampler(search_space),
+        storage="sqlite:///qpn_wav2aug_optuna_study.db",
+        study_name="qpn_wav2aug_tuning",
+        load_if_exists=True,
+        direction="maximize",
     )
 
-    # Training
-    parkinson_brain.fit(
-        parkinson_brain.hparams.epoch_counter,
-        train_set=datasets["train"],
-        valid_set=datasets["valid"],
-        train_loader_kwargs=hparams["train_dataloader_options"],
-        valid_loader_kwargs=hparams["valid_dataloader_options"],
-    )
+    study.optimize(objective, n_trials=len(search_space["lr"]) * len(search_space["weight_decay"]))
 
-    # Run validation and test set to get the predictions
-    logger.info("Final validation result:")
-    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=datasets["valid"],
-        #max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["test_dataloader_options"],
-    )
-
-    logger.info("Final test result:")
-    parkinson_brain.metrics_json = hparams["test_metrics_json"]
-    parkinson_brain.evaluate(
-        test_set=datasets["test"],
-        #max_key=hparams["error_metric"],
-        test_loader_kwargs=hparams["test_dataloader_options"],
-    )
+    print("Best trial:")
+    trial = study.best_trial
+    print(f"  Value: {trial.value}")
+    print("  Params: ")
+    for key, value in trial.params.items():
+        print(f"    {key}: {value}")

@@ -24,31 +24,37 @@ def convert_to_python(obj):
 
 
 def prepare_neuro(
-    data_folder, train_annotation, test_annotation, valid_annotation, chunk_size):
+    data_folder, train_annotation, valid_annotation, chunk_size, split):
     assert os.path.exists(data_folder), "Data folder not found"
 
-    path_type_dict = get_path_type_dicts(data_folder)
+    # Gather ALL recordings into one dict, ignoring train/valid folder structure
+    all_path_type_dict = get_all_path_type_dict(data_folder)
 
-    create_json(train_annotation, path_type_dict["train"], chunk_size, overlap=None)
-    create_json(test_annotation, path_type_dict["test"], chunk_size)
-    create_json(valid_annotation, path_type_dict["valid"], chunk_size)
+    # Deterministic 50/50 stratified split by patient ID and ptype
+    split_a, split_b = stratified_patient_split(all_path_type_dict)
 
-def get_path_type_dicts(data_folder):
+    # The split variable (0 or 1) determines which half is train vs. valid
+    if split == 0:
+        train_dict, valid_dict = split_a, split_b
+    else:
+        train_dict, valid_dict = split_b, split_a
+
+    create_json(train_annotation, train_dict, chunk_size, overlap=None)
+    create_json(valid_annotation, valid_dict, chunk_size)
+
+
+def get_all_path_type_dict(data_folder):
     """
-    Function that extracts the patient_type and the path for each recording.
-    Takes data_folder path, returns dicts with path:patient_type for each set.
+    Collects ALL recordings from the data folder into a single dict,
+    irrespective of train/valid subdirectory structure.
 
     :param data_folder: string
-    :return: dicts
+    :return: dict of {path: patient_traits}
     """
-
-    datasets = os.listdir(data_folder)
     batch1_excel_path = os.path.join(data_folder, "QPN_Batch1.xlsx")
     batch2_excel_path = os.path.join(data_folder, "QPN_Batch2.xlsx")
     batch3_excel_path = os.path.join(data_folder, "QPN_Batch3.xlsx")
-    path_type_dict = {}
 
-    # Load the Excel files
     batch1_workbook = openpyxl.load_workbook(batch1_excel_path)
     batch1_sheet = batch1_workbook.active
     batch2_workbook = openpyxl.load_workbook(batch2_excel_path)
@@ -56,52 +62,96 @@ def get_path_type_dicts(data_folder):
     batch3_workbook = openpyxl.load_workbook(batch3_excel_path)
     batch3_sheet = batch3_workbook.active
 
-    for dataset in datasets:
+    all_patients = {}
+    skip_dirs = {"noise", "rir", "test"}
+
+    for dataset in os.listdir(data_folder):
         dataset_path = os.path.join(data_folder, dataset)
 
-        # Skip files
-        if os.path.isfile(dataset_path):
-            continue
-        if dataset == "noise" or dataset == "rir":
+        if os.path.isfile(dataset_path) or dataset in skip_dirs:
             continue
 
-        batch1_data_path = os.path.join(dataset_path, "Batch1")
-        batch2_data_path = os.path.join(dataset_path, "Batch2")
-        batch3_data_path = os.path.join(dataset_path, "Batch3")
+        batch1_files = glob.glob(os.path.join(dataset_path, "Batch1", "*.wav"))
+        batch2_files = glob.glob(os.path.join(dataset_path, "Batch2", "*.wav"))
+        batch3_files = glob.glob(os.path.join(dataset_path, "Batch3", "*.wav"))
 
-        batch1_files = glob.glob(batch1_data_path + "/*.wav")
-        batch2_files = glob.glob(batch2_data_path + "/*.wav")
-        batch3_files = glob.glob(batch3_data_path + "/*.wav")
+        all_patients.update(get_patient_traits(batch1_files, batch1_sheet, "Batch1"))
+        all_patients.update(get_patient_traits(batch2_files, batch2_sheet, "Batch2"))
+        all_patients.update(get_patient_traits(batch3_files, batch3_sheet, "Batch3"))
 
-        batch1_patients = get_patient_traits(batch1_files, batch1_sheet, "Batch1")
-        batch2_patients = get_patient_traits(batch2_files, batch2_sheet, "Batch2")
-        batch3_patients = get_patient_traits(batch3_files, batch3_sheet, "Batch3")
+    return all_patients
 
-        path_type_dict[dataset] = batch1_patients | batch2_patients | batch3_patients
 
-    return path_type_dict
+def stratified_patient_split(path_type_dict):
+    """
+    Splits recordings into two halves by patient ID, stratified by ptype
+    (Disease/Control), so each half has a similar class balance.
+
+    Sorting by PID before splitting ensures the assignment is deterministic —
+    the same patients will always land in the same split regardless of
+    filesystem ordering.
+
+    :param path_type_dict: dict of {path: patient_traits}
+    :return: (split_a, split_b) — two dicts of {path: patient_traits}
+    """
+    # Group unique patient IDs by ptype
+    ptype_to_pids = {}
+    pid_to_paths = {}
+
+    for path, traits in path_type_dict.items():
+        pid = traits["pid"] if "pid" in traits else pathlib.Path(path).stem.split("_")[1]
+        ptype = traits["ptype"]
+
+        ptype_to_pids.setdefault(ptype, set()).add(pid)
+        pid_to_paths.setdefault(pid, []).append(path)
+
+    split_a_pids = set()
+    split_b_pids = set()
+
+    for ptype, pids in ptype_to_pids.items():
+        sorted_pids = sorted(pids)           # Sort for determinism
+        midpoint = len(sorted_pids) // 2
+        split_a_pids.update(sorted_pids[:midpoint])
+        split_b_pids.update(sorted_pids[midpoint:])
+
+    def build_dict(pids):
+        return {
+            path: traits
+            for path, traits in path_type_dict.items()
+            for pid in [pathlib.Path(path).stem.split("_")[1]]
+            if pid in pids
+        }
+
+    split_a = build_dict(split_a_pids)
+    split_b = build_dict(split_b_pids)
+
+    # Log the split composition for verification
+    for name, pids in [("Split A", split_a_pids), ("Split B", split_b_pids)]:
+        counts = {}
+        for pid in pids:
+            ptype = path_type_dict[pid_to_paths[pid][0]]["ptype"]
+            counts[ptype] = counts.get(ptype, 0) + 1
+        print(f"{name}: {len(pids)} patients — {counts}")
+
+    return split_a, split_b
 
 
 def get_patient_traits(files, sheet, batch):
     pids = [path.split("/")[-1].split("_")[1] for path in files]
     patients = {}
 
-    for row in range(2, sheet.max_row + 1):  # Start from row 2 to skip the header
+    for row in range(2, sheet.max_row + 1):
         pid = sheet.cell(row=row, column=1).value
         ptype = sheet.cell(row=row, column=2).value
         sex = sheet.cell(row=row, column=3).value
         l1 = sheet.cell(row=row, column=4).value
         age = sheet.cell(row=row, column=6).value
 
-        # Check if the patient ID is in the recordings, if it is add to dict
         if pid is not None and pid.rstrip() in pids:
-
-            # rstrip() everything
             ptype = ptype.rstrip()
             sex = sex.rstrip()
             l1 = l1.rstrip()
 
-            # Refactor patient type
             if ptype == "CTRL" or ptype == "control":
                 ptype = "Control"
             elif ptype == "PD" or ptype == "patient":
@@ -110,7 +160,6 @@ def get_patient_traits(files, sheet, batch):
                 print(f"Unknown key found: {ptype}")
                 continue
 
-            # Refactor language
             if l1 == "FR" or "French" in l1 or "Fench" in l1:
                 l1 = "French"
             elif l1 == "EN" or "English" in l1:
@@ -118,16 +167,8 @@ def get_patient_traits(files, sheet, batch):
             else:
                 l1 = "Other"
 
-            # Save to dict
-            patient_traits = {
-                "ptype": ptype,
-                "sex": sex,
-                "age": age,
-                "l1": l1,
-            }
-            patients[pid] = patient_traits
+            patients[pid] = {"ptype": ptype, "sex": sex, "age": age, "l1": l1}
 
-    # Change pids to paths
     updated_dict = {}
     for pid in patients:
         for path in files:
@@ -142,30 +183,24 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
     json_dict = {}
 
     for audiofile in path_type_dict.keys():
-        # Get info dict
         info_dict = path_type_dict[audiofile].copy()
 
-        # Remove 'l1' files as they are duplicates
         if "l1" in audiofile:
             continue
 
-        # Get utterance info from the file name
         audiopath = pathlib.Path(audiofile)
         uttid = audiopath.stem + "_" + audiopath.parent.name
 
-        # Second and third items are the PID and task, last is usually the language
         items = audiopath.stem.split("_")
         info_dict.update({"pid": items[1], "task": items[2], "lang": items[-1]})
 
-        # Corrections
         if info_dict["task"] not in ["a1", "a2", "a3", "a4", "vowel_repeat", "dpt", "recall", "repeat", "hbd", "read"]:
-            info_dict["task"] = items[3] # for some batch 3 files
+            info_dict["task"] = items[3]
         if info_dict["task"] in ["a1", "a2", "a3", "a4"]:
             info_dict["task"] = "vowel_repeat"
         if info_dict["lang"] not in ["en", "fr"]:
             info_dict["lang"] = "other"
 
-        # Get duration
         audioinfo = torchaudio.info(audiofile)
         duration = audioinfo.num_frames / audioinfo.sample_rate
 
@@ -179,7 +214,7 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
                 "info_dict": info_dict,
             }
 
-    # Writing the dictionary to the json file
     with open(json_file, mode="w") as json_f:
         json_dict = convert_to_python(json_dict)
         json.dump(json_dict, json_f, indent=2)
+        
