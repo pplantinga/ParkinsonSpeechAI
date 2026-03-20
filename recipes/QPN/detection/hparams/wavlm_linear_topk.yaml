@@ -1,4 +1,4 @@
-# ################################
+  # ################################
 # Model: Parkinson's identification with ECAPA
 # Author: Briac Cordelle & Peter Plantinga
 # ################################
@@ -42,6 +42,8 @@ lr: 0.0001
 sample_rate: 16000
 chunk_size: 30.0 # seconds
 loss: bce
+weight_pd: 1.8
+weight_hc: 1.2
 
 # This is formatted as key => list of values to keep
 train_keep_keys:
@@ -81,16 +83,21 @@ test_dataloader_options:
     batch_size: !ref <test_batch_size>
     num_workers: !ref <num_workers>
 
+# AUGMENTATIONS
+
+# Augmenter: Combines previously defined augmentations to perform data augmentation
+top_k: 9
+wav_augment: !new:wav2aug.gpu.Wav2Aug
+    sample_rate: !ref <sample_rate>
+    top_k: !ref <top_k>
+
 # Models
-apply_spec_augment: True
 compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
     source: !ref <pretrained_source>
     output_norm: True
     freeze_feature_extractor: True
-    apply_spec_augment: !ref <apply_spec_augment>
     freeze: !ref <freeze_pretrained>
     save_path: !ref <save_folder>/wavlm-large
-
 
 embedding_model: !new:torch.nn.Sequential
     - !new:speechbrain.nnet.linear.Linear
@@ -109,14 +116,15 @@ embedding_model: !new:torch.nn.Sequential
     - !new:torch.nn.LeakyReLU
 
 #embedding_model: !new:speechbrain.lobes.models.ECAPA_TDNN.ECAPA_TDNN
-#    input_size: !ref <feature_size>
-#    channels: [1024, 1024, 1024, 1024, 3072]
-#    kernel_sizes: [5, 3, 3, 3, 1]
-#    dilations: [1, 2, 3, 4, 1]
-#    groups: [1, 1, 1, 1, 1]
-#    attention_channels: 128
-#    lin_neurons: !ref <embedding_size>
-#    dropout: 0.2
+#   input_size: !ref <feature_size>
+#   channels: [1024, 1024, 1024, 1024, 3072]
+#   kernel_sizes: [5, 3, 3, 3, 1]
+#   dilations: [1, 2, 3, 4, 1]
+#   groups: [1, 1, 1, 1, 1]
+#   attention_channels: 128
+#   lin_neurons: !ref <embedding_size>
+#   dropout: 0.2
+
 
 classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: !ref <embedding_size>
@@ -155,7 +163,7 @@ bce_loss: !name:speechbrain.nnet.losses.bce_loss
     allowed_len_diff: 0
     label_smoothing: 0.01
 
-weight_decay: 1e-4 
+weight_decay: 1e-4
 opt_class: !name:torch.optim.AdamW
     lr: !ref <lr>
     weight_decay: !ref <weight_decay>

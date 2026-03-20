@@ -16,9 +16,13 @@ import json
 import pprint
 import tempfile
 
+import re
+
 import torch
 import torchaudio
 from hyperpyyaml import load_hyperpyyaml
+
+from speechbrain.lobes.models.huggingface_transformers.whisper import Whisper
 
 import speechbrain as sb
 import optuna
@@ -184,6 +188,7 @@ class ParkinsonBrain(sb.core.Brain):
             self.last_valid_stats = stage_stats
 
         if stage == sb.Stage.TEST:
+            self.last_valid_stats = stage_stats
             self.hparams.train_logger.log_stats(
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
@@ -313,8 +318,6 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
         },
     )
 
-    sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
-
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
 
@@ -440,12 +443,13 @@ if __name__ == "__main__":
         scores = []
 
         trial_overrides = overrides + (
-                f"\ntrial: {trial.number}"
-                f"\nlr: {trial.suggest_float('lr', 1e-5, 5e-4, log=True)}"
-                f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}")
-        
+            f"\ntrial: {trial.number}"
+            f"\nlr: {trial.suggest_float('lr', 1e-5, 1e-2, log=True)}"
+            f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}"
+            f"\nsplit: 0")
+
         for i in range(2):
-            trial_overrides += f"\nsplit: {i}"
+            trial_overrides = trial_overrides.replace("split: 0", f"split: {i}")
 
             with open(hparams_file) as fin:
                 hparams = load_hyperpyyaml(fin, trial_overrides)
@@ -457,10 +461,12 @@ if __name__ == "__main__":
 
         return sum(scores) / len(scores)
 
+    experiment_name = re.search(r"experiment_name: (.+)", overrides).group(1)
+
     study = optuna.create_study(
         sampler=optuna.samplers.GridSampler(search_space),
-        storage="sqlite:///wavlm_no_aug.db", # replace these 
-        study_name="wavlm_no_aug",
+        storage=f"sqlite:///{experiment_name}.db",
+        study_name=experiment_name,
         load_if_exists=True,
         direction="maximize",
     )
