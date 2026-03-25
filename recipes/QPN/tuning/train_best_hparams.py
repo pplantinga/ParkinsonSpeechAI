@@ -54,7 +54,7 @@ def main():
         SELECT trial_id
         FROM trial_values
         ORDER BY value DESC
-        LIMIT 10
+        LIMIT 5
     """)
     trial_ids = [row[0] for row in cursor.fetchall()]
 
@@ -77,7 +77,7 @@ def main():
         for name, value, dist_json in params:
             decoded_params[name] = decode_param(value, dist_json)
 
-        for seed in range(5):
+        for seed in range(3):
             train_cmd = [
                 "python",
                 "train.py",

@@ -58,6 +58,8 @@ class ParkinsonBrain(sb.core.Brain):
         if self.hparams.whisper_layer != None:
             feats = feats[self.hparams.whisper_layer]
 
+        feats = self.modules.mean_var_norm(feats)
+
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
         outputs = self.modules.classifier(embeddings)
@@ -183,6 +185,7 @@ class ParkinsonBrain(sb.core.Brain):
             self.last_valid_stats = stage_stats
 
         if stage == sb.Stage.TEST:
+            self.last_valid_stats = stage_stats
             self.hparams.train_logger.log_stats(
                 {"Epoch loaded": self.hparams.epoch_counter.current},
                 test_stats=stage_stats,
@@ -331,9 +334,15 @@ def train_and_evaluate(hparams, run_opts, hparams_file, overrides):
     parkinson_brain.fit(
         parkinson_brain.hparams.epoch_counter,
         train_set=datasets["train"],
-        valid_set=datasets["valid"],
+        valid_set=None,
         train_loader_kwargs=hparams["train_dataloader_options"],
-        valid_loader_kwargs=hparams["valid_dataloader_options"],
+    )
+
+    # Evaluate on validation set at the end only to save time
+    parkinson_brain.metrics_json = hparams["valid_metrics_json"]
+    parkinson_brain.evaluate(
+        test_set=datasets["valid"],
+        test_loader_kwargs=hparams["valid_dataloader_options"],
     )
 
     return parkinson_brain.last_valid_stats["comb_avg_F-score"]
@@ -426,20 +435,23 @@ if __name__ == "__main__":
 
     def objective(trial):
         scores = []
+
+        trial_overrides = overrides + (
+            f"\ntrial: {trial.number}"
+            f"\nepochs: {trial.suggest_float('epochs', 15, 60, step=5)}"
+            f"\nlr: {trial.suggest_float('lr', 1e-5, 5e-4, log=True)}"
+            f"\nchunk_size: {trial.suggest_int('chunk_size', 10, 60, step=5)}"
+            f"\nweight_pd: {trial.suggest_float('weight_pd', 0.1, 2.0, step=0.1)}"
+            f"\nweight_hc: {trial.suggest_float('weight_hc', 0.1, 2.0, step=0.1)}"
+            f"\nembedding_size: {trial.suggest_int('embedding_size', 512, 1280, step=64)}"
+            f"\ndropout: {trial.suggest_float('dropout', 0.0, 0.4)}"
+            f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}"
+            f"\nwhisper_layer: {trial.suggest_int('whisper_layer', 3, 12)}"
+            f"\nnorm_type: {trial.suggest_categorical('norm_type', ['sentence', 'batch'])}"
+            f"\nsplit: 0")
+
         for i in range(2):
-            trial_overrides = overrides + (
-                f"\ntrial: {trial.number}"
-                f"\nepochs: {trial.suggest_float('epochs', 15, 60, step=5)}"
-                f"\nlr: {trial.suggest_float('lr', 1e-5, 5e-4, log=True)}"
-                f"\nchunk_size: {trial.suggest_int('chunk_size', 10, 60, step=5)}"
-                f"\nweight_pd: {trial.suggest_float('weight_pd', 0.1, 2.0, step=0.1)}"
-                f"\nweight_hc: {trial.suggest_float('weight_hc', 0.1, 2.0, step=0.1)}"
-                f"\nembedding_size: {trial.suggest_int('embedding_size', 512, 1280, step=64)}"
-                f"\ndropout: {trial.suggest_float('dropout', 0.0, 0.4)}"
-                f"\nweight_decay: {trial.suggest_float('weight_decay', 1e-6, 1e-2, log=True)}"
-                f"\nwhisper_layer: {trial.suggest_int('whisper_layer', 3, 12)}"
-                f"\nnorm_type: {trial.suggest_categorical('norm_type', ['sentence', 'batch'])}"
-                f"\nsplit: {i}")
+            trial_overrides = trial_overrides.replace("split: 0", f"split: {i}")
 
             with open(hparams_file) as fin:
                 hparams = load_hyperpyyaml(fin, trial_overrides)

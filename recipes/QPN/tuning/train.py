@@ -33,15 +33,8 @@ from speechbrain.dataio.sampler import BalancingDataSampler, ReproducibleWeighte
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
 from tqdm import tqdm
-import opensmile
 
 logger = sb.utils.logger.get_logger("train.py")
-
-
-smile = opensmile.Smile(
-    feature_set=opensmile.FeatureSet.ComParE_2016,
-    feature_level=opensmile.FeatureLevel.LowLevelDescriptors,
-)
 
 class ParkinsonBrain(sb.core.Brain):
     """Class for speaker embedding training"""
@@ -62,7 +55,10 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
-        # feats = self.modules.mean_var_norm(feats, lens)
+        if self.hparams.whisper_layer != None:
+            feats = feats[self.hparams.whisper_layer]
+
+        feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -173,7 +169,10 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            lr = self.lr_scheduler.get_last_lr()
+            if hasattr(self.hparams, "lr_scheduler"):
+               lr = self.lr_scheduler.get_last_lr()
+            else:
+               lr = self.optimizer.param_groups[0]["lr"]
 
             self.hparams.train_logger.log_stats(
                 stats_meta={"epoch": epoch, "lr": lr},
@@ -185,6 +184,9 @@ class ParkinsonBrain(sb.core.Brain):
                 max_keys=[self.hparams.error_metric],
                 min_keys=["loss"],
             )
+            print(stage_stats)
+            print(type(stage_stats))
+            self.epoch_counter.update_metric(stage_stats["comb_avg_bce"])
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -213,12 +215,12 @@ class ParkinsonBrain(sb.core.Brain):
 
             if self.checkpointer is not None:
                 self.checkpointer.add_recoverable("optimizer", self.optimizer)
-
-            self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
+            if hasattr(self.hparams, "lr_scheduler"):
+                self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
 
     def on_fit_batch_end(self, batch, outputs, loss, should_step):
         """Update scheduler if an update was made."""
-        if should_step:
+        if should_step and hasattr(self.hparams, "lr_scheduler"):
             self.lr_scheduler.step()
 
     def combine_chunks(self, how="avg"):
@@ -305,22 +307,6 @@ def dataio_prep(hparams):
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
     @sb.utils.data_pipeline.provides("sig")
-    def opensmile_pipeline(wav, duration, start):
-        sig, fs = torchaudio.load(
-            wav,
-            num_frames=int(duration * hparams["sample_rate"]),
-            frame_offset=int(start * hparams["sample_rate"]),
-        )
-
-        with tempfile.NamedTemporaryFile(suffix=".wav") as f:
-            torchaudio.save(f.name, sig, fs)
-            feats = smile.process_file(f.name)
-
-        return torch.tensor(feats.to_numpy())
-
-    # Define audio pipeline
-    @sb.utils.data_pipeline.takes("wav", "duration", "start")
-    @sb.utils.data_pipeline.provides("sig")
     def audio_pipeline(wav, duration, start):
         sig, fs = torchaudio.load(
             wav,
@@ -345,8 +331,7 @@ def dataio_prep(hparams):
         yield patient_type_encoded
 
         # Weight PD less since there's more in the data
-        weight = 0.7 if patient_type_encoded else 1.5
-        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
+        weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
         #weight *= 0.7 if info_dict["lang"] == "fr" else 1.5
         yield weight
 
@@ -369,7 +354,6 @@ def dataio_prep(hparams):
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
             dynamic_items=[audio_pipeline, label_pipeline],
-            #dynamic_items=[opensmile_pipeline, label_pipeline],
             output_keys=out_keys,
         )
 
@@ -413,6 +397,13 @@ if __name__ == "__main__":
     with open(hparams_file) as fin:
         hparams = load_hyperpyyaml(fin, overrides)
 
+    # Create experiment directory
+    sb.core.create_experiment_directory(
+        experiment_directory=hparams["output_folder"],
+        hyperparams_to_save=hparams_file,
+        overrides=overrides,
+    )
+
     # Dataset prep (parsing KCL MDVR and annotation into json files)
     from prepare_neuro import prepare_neuro
 
@@ -432,13 +423,6 @@ if __name__ == "__main__":
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
     datasets = dataio_prep(hparams)
 
-    # Create experiment directory
-    sb.core.create_experiment_directory(
-        experiment_directory=hparams["output_folder"],
-        hyperparams_to_save=hparams_file,
-        overrides=overrides,
-    )
-
     # Brain class initialization
     parkinson_brain = ParkinsonBrain(
         modules=hparams["modules"],
@@ -449,6 +433,7 @@ if __name__ == "__main__":
     )
 
     # Training
+    parkinson_brain.epoch_counter=hparams["epoch_counter"]
     parkinson_brain.fit(
         parkinson_brain.hparams.epoch_counter,
         train_set=datasets["train"],

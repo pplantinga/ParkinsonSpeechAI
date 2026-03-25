@@ -43,6 +43,10 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
+        if self.hparams.output_hidden:
+            feats = feats[self.hparams.whisper_layer]
+
+        feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -64,7 +68,7 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Compute loss
         if stage == sb.Stage.TRAIN:
-            loss = self.hparams.bce_loss(outputs, labels) #, weight=batch.weight)
+            loss = self.hparams.bce_loss(outputs, labels)
         # Validation / Test
         else:
             probs = torch.sigmoid(outputs.view(-1))
@@ -116,7 +120,10 @@ class AlzheimerBrain(sb.core.Brain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            lr = self.lr_scheduler.get_last_lr()
+            if hasattr(self.hparams, "lr_scheduler"):
+               lr = self.lr_scheduler.get_last_lr()
+            else:
+               lr = self.optimizer.param_groups[0]["lr"]
 
             self.hparams.train_logger.log_stats(
                 stats_meta={"epoch": epoch, "lr": lr},
@@ -128,6 +135,7 @@ class AlzheimerBrain(sb.core.Brain):
                 max_keys=[self.hparams.error_metric],
                 min_keys=["loss"],
             )
+            self.epoch_counter.update_metric(stage_stats["comb_avg_bce"])
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -157,11 +165,12 @@ class AlzheimerBrain(sb.core.Brain):
             if self.checkpointer is not None:
                 self.checkpointer.add_recoverable("optimizer", self.optimizer)
 
-            self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
+            if hasattr(self.hparams, "lr_scheduler"):
+                self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
 
     def on_fit_batch_end(self, batch, outputs, loss, should_step):
         """Update scheduler if an update was made."""
-        if should_step:
+        if should_step and hasattr(self.hparams, "lr_scheduler"):
             self.lr_scheduler.step()
 
     def combine_chunks(self, how="avg"):
@@ -239,8 +248,8 @@ def dataio_prep(hparams):
     # of the observed label a unique index (e.g, 'hc': 0, 'ad': 1, ..)
     label_encoder = sb.dataio.encoder.CategoricalEncoder()
     label_encoder.expect_len(2)
-    label_encoder.enforce_label("AD", 1)
-    label_encoder.enforce_label("HC", 0)
+    label_encoder.enforce_label("Disease", 1)
+    label_encoder.enforce_label("Control", 0)
 
     # Define audio pipeline
     @sb.utils.data_pipeline.takes("wav", "duration", "start")
@@ -315,6 +324,7 @@ if __name__ == "__main__":
             "chunk_size": hparams["chunk_size"],
         }
     )
+
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])
 
     # Dataset IO prep: creating Dataset objects and proper encodings for phones
@@ -330,6 +340,7 @@ if __name__ == "__main__":
     )
 
     # Training
+    alzheimer_brain.epoch_counter = hparams["epoch_counter"]
     alzheimer_brain.fit(
         alzheimer_brain.hparams.epoch_counter,
         train_set=datasets["train"],

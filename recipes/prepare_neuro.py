@@ -5,7 +5,7 @@ import torchaudio
 import openpyxl
 import numpy as np
 import pathlib
-
+import soundfile as sf
 
 def convert_to_python(obj):
     """Recursively convert NumPy types to Python types for JSON serialization."""
@@ -166,8 +166,8 @@ def create_json(json_file, path_type_dict, chunk_size, overlap=None):
             info_dict["lang"] = "other"
 
         # Get duration
-        audioinfo = torchaudio.info(audiofile)
-        duration = audioinfo.num_frames / audioinfo.sample_rate
+        audioinfo = sf.info(audiofile)
+        duration = audioinfo.frames / audioinfo.samplerate
 
         max_start = max(duration - hop_size, 1)
         for i, start in enumerate(np.arange(0, max_start, hop_size)):

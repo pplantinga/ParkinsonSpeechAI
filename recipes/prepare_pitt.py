@@ -5,6 +5,7 @@ import torchaudio
 import numpy as np
 import pathlib
 import pandas
+import soundfile as sf
 
 def convert_to_python(obj):
     """Recursively convert NumPy types to Python types for JSON serialization."""
@@ -80,8 +81,8 @@ def create_json(json_file, ground_truth, chunk_size, transcripts=None, overlap=N
 
     for row in ground_truth.to_dict(orient="records"):
         # Get duration
-        audioinfo = torchaudio.info(row["path"])
-        duration = audioinfo.num_frames / audioinfo.sample_rate
+        audioinfo = sf.info(row["path"])
+        duration = audioinfo.frames / audioinfo.samplerate
 
         ptype = "Disease" if row["dx"] == "ProbableAD" else "Control"
 

@@ -54,6 +54,10 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
+        if self.hparams.output_hidden:
+            feats = feats[self.hparams.whisper_layer]
+
+        feats = self.modules.mean_var_norm(feats, lens)
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -127,7 +131,10 @@ class ParkinsonBrain(sb.core.Brain):
 
         # Perform end-of-iteration things, like annealing, logging, etc.
         if stage == sb.Stage.VALID:
-            lr = self.lr_scheduler.get_last_lr()
+            if hasattr(self.hparams, "lr_scheduler"):
+               lr = self.lr_scheduler.get_last_lr()
+            else:
+               lr = self.optimizer.param_groups[0]["lr"]
 
             self.hparams.train_logger.log_stats(
                 stats_meta={"epoch": epoch, "lr": lr},
@@ -139,6 +146,7 @@ class ParkinsonBrain(sb.core.Brain):
                 max_keys=[self.hparams.error_metric],
                 min_keys=["loss"],
             )
+            self.epoch_counter.update_metric(stage_stats["comb_avg_bce"])
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -168,11 +176,12 @@ class ParkinsonBrain(sb.core.Brain):
             if self.checkpointer is not None:
                 self.checkpointer.add_recoverable("optimizer", self.optimizer)
 
-            self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
+            if hasattr(self.hparams, "lr_scheduler"):
+                self.lr_scheduler = self.hparams.lr_scheduler(self.optimizer)
 
     def on_fit_batch_end(self, batch, outputs, loss, should_step):
         """Update scheduler if an update was made."""
-        if should_step:
+        if should_step and hasattr(self.hparams, "lr_scheduler"):
             self.lr_scheduler.step()
 
     def combine_chunks(self, how="avg"):
@@ -283,7 +292,6 @@ def dataio_prep_neuro(hparams):
         # Weight PD less since there's more in the data
         # Weight males less since there are more in the data
         weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
-        weight *= hparams["weight_male"] if info_dict["sex"] == "M" else hparams["weight_female"]
         yield weight
 
         # Balance on ptype and sex

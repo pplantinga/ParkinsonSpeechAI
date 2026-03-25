@@ -8,16 +8,15 @@ seed: 2028
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 trial: 1
-num_trials: 1000
 
 # Save folders and paths
 experiment_name: !PLACEHOLDER
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
-output_folder: !ref <storage_folder>/<experiment_name>/trial_<trial>_seed_<seed>
-save_folder: !ref <output_folder>/save
+output_folder: !ref <storage_folder>/<experiment_name>/trial_<trial>/<seed>
+save_folder: !ref <storage_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
-encoded_labels: !ref <output_folder>/label_encoder.txt
+encoded_labels: !ref <save_folder>/label_encoder.txt
 
 # Data files
 data_folder: !PLACEHOLDER
@@ -35,19 +34,16 @@ skip_prep: False
 ckpt_interval_minutes: 15
 
 # Data for augmentation
-NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.zip?rlkey=j8b0n9kdjdr32o1f06t0cw5b7&dl=1
+#NOISE_DATASET_URL: https://www.dropbox.com/scl/fi/a09pj97s5ifan81dqhi4n/noises.zip?rlkey=j8b0n9kdjdr32o1f06t0cw5b7&dl=1
+NOISE_DATASET_URL: /home/bcordel/save/noise/data.zip
 
 # Training parameters
-epochs: 20
-warmup_epochs: 2
+epochs: 60
 samples_per_epoch: 1024
-total_batch_size: 32
-batch_size: 4
+total_batch_size: 48
+batch_size: 16
 grad_accumulation_factor: !ref <total_batch_size> // <batch_size>
-lr: 0.0001
-base_lr: 0.000001
-max_lr: !ref <lr>
-step_size: 50
+lr: 0.001
 sample_rate: 16000
 chunk_size: 30.0
 loss: bce
@@ -68,7 +64,7 @@ metric_categories: [sex, lang]
 
 # Model parameters
 # For the pretrained_source, use the path to the model dir
-pretrained_source: openai/whisper-small
+pretrained_source: /home/bcordel/save/whisper-small/
 freeze_pretrained: True
 feature_size: 768 # for small: 768, for medium: 1024, 
 embedding_size: 1280
@@ -99,8 +95,8 @@ prepare_noise_data: !name:speechbrain.augment.preparation.prepare_dataset_from_U
     csv_file: !ref <noise_annotation>
     max_length: !ref <chunk_size>
 
-snr_low: 5.0
-snr_delta: 5.0
+snr_low: 0
+snr_delta: 15
 snr_high: !ref <snr_low> + <snr_delta>
 
 # Add noise to input signal
@@ -115,7 +111,7 @@ add_noise: !new:speechbrain.augment.time_domain.AddNoise
 drop_freq_low: 0
 drop_freq_high: 1.0
 drop_freq_count_low: 1
-drop_freq_count_delta: 3
+drop_freq_count_delta: 2
 drop_freq_count_high: !ref <drop_freq_count_low> + <drop_freq_count_delta>
 drop_freq_width: 0.05
 
@@ -135,8 +131,8 @@ drop_freq: !new:speechbrain.augment.time_domain.DropFreq
 #    drop_count_high: 5
 
 # Augmenter: Combines previously defined augmentations to perform data augmentation
-min_augmentations: 1
-augment_prob: 0.9
+min_augmentations: 2
+augment_prob: 0.95
 
 wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     parallel_augment: False
@@ -147,9 +143,13 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
+output_hidden: True
+whisper_layer: 6
+
 compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
     source: !ref <pretrained_source>
     encoder_only: True
+    output_all_hiddens: !ref <output_hidden>
     freeze: !ref <freeze_pretrained>
     save_path: !ref <save_folder>/whisper
 
@@ -184,12 +184,21 @@ classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     out_neurons: !ref <out_neurons>
 
 # Functions
-epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounter
+epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounterWithStopper
     limit: !ref <epochs>
+    limit_to_stop: 3
+    limit_warmup: 20
+    direction: min
+
+norm_type: sentence
+mean_var_norm: !new:speechbrain.processing.features.InputNormalization
+    norm_type: !ref <norm_type>
+    std_norm: False
 
 modules:
     compute_features: !ref <compute_features>
     embedding_model: !ref <embedding_model>
+    mean_var_norm: !ref <mean_var_norm>
     classifier: !ref <classifier>
 
 softmax: !new:speechbrain.nnet.activations.Softmax
@@ -226,10 +235,6 @@ opt_class: !name:bitsandbytes.optim.Adam8bit
 #    max_lr: !ref <max_lr>
 #    step_size: !ref <step_size>
 
-lr_scheduler: !name:transformers.get_cosine_schedule_with_warmup
-    num_warmup_steps: !ref <warmup_epochs> * <samples_per_epoch> // <total_batch_size>
-    num_training_steps: !ref <epochs> * <samples_per_epoch> // <total_batch_size>
-
 # Logging 
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
@@ -237,10 +242,10 @@ train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
 # Error computation
 error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
     positive_label: 1
-error_metric: chunk_F-score
+error_metric: comb_avg_F-score
 
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
-    checkpoints_dir: !ref <save_folder>
+    checkpoints_dir: !ref <output_folder>/ckpt
     recoverables:
         embedding_model: !ref <embedding_model>
         classifier: !ref <classifier>
