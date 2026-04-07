@@ -385,8 +385,10 @@ def dataio_prep(hparams):
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
 
+        weight = 1
         # Weight pd and hc differently
-        weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
+        weight *= 0.7 if patient_type_encoded else 1.5
+        weight *= 0.7 if info_dict["sex"] == "M" else 1.5
         yield weight
 
         # Balance on ptype and sex
@@ -425,6 +427,7 @@ def dataio_prep(hparams):
         key="to_balance",
         num_samples=hparams["samples_per_epoch"],
         replacement=True,
+        seed=hparams["seed"],
     )
 
     return datasets

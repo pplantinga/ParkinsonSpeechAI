@@ -352,6 +352,7 @@ def dataio_prep(hparams):
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
 
+        weight = 1
         # Weight PD less since there's more in the data
         weight = 0.7 if patient_type_encoded else 1.5
         weight *= 0.7 if info_dict["sex"] == "M" else 1.5
