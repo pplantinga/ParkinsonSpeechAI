@@ -9,7 +9,7 @@ __set_seed: !apply:torch.manual_seed [!ref <seed>]
 lr_factor: 1
 
 # Save folders and paths
-experiment_name: whisper_mlp_qpn_pitt
+experiment_name: wavlm_mlp_qpn_pitt
 storage_folder: !PLACEHOLDER # where you want to save results ($HOME/scratch/results on compute canada, maybe just results/ on personal machine)
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -75,10 +75,10 @@ test_keep_keys:
 
 # Model parameters
 # For the pretrained_source, use the path to the model dir
-pretrained_source: openai/whisper-small
+pretrained_source: microsoft/wavlm-large
 freeze_pretrained: True
-feature_size: 768
-embedding_size: 768
+feature_size: 1024
+embedding_size: 1280
 dropout: 0.2
 out_neurons: 1
 
@@ -140,22 +140,22 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
 # Models
-#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
-#    source: !ref <pretrained_source>
-#    output_norm: True
-#    freeze_feature_extractor: True
-#    freeze: !ref <freeze_pretrained>
-#    save_path: !ref <output_folder>/wavlm-large
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+    source: !ref <pretrained_source>
+    output_norm: True
+    freeze_feature_extractor: True
+    freeze: !ref <freeze_pretrained>
+    save_path: /home/bcordel/pretrained_models/models--microsoft--wavlm-large/
 
 output_hidden: False
 #whisper_layer: -1
 
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
-    source: !ref <pretrained_source>
-    encoder_only: True
-    output_all_hiddens: !ref <output_hidden>
-    freeze: !ref <freeze_pretrained>
-    save_path: /home/bcordel/pretrained_models/models--openai--whisper-small/
+#compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
+ #   source: !ref <pretrained_source>
+ #   encoder_only: True
+ #   output_all_hiddens: !ref <output_hidden>
+ #   freeze: !ref <freeze_pretrained>
+ #   save_path: /home/bcordel/pretrained_models/models--openai--whisper-small/
 
 #compute_features: !new:speechbrain.lobes.models.huggingface_transformers.hubert.HuBERT
 #    source: !ref <pretrained_source>

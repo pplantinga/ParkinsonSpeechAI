@@ -32,6 +32,7 @@ from speechbrain.dataio.sampler import BalancingDataSampler
 from torch.utils.data import DataLoader
 from torch.nn.functional import binary_cross_entropy
 from tqdm import tqdm
+from sklearn.metrics import roc_auc_score
 
 logger = sb.utils.logger.get_logger("train.py")
 
@@ -57,7 +58,7 @@ class ParkinsonBrain(sb.core.Brain):
         if self.hparams.output_hidden:
             feats = feats[self.hparams.whisper_layer]
 
-        feats = self.modules.mean_var_norm(feats, lens)
+        feats = self.modules.mean_var_norm(feats, lens) if hasattr(self.modules, "mean_var_norm") else feats
 
         # Embeddings + speaker classifier
         embeddings = self.modules.embedding_model(feats)
@@ -106,6 +107,16 @@ class ParkinsonBrain(sb.core.Brain):
             # Combine chunks using two strategies
             combined_avg = self.combine_chunks(how="avg")
 
+            # Score distribution by class
+            pd_scores = [v["combined"] for v in combined_avg.values() if v["label"] == 1]
+            hc_scores = [v["combined"] for v in combined_avg.values() if v["label"] == 0]
+            if pd_scores:
+                logger.info(f"PD scores — mean: {sum(pd_scores)/len(pd_scores):.3f}, "
+                    f"min: {min(pd_scores):.3f}, max: {max(pd_scores):.3f}, n={len(pd_scores)}")
+            if hc_scores:
+                logger.info(f"HC scores — mean: {sum(hc_scores)/len(hc_scores):.3f}, "
+                    f"min: {min(hc_scores):.3f}, max: {max(hc_scores):.3f}, n={len(hc_scores)}")
+
             # Generate overall metrics, using stored threshold for test set
             avg_threshold = None if stage == sb.Stage.VALID else self.avg_threshold
             metrics_comb_avg = self.metrics_by_category(
@@ -146,7 +157,7 @@ class ParkinsonBrain(sb.core.Brain):
                 max_keys=[self.hparams.error_metric],
                 min_keys=["loss"],
             )
-            self.epoch_counter.update_metric(stage_stats["comb_avg_bce"])
+            self.hparams.epoch_counter.update_metric(stage_stats["comb_avg_bce"])
 
         if stage == sb.Stage.TEST:
             self.hparams.train_logger.log_stats(
@@ -244,14 +255,35 @@ class ParkinsonBrain(sb.core.Brain):
 
     def summarize_metrics(self, metrics, threshold):
         """Simplify metrics to round(100 * (P, R, F1)), x-ent, and threshold"""
-        all_metrics = metrics.summarize(threshold=threshold)
+        try:
+             all_metrics = metrics.summarize(threshold=threshold)
+        except ZeroDivisionError:
+            # P=R=0 for this subset; F-score is undefined, treat as 0
+            all_metrics = {
+                "precision": 0.0,
+                "recall": 0.0,
+                "F-score": 0.0,
+                "threshold": threshold if threshold is not None else 0.5,
+            }
+
         target_metrics = ["precision", "recall", "F-score"]
         summary = {k: round(100 * all_metrics[k], 2) for k in target_metrics}
         summary["threshold"] = round(all_metrics["threshold"], 3)
+
+        # Scores/labels may still be valid even when summarize() failed
         cross_ent = binary_cross_entropy(metrics.scores, metrics.labels.float())
         summary["bce"] = round(cross_ent.item(), 3)
-        return summary
+        summary["count"] = len(metrics.ids)
 
+        # AUC (undefined if only one class present in the subset)
+        labels_np = metrics.labels.cpu().numpy()
+        scores_np = metrics.scores.cpu().numpy()
+        if len(set(labels_np)) > 1:
+            summary["auc"] = round(roc_auc_score(labels_np, scores_np), 3) * 100
+        else:
+            summary["auc"] = None
+
+        return summary
 
 def dataio_prep_neuro(hparams):
     """Creates the datasets and their data processing pipelines."""
@@ -292,6 +324,7 @@ def dataio_prep_neuro(hparams):
         # Weight PD less since there's more in the data
         # Weight males less since there are more in the data
         weight = hparams["weight_pd"] if patient_type_encoded else hparams["weight_hc"]
+        weight *= hparams["weight_m"] if info_dict["sex"] == "M" else hparams["weight_f"]
         yield weight
 
         # Balance on ptype and sex
@@ -315,6 +348,16 @@ def dataio_prep_neuro(hparams):
             dynamic_items=[audio_pipeline, label_pipeline],
             output_keys=out_keys,
         )
+
+    for key, values in hparams["train_keep_keys"].items():
+        datasets["pd_train"] = datasets["pd_train"].filtered_sorted(
+            key_test={"info_dict": lambda x: x[key] in values},
+        )
+    for key, values in hparams["test_keep_keys"].items():
+        for dataset in ["pd_valid", "pd_test"]:
+            datasets[dataset] = datasets[dataset].filtered_sorted(
+                key_test={"info_dict": lambda x: x[key] in values},
+            )
 
     hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
         dataset=datasets["pd_train"],
