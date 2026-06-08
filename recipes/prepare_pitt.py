@@ -27,16 +27,14 @@ def prepare_pitt(data_folder, train_annotation, test_annotation, valid_annotatio
     assert os.path.exists(data_folder), "Data folder not found"
 
     data_folder = pathlib.Path(data_folder)
-    data_csv = read_csv(data_folder, "pitt_corpus")
+    pitt_csv = read_csv(data_folder, "pitt_corpus")
 
     # Separate out validation/test sets
     valid_ids = [59, 167, 211, 124, 182, 52, 208, 304, 122, 173, 238, 687, 10, 508, 213, 244]
 
-    valid_gt = data_csv[data_csv["id"].isin(valid_ids)]
-    train_gt = data_csv[~data_csv["id"].isin(valid_ids)]
-
-    test_gt = data_csv[data_csv["test"] == 1]
-    train_gt = data_csv[data_csv["test"] == 0]
+    test_gt  = pitt_csv[pitt_csv["test"] == 1]
+    valid_gt = pitt_csv[(pitt_csv["test"] == 0) &  pitt_csv["id"].isin(valid_ids)]
+    train_gt = pitt_csv[(pitt_csv["test"] == 0) & ~pitt_csv["id"].isin(valid_ids)]
 
     # Create json manifests
     create_json(train_annotation, train_gt, chunk_size, overlap=0)
@@ -86,11 +84,13 @@ def create_json(json_file, ground_truth, chunk_size, transcripts=None, overlap=N
 
         ptype = "Disease" if row["dx"] == "ProbableAD" else "Control"
 
+        rec_stem = pathlib.Path(row["path"]).stem
+
         # Write chunks to dict
         max_start = max(duration - hop_size, 1)
         for i, start in enumerate(np.arange(0, max_start, hop_size)):
             chunk_duration = min(chunk_size, duration - i * hop_size)
-            json_dict[f"{row['id']}_{i}"] = {
+            json_dict[f"pitt_{rec_stem}_{i}"] = {
                 "wav": str(row["path"]),
                 "start": start,
                 "duration": chunk_duration,
