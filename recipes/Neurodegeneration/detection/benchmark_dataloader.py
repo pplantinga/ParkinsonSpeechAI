@@ -137,7 +137,7 @@ def main():
 
     # Sweep num_workers to find the sweet spot
     print(f"\n--- num_workers sweep (10 batches each) ---")
-    for nw in [0, 1, 2, 4, 8]:
+    for nw in [0, 1, 2, 4, 8, 16, 32]:
         if nw > 16:
             continue
         ldr = DataLoader(

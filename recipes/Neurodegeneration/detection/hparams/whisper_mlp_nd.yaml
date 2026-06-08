@@ -74,18 +74,22 @@ out_neurons: 1
 output_hidden: False
 
 # Dataloader options
-num_workers: 8
+num_workers: 16
+prefetch_factor: 4
 train_dataloader_options:
     batch_size: !ref <batch_size>
     num_workers: !ref <num_workers>
+    prefetch_factor: !ref <prefetch_factor>
 
 valid_dataloader_options:
     batch_size: !ref <test_batch_size>
     num_workers: !ref <num_workers>
+    prefetch_factor: !ref <prefetch_factor>
 
 test_dataloader_options:
     batch_size: !ref <test_batch_size>
     num_workers: !ref <num_workers>
+    prefetch_factor: !ref <prefetch_factor>
 
 # Augmentations
 prepare_noise_data: !name:speechbrain.augment.preparation.prepare_dataset_from_URL
