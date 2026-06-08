@@ -559,17 +559,24 @@ def get_delaware_splits(
 
         for pid in pids:
             meta = pid_info[pid]
-            info = {"ptype": ptype, "pid": f"{subfolder}-{pid}"}
-            info.update(meta["demo"])
-            info["visit"] = meta["earliest_visit"]  # recording-derived visit is authoritative
+            is_test = pid in test_pids
+            is_valid = pid in valid_pids
 
-            if pid in test_pids:
-                target = splits["test"]
-            elif pid in valid_pids:
-                target = splits["valid"]
+            if is_test or is_valid:
+                # Evaluation: earliest recording only
+                info = {"ptype": ptype, "pid": f"{subfolder}-{pid}"}
+                info.update(meta["demo"])
+                info["visit"] = meta["earliest_visit"]
+                target = splits["test"] if is_test else splits["valid"]
+                target[meta["earliest_path"]] = info
             else:
-                target = splits["train"]
-            target[meta["earliest_path"]] = info
+                # Training: all available recordings
+                for visit_str, wav_path in files_by_pid[pid]:
+                    demo = class_demo.get((pid, visit_str)) or meta["demo"]
+                    info = {"ptype": ptype, "pid": f"{subfolder}-{pid}"}
+                    info.update(demo)
+                    info["visit"] = visit_str
+                    splits["train"][wav_path] = info
 
     return splits
 
