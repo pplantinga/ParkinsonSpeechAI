@@ -317,7 +317,7 @@ def read_pitt_csv(data_folder, subset):
 
     expanded_rows = []
     for _, row in df.iterrows():
-        subfolder = "control" if row["dx"] == "Control" else "Disease"
+        subfolder = "control" if row["dx"] == "Control" else "dementia"
         base_path = data_folder / subfolder
         id_str = str(row["id"]).zfill(3)
         pattern = f"{id_str}-*.wav"
