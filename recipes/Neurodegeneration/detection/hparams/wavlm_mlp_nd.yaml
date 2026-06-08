@@ -32,7 +32,7 @@ skip_prep: False
 ckpt_interval_minutes: 15
 
 # Noise augmentation data source
-NOISE_DATASET_URL: /home/bcordel/save/noise/data.zip
+NOISE_DATASET_URL: /home/bcordel/projects/aip-ravenelm/bcordel/save/noise/data.zip
 
 # Domain adversarial parameters
 lambda_dann: 0.1
@@ -59,7 +59,7 @@ threshold: 0.5
 
 # Model parameters
 pretrained_source: microsoft/wavlm-large
-pretrained_models_path: /home/bcordel/pretrained_models
+pretrained_models_path: /home/bcordel/scratch/save/pretrained_models/
 freeze_pretrained: True
 feature_size: 1024  # WavLM Large hidden size
 embedding_size: 1024
