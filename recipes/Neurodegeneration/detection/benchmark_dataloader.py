@@ -39,7 +39,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-    overrides_str = " ".join(args.overrides)
+    # hyperpyyaml expects "key: value\nkey: value", not "key=value key=value"
+    overrides_str = "\n".join(o.replace("=", ": ", 1) for o in args.overrides)
 
     with open(args.hparams_file) as f:
         hparams = load_hyperpyyaml(f, overrides_str)
