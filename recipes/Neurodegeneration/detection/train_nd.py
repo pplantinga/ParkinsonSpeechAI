@@ -38,6 +38,24 @@ from sklearn.metrics import roc_auc_score
 
 logger = sb.utils.logger.get_logger("train.py")
 
+
+class GradientReversalLayer(torch.autograd.Function):
+    """Reverses gradients during backward pass, scaling by lambda_.
+
+    Forward pass is identity; backward pass negates and scales the gradient.
+    This makes the embedding model adversarially unlearn dataset identity.
+    """
+    @staticmethod
+    def forward(ctx, x, lambda_):
+        ctx.save_for_backward(torch.tensor(lambda_))
+        return x.clone()
+
+    @staticmethod
+    def backward(ctx, grads):
+        lambda_, = ctx.saved_tensors
+        return -lambda_.item() * grads, None
+
+
 class NdBrain(sb.core.Brain):
     """Class for speaker embedding training"""
 
@@ -58,11 +76,18 @@ class NdBrain(sb.core.Brain):
         # Compute features
         feats = self.modules.compute_features(wavs, lens)
 
-        # Embeddings + speaker classifier
+        # Embeddings + disease classifier
         embeddings = self.modules.embedding_model(feats)
         outputs = self.modules.classifier(embeddings)
 
-        # Outputs
+        # Domain adversarial head: predict dataset from reversed gradients
+        if stage == sb.Stage.TRAIN and hasattr(self.modules, "dataset_classifier"):
+            lambda_ = getattr(self.hparams, "lambda_dann", 0.1)
+            reversed_emb = GradientReversalLayer.apply(
+                embeddings.view(embeddings.shape[0], -1), lambda_
+            )
+            self._domain_logits = self.modules.dataset_classifier(reversed_emb)
+
         return outputs, lens
 
     def compute_objectives(self, outputs, batch, stage):
@@ -79,6 +104,21 @@ class NdBrain(sb.core.Brain):
         # Compute loss
         if stage == sb.Stage.TRAIN:
             loss = self.hparams.bce_loss(outputs, labels)
+
+            # Domain adversarial loss (gradient reversal already applied in forward)
+            if hasattr(self, "_domain_logits"):
+                dataset_ids = torch.tensor(
+                    [self.hparams.dataset_to_id.get(d, 0) for d in batch.dataset],
+                    device=self.device,
+                )
+                if hasattr(self.hparams, "wav_augment"):
+                    dataset_ids = self.hparams.wav_augment.replicate_labels(
+                        dataset_ids.unsqueeze(1)
+                    ).squeeze(1).long()
+                domain_loss = torch.nn.functional.cross_entropy(
+                    self._domain_logits, dataset_ids
+                )
+                loss = loss + getattr(self.hparams, "lambda_dann", 0.1) * domain_loss
 
         # Validation / Test
         else:

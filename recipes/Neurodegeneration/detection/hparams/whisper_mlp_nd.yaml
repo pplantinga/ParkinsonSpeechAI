@@ -1,6 +1,6 @@
 # ################################
-# Model: Dementia identification with WavLM Large + MLP
-# Author: Briac Cordelle
+# Model: Dementia identification with Whisper + MLP
+# Author: Briac Cordelle & Peter Plantinga
 # ################################
 
 # Basic parameters
@@ -8,7 +8,7 @@ seed: 42
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
 
 # Save folders and paths
-experiment_name: wavlm_mlp_qpn_pitt
+experiment_name: whisper_mlp_qpn_pitt
 storage_folder: !PLACEHOLDER
 output_folder: !ref <storage_folder>/<experiment_name>/seed_<seed>
 save_folder: !ref <output_folder>/save
@@ -32,7 +32,14 @@ skip_prep: False
 ckpt_interval_minutes: 15
 
 # Noise augmentation data source
-NOISE_DATASET_URL: /home/bcordel/save/noise/data.zip
+NOISE_DATASET_URL: /home/bcordel/projects/aip-ravenelm/bcordel/save/noise/data.zip
+
+# Domain adversarial parameters
+lambda_dann: 0.1
+dataset_to_id:
+    qpn: 0
+    pitt: 1
+    delaware: 2
 
 # Training parameters
 epochs: 30
@@ -45,17 +52,23 @@ weight_decay: 0.01
 sample_rate: 16000
 chunk_size: 30.0
 loss: bce
+samples_per_epoch: 4096
+
+# Class weights for BCE loss — wire these into bce_loss or a sampler to take effect
+weight_pd: 0.7
+weight_hc: 1.5
+weight_m: 0.7
+weight_f: 1.5
 
 # Test parameters
 test_batch_size: 16
 threshold: 0.5
 
 # Model parameters
-pretrained_source: microsoft/wavlm-large
-pretrained_models_path: /home/bcordel/pretrained_models
+pretrained_source: openai/whisper-small
 freeze_pretrained: True
-feature_size: 1024  # WavLM Large hidden size
-embedding_size: 1024
+feature_size: 768
+embedding_size: 768
 dropout: 0.2
 out_neurons: 1
 output_hidden: False
@@ -105,13 +118,13 @@ wav_augment: !new:speechbrain.augment.augmenter.Augmenter
     augment_prob: 0.95
     augmentations: [!ref <add_noise>, !ref <drop_freq>]
 
-# Feature extractor (WavLM Large encoder)
-compute_features: !new:speechbrain.lobes.models.huggingface_transformers.wavlm.WavLM
+# Feature extractor (Whisper encoder)
+compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper.Whisper
     source: !ref <pretrained_source>
-    output_norm: True
-    freeze_feature_extractor: True
+    encoder_only: True
+    output_all_hiddens: !ref <output_hidden>
     freeze: !ref <freeze_pretrained>
-    save_path: !ref <pretrained_models_path>/models--microsoft--wavlm-large/
+    save_path: /home/bcordel/scratch/save/pretrained_models/models--openai--whisper-small/
 
 # Embedding model: Linear -> Dropout -> LeakyReLU -> AttentionPooling -> Linear -> Dropout -> LeakyReLU
 embedding_model: !new:torch.nn.Sequential
@@ -134,10 +147,17 @@ classifier: !new:speechbrain.lobes.models.ECAPA_TDNN.Classifier
     input_size: !ref <embedding_size>
     out_neurons: !ref <out_neurons>
 
+# Domain adversarial classifier: predicts dataset identity from reversed gradients
+n_datasets: 3
+dataset_classifier: !new:torch.nn.Linear
+    in_features: !ref <embedding_size>
+    out_features: !ref <n_datasets>
+
 modules:
     compute_features: !ref <compute_features>
     embedding_model: !ref <embedding_model>
     classifier: !ref <classifier>
+    dataset_classifier: !ref <dataset_classifier>
 
 # Loss
 bce_loss: !name:speechbrain.nnet.losses.bce_loss
@@ -149,21 +169,21 @@ opt_class: !name:bitsandbytes.optim.Adam8bit
     lr: !ref <lr>
     weight_decay: !ref <weight_decay>
 
-# Epoch counter — direction: min because we checkpoint on bce
+# Epoch counter — direction: min because we checkpoint on loss
 epoch_counter: !new:speechbrain.utils.epoch_loop.EpochCounterWithStopper
     limit: !ref <epochs>
     limit_to_stop: 3
     limit_warmup: 20
-    direction: min
+    direction: max
 
 # Logging
 train_logger: !new:speechbrain.utils.train_logger.FileTrainLogger
     save_file: !ref <train_log>
 
-# Error metric — used as max_key in evaluate() and save_and_keep_only()
+# Error metric
 error_stats: !name:speechbrain.utils.metric_stats.BinaryMetricStats
     positive_label: 1
-error_metric: comb_avg_bce
+error_metric: comb_avg_auc
 
 # Checkpointer
 checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
@@ -171,4 +191,5 @@ checkpointer: !new:speechbrain.utils.checkpoints.Checkpointer
     recoverables:
         embedding_model: !ref <embedding_model>
         classifier: !ref <classifier>
+        dataset_classifier: !ref <dataset_classifier>
         counter: !ref <epoch_counter>
