@@ -15,7 +15,6 @@ save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 predictions_file: !ref <output_folder>/predictions.csv
 encoded_labels: !ref <save_folder>/label_encoder.txt
-wav_cache_dir: !apply:os.environ.get [SLURM_TMPDIR, /tmp]
 
 # Data files
 qpn_data_path: !PLACEHOLDER

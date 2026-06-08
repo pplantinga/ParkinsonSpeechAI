@@ -108,6 +108,7 @@ class NdBrain(sb.core.Brain):
         else:
             # Combine chunks
             combined_avg = self.combine_chunks(how="avg")
+            self._log_score_distribution(combined_avg, stage, epoch)
 
             # Build a metrics object over the combined (utt-level) scores
             avg_threshold = None if stage == sb.Stage.VALID else self.avg_threshold
@@ -192,6 +193,30 @@ class NdBrain(sb.core.Brain):
         """Update scheduler if an update was made."""
         if should_step and hasattr(self.hparams, "lr_scheduler"):
             self.lr_scheduler.step()
+
+    def _log_score_distribution(self, combined_avg, stage, epoch):
+        """Log mean predicted score ± std per (dataset, ptype) cell."""
+        buckets = collections.defaultdict(list)
+        for entry in combined_avg.values():
+            key = (entry.get("dataset", "?"), entry.get("ptype", "?"))
+            buckets[key].append(entry["combined"])
+
+        stage_name = "valid" if stage == sb.Stage.VALID else "test"
+        epoch_str = f" epoch {epoch}" if epoch is not None else ""
+        lines = [f"[{stage_name}{epoch_str}] score distribution (Disease=1, Control=0)"]
+
+        for ds in sorted({ds for ds, _ in buckets}):
+            for pt in ("Control", "Disease"):
+                scores = buckets.get((ds, pt), [])
+                if not scores:
+                    continue
+                mean = sum(scores) / len(scores)
+                std = (sum((s - mean) ** 2 for s in scores) / len(scores)) ** 0.5
+                lines.append(
+                    f"  {str(ds):<10} {pt:<8}  mean={mean:.3f}  std={std:.3f}  n={len(scores)}"
+                )
+
+        logger.info("\n".join(lines))
 
     def combine_chunks(self, how="avg"):
         """Aggregates predictions made on all individual chunks"""
@@ -370,7 +395,6 @@ if __name__ == "__main__":
             "test_annotation": hparams["test_annotation"],
             "valid_annotation": hparams["valid_annotation"],
             "chunk_size": hparams["chunk_size"],
-            "wav_cache_dir": hparams["wav_cache_dir"],
         },
     )
     sb.utils.distributed.run_on_main(hparams["prepare_noise_data"])

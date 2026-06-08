@@ -9,44 +9,6 @@ import pandas
 import soundfile as sf
 import collections
 
-def convert_audio_to_wav(json_dict, wav_cache_dir, sample_rate=16000):
-    """Decode every unique source file once to a 16 kHz mono wav so that
-    per-chunk loads become O(1) seeks instead of mp3 decode-from-zero.
-
-    Rewrites each entry's 'wav' field in place to point at the cached wav.
-    Idempotent: skips files already converted.
-    """
-    import torchaudio
-
-    os.makedirs(wav_cache_dir, exist_ok=True)
-
-    # Unique source files (many chunks share one file)
-    src_files = {entry["wav"] for entry in json_dict.values()}
-    path_map = {}
-
-    for src in src_files:
-        # Stable cache name from the full source path, preserving uniqueness
-        # across datasets/dirs that may share a basename.
-        stem = pathlib.Path(src).stem
-        digest = str(abs(hash(src)) % (10 ** 8))
-        dst = os.path.join(wav_cache_dir, f"{stem}_{digest}.wav")
-
-        if not os.path.exists(dst):
-            sig, fs = torchaudio.load(src)          # full decode, once
-            if sig.shape[0] > 1:                    # stereo -> mono
-                sig = sig.mean(dim=0, keepdim=True)
-            if fs != sample_rate:                   # resample if needed
-                sig = torchaudio.functional.resample(sig, fs, sample_rate)
-            torchaudio.save(dst, sig, sample_rate)
-
-        path_map[src] = dst
-
-    # Repoint manifest entries at the cached wavs
-    for entry in json_dict.values():
-        entry["wav"] = path_map[entry["wav"]]
-
-    return json_dict
-
 def summarize_split(json_dict, split_name):
     """Print per-dataset, per-class utterance and chunk counts for a split.
 
@@ -148,11 +110,10 @@ def prepare_nd(
     test_annotation,
     valid_annotation,
     chunk_size,
-    wav_cache_dir,
     delaware_demographics_path=None,
     delaware_split_seed=42,
-    delaware_valid_frac=0.15,
-    delaware_test_frac=0.15,
+    delaware_n_valid=8,
+    delaware_n_test=8,
 ):
     """
     Build combined train/valid/test JSON manifests from the QPN, Pitt and
@@ -174,8 +135,10 @@ def prepare_nd(
         `delaware_data_path` is auto-detected.
     :param delaware_split_seed: RNG seed for the Delaware patient-level
         train/valid/test split. Same seed + same patient set => same split.
-    :param delaware_valid_frac: fraction of patients (per class) for valid.
-    :param delaware_test_frac: fraction of patients (per class) for test.
+    :param delaware_n_valid: total number of patients in the valid split
+        (balanced 50/50 across sex and ptype, so must be divisible by 4).
+    :param delaware_n_test: total number of patients in the test split
+        (balanced 50/50 across sex and ptype, so must be divisible by 4).
     """
     assert os.path.exists(qpn_data_path), "QPN data folder not found"
     assert os.path.exists(pitt_data_path), "Pitt data folder not found"
@@ -206,8 +169,8 @@ def prepare_nd(
     delaware_splits = get_delaware_splits(
         delaware_data_path,
         demographics=delaware_demographics,
-        valid_frac=delaware_valid_frac,
-        test_frac=delaware_test_frac,
+        n_valid=delaware_n_valid,
+        n_test=delaware_n_test,
         seed=delaware_split_seed,
     )
 
@@ -218,7 +181,6 @@ def prepare_nd(
         pitt_train_gt,
         delaware_splits["train"],
         chunk_size,
-        wav_cache_dir=os.path.join(wav_cache_dir, "train"),
         overlap=None,
         pitt_overlap=None,
         delaware_overlap=None,
@@ -229,7 +191,6 @@ def prepare_nd(
         pitt_test_gt,
         delaware_splits["test"],
         chunk_size,
-        wav_cache_dir=os.path.join(wav_cache_dir, "test"),
         overlap=None,
         pitt_overlap=None,
         delaware_overlap=None,
@@ -240,7 +201,6 @@ def prepare_nd(
         pitt_valid_gt,
         delaware_splits["valid"],
         chunk_size,
-        wav_cache_dir=os.path.join(wav_cache_dir, "valid"),
         overlap=0,
         pitt_overlap=0,
         delaware_overlap=0,
@@ -360,12 +320,12 @@ def read_pitt_csv(data_folder, subset):
         subfolder = "control" if row["dx"] == "Control" else "Disease"
         base_path = data_folder / subfolder
         id_str = str(row["id"]).zfill(3)
-        pattern = f"{id_str}-*.mp3"
+        pattern = f"{id_str}-*.wav"
         recording_files = sorted(glob.glob(str(base_path / pattern)))
 
         # For test set, only keep the first recording (-0)
         if row["test"] == 1:
-            recording_files = [f for f in recording_files if f.endswith("-0.mp3")]
+            recording_files = [f for f in recording_files if f.endswith("-0.wav")]
 
         for rec_path in recording_files:
             new_row = row.copy()
@@ -490,30 +450,25 @@ def load_delaware_demographics(excel_path):
 
 
 def get_delaware_splits(
-    data_folder, demographics=None, valid_frac=0.15, test_frac=0.15, seed=42
+    data_folder, demographics=None, n_valid=8, n_test=8, seed=42
 ):
     """
     Walk the Delaware folder layout (MCI/<pid>-<rec>.wav,
     Control/<pid>-<rec>.wav), keep the EARLIEST available recording per
     patient, attach per-visit demographics, and bucket patients into
-    train/valid/test with a deterministic stratified split.
+    train/valid/test with a deterministic sex-and-ptype-balanced split.
 
-    Recording selection: the filename's <rec> is the visit/appointment
-    number. Some appointment-1 recordings are lost, so we take the lowest
-    available number per patient (which may be 2+). Demographics are then
-    looked up by (pid, visit) within the SAME class so that a Control and
-    an MCI patient sharing a RECORD ID never get crossed.
-
-    Within each class, patient IDs are sorted then shuffled with a per-class
-    seed. The first `test_frac` go to test, the next `valid_frac` to valid,
-    the rest to train. All (now single) recordings of a patient land in the
-    same split. Fully reproducible for a fixed patient set + seed.
+    Exactly n_valid patients go to valid and n_test patients go to test,
+    balanced 50/50 across both sex (M/F) and ptype (MCI/Control). Each
+    (ptype, sex) cell gets n_valid // 4 and n_test // 4 patients. Patients
+    with unknown sex or that exceed the balanced quota go to train.
 
     :param data_folder: path to the Delaware dataset root
     :param demographics: dict from load_delaware_demographics(), or None
-    :param valid_frac: fraction of patients per class assigned to valid
-    :param test_frac: fraction of patients per class assigned to test
-    :param seed: RNG seed for the patient shuffle
+    :param n_valid: total number of patients in the valid split; must be
+        divisible by 4 for a perfectly balanced (ptype × sex) grid
+    :param n_test: total number of patients in the test split; same constraint
+    :param seed: RNG seed for the patient shuffle within each sex group
     :return: dict {'train'/'valid'/'test': {audio_path: info_dict}}
     """
     import random
@@ -521,6 +476,10 @@ def get_delaware_splits(
     data_folder = pathlib.Path(data_folder)
     demographics = demographics or {}
     splits = {"train": {}, "valid": {}, "test": {}}
+
+    # n_valid // 4 and n_test // 4 patients per (class, sex) cell
+    n_valid_per_cell = n_valid // 4
+    n_test_per_cell = n_test // 4
 
     for subfolder, ptype in [("MCI", "Disease"), ("Control", "Control")]:
         sub_path = data_folder / subfolder
@@ -532,7 +491,7 @@ def get_delaware_splits(
 
         # Group files by patient id -> list of (visit_str, wav_path)
         files_by_pid = {}
-        for wav_path in sorted(glob.glob(str(sub_path / "*.mp3"))):
+        for wav_path in sorted(glob.glob(str(sub_path / "*.wav"))):
             stem = pathlib.Path(wav_path).stem  # e.g. "12-3"
             try:
                 pid, rec = stem.split("-", 1)
@@ -541,28 +500,12 @@ def get_delaware_splits(
                 continue
             files_by_pid.setdefault(pid, []).append((_norm_visit(rec), wav_path))
 
-        # Deterministic stratified patient-level split.
-        pids = sorted(files_by_pid.keys())
-        rng = random.Random(f"{seed}-{subfolder}")
-        rng.shuffle(pids)
-
-        n = len(pids)
-        n_test = int(round(n * test_frac))
-        n_valid = int(round(n * valid_frac))
-        test_pids = set(pids[:n_test])
-        valid_pids = set(pids[n_test:n_test + n_valid])
-        # remaining pids go to train
-
-        for pid, recs in files_by_pid.items():
-            # Earliest available appointment (lowest visit number present).
-            earliest_visit, earliest_path = min(
-                recs, key=lambda vr: _visit_sort_key(vr[0])
-            )
-
-            # Per-visit demographics, scoped to this class.
+        # Resolve demographics for each patient at their earliest recorded visit.
+        def _resolve_demo(pid):
+            recs = files_by_pid[pid]
+            earliest_visit, _ = min(recs, key=lambda vr: _visit_sort_key(vr[0]))
             demo = class_demo.get((pid, earliest_visit))
             if demo is None and class_demo:
-                # Fallback: earliest visit present in the Excel for this pid.
                 pid_visits = sorted(
                     (v for (p, v) in class_demo if p == pid),
                     key=_visit_sort_key,
@@ -573,11 +516,52 @@ def get_delaware_splits(
                           f"visit={earliest_visit}, using visit={pid_visits[0]}")
                 else:
                     print(f"[delaware] {subfolder} pid={pid}: no demographics found")
-            demo = demo or {}
+            return demo or {}, earliest_visit
 
-            info = {"ptype": ptype, "pid": pid}
-            info.update(demo)            # age, sex, l1, moca, test_date, visit
-            info["visit"] = earliest_visit  # recording-derived visit is authoritative
+        pids = sorted(files_by_pid.keys())
+
+        # Collect (demo, earliest_visit, earliest_path) per pid.
+        pid_info = {}
+        for pid in pids:
+            demo, earliest_visit = _resolve_demo(pid)
+            earliest_path = min(
+                files_by_pid[pid], key=lambda vr: _visit_sort_key(vr[0])
+            )[1]
+            pid_info[pid] = {
+                "sex": demo.get("sex"),
+                "earliest_visit": earliest_visit,
+                "earliest_path": earliest_path,
+                "demo": demo,
+            }
+
+        # Sex-stratified shuffle within this class.
+        male_pids = [p for p in pids if pid_info[p]["sex"] == "M"]
+        female_pids = [p for p in pids if pid_info[p]["sex"] == "F"]
+
+        rng = random.Random(f"{seed}-{subfolder}")
+        rng.shuffle(male_pids)
+        rng.shuffle(female_pids)
+
+        need = n_valid_per_cell + n_test_per_cell
+        if len(male_pids) < need:
+            print(f"[delaware] {subfolder}: only {len(male_pids)} male patients, "
+                  f"need {need} for balanced split")
+        if len(female_pids) < need:
+            print(f"[delaware] {subfolder}: only {len(female_pids)} female patients, "
+                  f"need {need} for balanced split")
+
+        valid_pids = set(
+            male_pids[:n_valid_per_cell] + female_pids[:n_valid_per_cell]
+        )
+        test_pids = set(
+            male_pids[n_valid_per_cell:need] + female_pids[n_valid_per_cell:need]
+        )
+
+        for pid in pids:
+            meta = pid_info[pid]
+            info = {"ptype": ptype, "pid": f"{subfolder}-{pid}"}
+            info.update(meta["demo"])
+            info["visit"] = meta["earliest_visit"]  # recording-derived visit is authoritative
 
             if pid in test_pids:
                 target = splits["test"]
@@ -585,7 +569,7 @@ def get_delaware_splits(
                 target = splits["valid"]
             else:
                 target = splits["train"]
-            target[earliest_path] = info
+            target[meta["earliest_path"]] = info
 
     return splits
 
@@ -611,7 +595,6 @@ def create_combined_json(
     pitt_ground_truth,
     delaware_path_type_dict,
     chunk_size,
-    wav_cache_dir,
     overlap=None,
     pitt_overlap=None,
     delaware_overlap=None,
@@ -634,9 +617,6 @@ def create_combined_json(
     _add_delaware_entries(
         json_dict, delaware_path_type_dict, chunk_size, delaware_overlap
     )
-
-    # Convert all source audio to seekable 16 kHz mono wav once.
-    convert_audio_to_wav(json_dict, wav_cache_dir, sample_rate=16000)
 
     with open(json_file, mode="w") as json_f:
         json_dict = convert_to_python(json_dict)
@@ -699,7 +679,7 @@ def _add_pitt_entries(json_dict, ground_truth, chunk_size, overlap):
         audioinfo = sf.info(row["path"])
         duration = audioinfo.frames / audioinfo.samplerate
 
-        ptype = "Disease" if row["dx"] == "ProbableAD" else "Control"
+        ptype = "Control" if row["dx"] == "Control" else "Disease"
 
         info_dict = _empty_info()
         info_dict.update({
