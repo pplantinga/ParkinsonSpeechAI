@@ -32,7 +32,7 @@ skip_prep: False
 ckpt_interval_minutes: 15
 
 # Noise augmentation data source
-NOISE_DATASET_URL: /home/bcordel/projects/aip-ravenelm/bcordel/save/noise/data.zip
+NOISE_DATASET_URL: /home/bcordel/projects/aip-ravanelm/bcordel/save/noise/data.zip
 
 # Domain adversarial parameters
 lambda_dann: 0.1
@@ -124,7 +124,7 @@ compute_features: !new:speechbrain.lobes.models.huggingface_transformers.whisper
     encoder_only: True
     output_all_hiddens: !ref <output_hidden>
     freeze: !ref <freeze_pretrained>
-    save_path: /home/bcordel/scratch/save/pretrained_models/models--openai--whisper-small/
+    save_path: /home/bcordel/projects/aip-ravanelm/bcordel/save/pretrained_models/models--openai--whisper-small/
 
 # Embedding model: Linear -> Dropout -> LeakyReLU -> AttentionPooling -> Linear -> Dropout -> LeakyReLU
 embedding_model: !new:torch.nn.Sequential
