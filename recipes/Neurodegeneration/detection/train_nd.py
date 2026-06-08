@@ -331,7 +331,7 @@ def dataio_prep(hparams):
     # Define label pipeline:
     @sb.utils.data_pipeline.takes("info_dict")
     @sb.utils.data_pipeline.provides(
-        "patient_type", "patient_type_encoded", "dataset"
+        "patient_type", "patient_type_encoded", "dataset", "dataset_ptype"
     )
     def label_pipeline(info_dict):
         """Defines the pipeline to process the patient type labels.
@@ -342,6 +342,7 @@ def dataio_prep(hparams):
         patient_type_encoded = label_encoder.encode_label_torch(info_dict["ptype"])
         yield patient_type_encoded
         yield info_dict["dataset"]
+        yield f"{info_dict['dataset']}_{info_dict['ptype']}"
 
     # Define datasets. We also connect the dataset with the data processing
     # functions defined above.
@@ -352,7 +353,7 @@ def dataio_prep(hparams):
         "test": hparams["test_annotation"],
     }
 
-    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "dataset"]
+    out_keys = ["id", "sig", "patient_type_encoded", "info_dict", "dataset", "dataset_ptype"]
     for dataset in train_info:
         datasets[dataset] = sb.dataio.dataset.DynamicItemDataset.from_json(
             json_path=train_info[dataset],
@@ -362,7 +363,7 @@ def dataio_prep(hparams):
 
     hparams["train_dataloader_options"]["sampler"] = BalancingDataSampler(
         dataset=datasets["train"],
-        key="dataset",
+        key="dataset_ptype",
         num_samples=hparams["samples_per_epoch"],
         replacement=True,
     )
