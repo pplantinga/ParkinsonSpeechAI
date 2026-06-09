@@ -52,7 +52,7 @@ weight_decay: 0.01
 sample_rate: 16000
 chunk_size: 30.0
 loss: bce
-samples_per_epoch: 4096
+samples_per_epoch: 8192
 
 # Class weights for BCE loss — wire these into bce_loss or a sampler to take effect
 weight_pd: 0.7
