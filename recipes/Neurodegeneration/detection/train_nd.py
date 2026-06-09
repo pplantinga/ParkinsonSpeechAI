@@ -12,6 +12,7 @@ Author
     * Briac Cordelle 2026
 """
 
+import math
 import os
 import random
 import sys
@@ -80,9 +81,15 @@ class NdBrain(sb.core.Brain):
         embeddings = self.modules.embedding_model(feats)
         outputs = self.modules.classifier(embeddings)
 
-        # Domain adversarial head: predict dataset from reversed gradients
+        # Domain adversarial head: predict dataset from reversed gradients.
+        # Lambda ramps from 0 → lambda_dann using the DANN schedule so the
+        # disease classifier establishes a foothold before domain confusion
+        # pressure builds. Without the ramp a fixed lambda collapses the
+        # embedding to a constant in early training.
         if stage == sb.Stage.TRAIN and hasattr(self.modules, "dataset_classifier"):
-            lambda_ = getattr(self.hparams, "lambda_dann", 0.1)
+            p = self.hparams.epoch_counter.current / max(self.hparams.epochs, 1)
+            lambda_max = getattr(self.hparams, "lambda_dann", 0.1)
+            lambda_ = lambda_max * (2.0 / (1.0 + math.exp(-10.0 * p)) - 1.0)
             reversed_emb = GradientReversalLayer.apply(
                 embeddings.view(embeddings.shape[0], -1), lambda_
             )

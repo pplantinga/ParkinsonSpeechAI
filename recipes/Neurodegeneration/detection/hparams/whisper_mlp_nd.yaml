@@ -35,7 +35,7 @@ ckpt_interval_minutes: 15
 NOISE_DATASET_URL: /home/bcordel/projects/aip-ravanelm/bcordel/save/noise/data.zip
 
 # Domain adversarial parameters
-lambda_dann: 0.1
+lambda_dann: 0.05
 dataset_to_id:
     qpn: 0
     pitt: 1
